@@ -20,10 +20,12 @@ public class CustomerController {
             @RequestParam String password,
             @RequestParam(required = false) String house_number,
             @RequestParam String street,
-            @RequestParam String city,
+            @RequestParam String area,             // ✅ changed from city
             @RequestParam String postalCode,
             @RequestParam String phone,
-            @RequestParam String preferred_store
+            @RequestParam(required = false) String phone2,
+            @RequestParam String preferred_store,
+            @RequestParam(required = false) String complex_name
     ) {
         Customer customer = new Customer();
         customer.setName(name);
@@ -31,13 +33,16 @@ public class CustomerController {
         customer.setPassword(password);
         customer.setHouseNumber(house_number);
         customer.setStreet(street);
-        customer.setCity(city);
+        customer.setArea(area);                   // ✅ area
         customer.setPostalCode(postalCode);
-        customer.setPhone(phone);
+        customer.setPhone(phone);                 // phone1
+        customer.setPhone2(phone2);               // optional
         customer.setPreferredStore(preferred_store);
+        customer.setComplexName(complex_name);   // optional
+        customer.setLastOrderedAt(java.time.LocalDateTime.now());
 
-        customerRepository.save(customer); // ← writes to DB
+        customerRepository.save(customer);
 
-        return "redirect:/"; // redirect to index page
+        return "redirect:/";  // go to index after registration
     }
 }

@@ -22,7 +22,7 @@ public class CustomerService {
                                      String phone2,
                                      String houseNumber,
                                      String street,
-                                     String city,
+                                     String area,
                                      String complex,
                                      String preferredStore,
                                      String postalCode) {
@@ -30,17 +30,17 @@ public class CustomerService {
         Customer customer = new Customer();
         customer.setName(name);
         customer.setEmail(email);
-        customer.setPhone(phone);
+        customer.setPhone(phone);       // phone1
         customer.setPhone2(phone2);
         customer.setHouseNumber(houseNumber);
         customer.setStreet(street);
-        customer.setCity(city);
+        customer.setArea(area);         // ✅ area
         customer.setComplexName(complex);
         customer.setPreferredStore(preferredStore);
         customer.setPostalCode(postalCode);
         customer.setLastOrderedAt(LocalDateTime.now());
 
-        return customerRepository.save(customer); // ← this inserts into DB
+        return customerRepository.save(customer); // inserts into DB
     }
 
     public List<Customer> getAllCustomers() {

@@ -19,9 +19,14 @@ public class Customer {
     private String houseNumber;
 
     private String street;
-    private String city;
 
+    @Column(name = "area")      // Changed from city to area
+    private String area;
+
+    @Column(name = "phone1")    // phone1
     private String phone;
+
+    @Column(name = "phone2")    // phone2
     private String phone2;
 
     @Column(name = "postal_code")
@@ -33,16 +38,15 @@ public class Customer {
     @Column(name = "last_ordered_at")
     private LocalDateTime lastOrderedAt;
 
-    @Column(name = "complex_name")  // maps this field to the DB column complex_name
+    @Column(name = "complex_name")
     private String complexName;
-
-    private String area;
 
     // Default constructor
     public Customer() {}
 
-    // Getters & Setters
+    // Getters & setters
     public Long getId() { return id; }
+
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
@@ -58,8 +62,8 @@ public class Customer {
     public String getStreet() { return street; }
     public void setStreet(String street) { this.street = street; }
 
-    public String getCity() { return city; }
-    public void setCity(String city) { this.city = city; }
+    public String getArea() { return area; }
+    public void setArea(String area) { this.area = area; }
 
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
@@ -78,7 +82,4 @@ public class Customer {
 
     public String getComplexName() { return complexName; }
     public void setComplexName(String complexName) { this.complexName = complexName; }
-
-    public String getArea() { return area; }
-    public void setArea(String area) { this.area = area; }
 }
