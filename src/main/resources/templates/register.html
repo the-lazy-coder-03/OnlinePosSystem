@@ -75,7 +75,7 @@
         input[type="text"],
         input[type="email"],
         input[type="password"],
-        input[type="number"] {
+        select {
             padding: 10px;
             margin: 8px 0;
             border-radius: 5px;
@@ -141,11 +141,24 @@
         <input type="text" name="name" placeholder="Full Name" required>
         <input type="email" name="email" placeholder="Email Address" required>
         <input type="password" name="password" placeholder="Password" required>
+
+        <!-- House/Complex optional -->
+        <input type="text" name="house_number" id="house_number" placeholder="House / Apartment Number / Complex Name">
+
         <input type="text" name="street" id="street" placeholder="Street Address" required>
-        <input type="text" name="number" id="number" placeholder="House / Apartment Number" required>
         <input type="text" name="city" id="city" placeholder="City" required>
         <input type="text" name="postalCode" id="postalCode" placeholder="Postal Code" required>
         <input type="text" name="phone" placeholder="Phone Number" required>
+
+        <!-- Preferred Store Dropdown -->
+        <label for="preferredStore">Preferred Store:</label>
+        <select name="preferred_store" id="preferredStore" required>
+            <option value="">Select a store</option>
+            <option value="Kenridge Branch">Kenridge Branch</option>
+            <option value="Uitzicht Branch">Uitzicht Branch</option>
+
+        </select>
+
         <button type="button" id="locationBtn">Use My Current Location</button>
         <button type="submit">Register</button>
     </form>
@@ -169,13 +182,12 @@
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
 
-        // Use Nominatim API to get full address including house number
         fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`)
             .then(response => response.json())
             .then(data => {
                 if(data.address) {
                     document.getElementById("street").value = data.address.road || "";
-                    document.getElementById("number").value = data.address.house_number || "";
+                    document.getElementById("house_number").value = data.address.house_number || "";
                     document.getElementById("city").value = data.address.city || data.address.town || data.address.village || "";
                     document.getElementById("postalCode").value = data.address.postcode || "";
                 }
