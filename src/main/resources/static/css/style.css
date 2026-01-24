@@ -7,13 +7,13 @@
 
 body {
     font-family: 'Arial', sans-serif;
-    background-color: #fff5e6;
+    background-color: #e6f0ff; /* light blue background */
     color: #333;
     line-height: 1.6;
 }
 
 header {
-    background-color: #ff4d4d;
+    background-color: #3366ff; /* strong blue */
     color: white;
     padding: 20px;
     text-align: center;
@@ -37,31 +37,32 @@ nav {
 
 nav a {
     text-decoration: none;
-    color: #ff4d4d;
+    color: #3366ff;
     font-weight: bold;
     padding: 10px 20px;
-    border: 2px solid #ff4d4d;
+    border: 2px solid #3366ff;
     border-radius: 5px;
     transition: all 0.3s;
 }
 
 nav a:hover {
-    background-color: #ff4d4d;
+    background-color: #3366ff;
     color: white;
 }
 
+/* Removed #specials section if not needed, but keeping colors in case used */
 section#specials {
     max-width: 800px;
     margin: 0 auto 40px auto;
     padding: 20px;
-    background-color: #fff0d9;
+    background-color: #cce0ff; /* light blue background */
     border-radius: 10px;
 }
 
 section#specials h2 {
     text-align: center;
     margin-bottom: 20px;
-    color: #ff4d4d;
+    color: #3366ff; /* header blue */
 }
 
 section#specials ul {
@@ -71,12 +72,12 @@ section#specials ul {
 
 section#specials li {
     padding: 10px 0;
-    border-bottom: 1px solid #ffb366;
+    border-bottom: 1px solid #99c2ff; /* lighter blue for lines */
 }
 
 footer {
     text-align: center;
     padding: 20px;
-    background-color: #ff4d4d;
+    background-color: #3366ff; /* strong blue */
     color: white;
 }

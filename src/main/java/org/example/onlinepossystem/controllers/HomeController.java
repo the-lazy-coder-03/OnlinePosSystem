@@ -8,6 +8,11 @@ public class HomeController {
 
     @GetMapping("/")
     public String index() {
-        return "index"; // points to templates/index.html
+        return "index"; // maps to templates/index.html
+    }
+
+    @GetMapping("/register")
+    public String register() {
+        return "register"; // maps to templates/register.html
     }
 }
