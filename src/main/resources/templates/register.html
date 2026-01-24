@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Register</title>
+</head>
+<body>
+<h2>Create Account</h2>
+<form action="/register" method="post">
+    <label>Name: <input type="text" name="name" required></label><br>
+    <label>Email: <input type="email" name="email" required></label><br>
+    <label>Phone 1: <input type="text" name="phone1"></label><br>
+    <label>Phone 2: <input type="text" name="phone2"></label><br>
+    <label>House Number: <input type="text" name="houseNumber" required></label><br>
+    <label>Street: <input type="text" name="street" required></label><br>
+    <label>Area: <input type="text" name="area" required></label><br>
+    <label>Complex: <input type="text" name="complex"></label><br>
+    <button type="submit">Register</button>
+</form>
+</body>
+</html>
