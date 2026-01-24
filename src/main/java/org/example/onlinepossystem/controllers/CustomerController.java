@@ -1,7 +1,7 @@
 package org.example.onlinepossystem.controllers;
 
 import org.example.onlinepossystem.entity.Customer;
-import org.example.onlinepossystem.repository.customerRepository;
+import org.example.onlinepossystem.repository.CustomerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class CustomerController {
 
     @Autowired
-    private customerRepository customerRepository;
+    private CustomerRepository customerRepository;
 
     @PostMapping("/register")
     public String handleRegister(
@@ -36,9 +36,8 @@ public class CustomerController {
         customer.setPhone(phone);
         customer.setPreferredStore(preferred_store);
 
-        customerRepository.save(customer);
+        customerRepository.save(customer); // ← writes to DB
 
-        // Redirect to index page after registration
-        return "redirect:/";
+        return "redirect:/"; // redirect to index page
     }
 }

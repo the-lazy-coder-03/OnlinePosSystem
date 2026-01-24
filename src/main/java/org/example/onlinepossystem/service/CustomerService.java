@@ -1,7 +1,7 @@
 package org.example.onlinepossystem.service;
 
 import org.example.onlinepossystem.entity.Customer;
-import org.example.onlinepossystem.repository.customerRepository;
+import org.example.onlinepossystem.repository.CustomerRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -10,9 +10,9 @@ import java.util.List;
 @Service
 public class CustomerService {
 
-    private final customerRepository customerRepository;
+    private final CustomerRepository customerRepository;
 
-    public CustomerService(customerRepository customerRepository) {
+    public CustomerService(CustomerRepository customerRepository) {
         this.customerRepository = customerRepository;
     }
 
