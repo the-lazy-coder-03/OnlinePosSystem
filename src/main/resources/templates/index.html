@@ -165,7 +165,9 @@
 </header>
 
 <sec:authorize access="isAuthenticated()">
-    <div id="logged-in">You are logged in</div>
+    <div id="logged-in" th:if="${customerName != null}">
+        Welcome back, <span th:text="${customerName}">User</span>!
+    </div>
 </sec:authorize>
 <nav>
     <div class="nav-links">

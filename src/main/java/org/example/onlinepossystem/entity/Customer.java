@@ -20,13 +20,13 @@ public class Customer {
 
     private String street;
 
-    @Column(name = "area")      // Changed from city to area
+    @Column(name = "area")
     private String area;
 
-    @Column(name = "phone1")    // phone1
-    private String phone;
+    @Column(name = "phone1")
+    private String phone1;   // ✅ field name matches repository method
 
-    @Column(name = "phone2")    // phone2
+    @Column(name = "phone2")
     private String phone2;
 
     @Column(name = "postal_code")
@@ -44,7 +44,7 @@ public class Customer {
     // Default constructor
     public Customer() {}
 
-    // Getters & setters
+    // Getters & Setters
     public Long getId() { return id; }
 
     public String getName() { return name; }
@@ -65,8 +65,8 @@ public class Customer {
     public String getArea() { return area; }
     public void setArea(String area) { this.area = area; }
 
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
+    public String getPhone1() { return phone1; }
+    public void setPhone1(String phone1) { this.phone1 = phone1; }
 
     public String getPhone2() { return phone2; }
     public void setPhone2(String phone2) { this.phone2 = phone2; }

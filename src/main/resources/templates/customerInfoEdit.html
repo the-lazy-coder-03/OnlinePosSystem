@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Account Details — Pete’s Pizza</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #e6f0ff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: #3366ff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        header h1 { font-size: 3em; margin: 0; }
+        header p { font-size: 1.2em; margin: 5px 0; }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            margin: 20px auto;
+            max-width: 1000px;
+            gap: 20px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            max-height: 600px;
+            padding: 20px;
+        }
+
+        .sidebar h3 {
+            color: #3366ff;
+            margin-bottom: 15px;
+        }
+
+        .sidebar button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 5px;
+            background: #f0f0f0;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.3s;
+        }
+
+        .sidebar button.active, .sidebar button:hover {
+            background: #3366ff;
+            color: white;
+        }
+
+        .sidebar .back-btn {
+            background: #ff9900;
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 600px;
+        }
+
+        .content h2 {
+            color: #3366ff;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"], input[type="email"], input[type="password"], select {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button.save-btn {
+            background: #3366ff;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        button.save-btn:hover {
+            background-color: #254eda;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f0f0f0;
+        }
+
+        .message {
+            color: green;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Pete’s Pizza</h1>
+    <p>Kenridge & Uitzicht Branch</p>
+</header>
+
+<div class="main-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <button class="back-btn" onclick="goBack()">← Back to Home</button>
+        <h3>Account Menu</h3>
+        <button class="tab-btn active" data-tab="profile">Edit Profile</button>
+        <button class="tab-btn" data-tab="orders">Past Orders</button>
+    </div>
+
+    <!-- Content Area -->
+    <div class="content">
+        <!-- Profile Tab -->
+        <div class="tab-content" id="profile">
+            <h2>Edit Profile</h2>
+            <form id="profileForm">
+                <input type="text" id="name" placeholder="Full Name" required>
+                <input type="email" id="email" placeholder="Email Address" required>
+                <input type="password" id="password" placeholder="Password" required>
+
+                <input type="text" id="houseNumber" placeholder="House / Apartment Number / Complex Name">
+                <input type="text" id="street" placeholder="Street Address">
+                <input type="text" id="area" placeholder="Area / Suburb">
+                <input type="text" id="city" placeholder="City">
+                <input type="text" id="postalCode" placeholder="Postal Code">
+
+                <label for="preferredStore">Preferred Store:</label>
+                <select id="preferredStore" required>
+                    <option value="">Select a store</option>
+                    <option value="Kenridge Branch">Kenridge Branch</option>
+                    <option value="Uitzicht Branch">Uitzicht Branch</option>
+                </select>
+
+                <button type="submit" class="save-btn">Save Profile</button>
+                <div class="message" id="message"></div>
+            </form>
+        </div>
+
+        <!-- Orders Tab -->
+        <div class="tab-content" id="orders" style="display:none;">
+            <h2>Past Orders</h2>
+            <table>
+                <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Date</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                </tr>
+                </thead>
+                <tbody id="ordersTable">
+                <!-- Orders will populate here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let isProfileDirty = false;
+
+    // Go back to home
+    function goBack() {
+        if(isProfileDirty) {
+            if(!confirm("You have unsaved changes. Do you want to discard them and go back?")) return;
+        }
+        window.location.href = "/";
+    }
+
+    // Tab switching with save/discard check
+    const tabs = document.querySelectorAll(".tab-btn");
+    const contents = document.querySelectorAll(".tab-content");
+
+    tabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+            if(isProfileDirty) {
+                const proceed = confirm("You have unsaved changes. Do you want to discard them?");
+                if(!proceed) return;
+            }
+            tabs.forEach(t => t.classList.remove("active"));
+            tab.classList.add("active");
+
+            contents.forEach(c => c.style.display = "none");
+            document.getElementById(tab.dataset.tab).style.display = "block";
+            isProfileDirty = false;
+        });
+    });
+
+    // Track changes in profile form
+    const profileForm = document.getElementById("profileForm");
+    profileForm.addEventListener("input", () => {
+        isProfileDirty = true;
+    });
+
+    // Load profile (example data, replace with backend call)
+    function loadProfile() {
+        const data = {
+            name: "John Doe",
+            email: "john@example.com",
+            password: "password123",
+            houseNumber: "12",
+            street: "Main St",
+            area: "Kenridge",
+            city: "Cape Town",
+            postalCode: "7708",
+            preferredStore: "Kenridge Branch"
+        };
+        document.getElementById('name').value = data.name;
+        document.getElementById('email').value = data.email;
+        document.getElementById('password').value = data.password;
+        document.getElementById('houseNumber').value = data.houseNumber;
+        document.getElementById('street').value = data.street;
+        document.getElementById('area').value = data.area;
+        document.getElementById('city').value = data.city;
+        document.getElementById('postalCode').value = data.postalCode;
+        document.getElementById('preferredStore').value = data.preferredStore;
+    }
+
+    // Save profile
+    profileForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const payload = {
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+            houseNumber: document.getElementById('houseNumber').value,
+            street: document.getElementById('street').value,
+            area: document.getElementById('area').value,
+            city: document.getElementById('city').value,
+            postalCode: document.getElementById('postalCode').value,
+            preferredStore: document.getElementById('preferredStore').value
+        };
+        console.log("Saving profile...", payload);
+        document.getElementById('message').textContent = "Profile saved!";
+        setTimeout(() => { document.getElementById('message').textContent = ''; }, 3000);
+        isProfileDirty = false;
+    });
+
+    // Load orders (example data)
+    function loadOrders() {
+        const orders = [
+            {id: 101, date: "2026-01-20", items: "Pizza, Chips", total: "R250"},
+            {id: 102, date: "2026-01-22", items: "Burger, Ribs", total: "R320"}
+        ];
+        const tbody = document.getElementById("ordersTable");
+        tbody.innerHTML = "";
+        orders.forEach(o => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${o.id}</td><td>${o.date}</td><td>${o.items}</td><td>${o.total}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Warn user if closing page with unsaved changes
+    window.addEventListener("beforeunload", (e) => {
+        if(isProfileDirty) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    loadProfile();
+    loadOrders();
+</script>
+
+</body>
+</html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <title>Register — Pete’s Pizza</title>
@@ -138,6 +138,9 @@
 <div class="container">
     <h2>Create an Account</h2>
     <form action="/register" method="post">
+        <!-- CSRF TOKEN (REQUIRED) -->
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
         <input type="text" name="name" placeholder="Full Name" required>
         <input type="email" name="email" placeholder="Email Address" required>
         <input type="password" name="password" placeholder="Password" required>
@@ -162,6 +165,14 @@
 
         <button type="button" id="locationBtn">Use My Current Location</button>
         <button type="submit">Register</button>
+
+        <!-- ERROR MESSAGES -->
+        <div th:if="${param.error != null and param.error[0] == 'email'}" style="color: red; margin-top: 15px; text-align: center;">
+            This email is already registered. Please use a different email or <a href="/login">login here</a>.
+        </div>
+        <div th:if="${param.error != null and param.error[0] == 'phone'}" style="color: red; margin-top: 15px; text-align: center;">
+            This phone number is already registered. Please use a different phone number or <a href="/login">login here</a>.
+        </div>
     </form>
     <div class="login-link">
         Already have an account? <a href="/login">Login here</a>
