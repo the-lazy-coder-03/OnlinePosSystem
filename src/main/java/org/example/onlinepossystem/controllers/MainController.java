@@ -1,5 +1,6 @@
 package org.example.onlinepossystem.controllers;
 
+import org.example.onlinepossystem.entity.Customer;
 import org.example.onlinepossystem.repository.CustomerRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -18,26 +19,40 @@ public class MainController {
     @GetMapping({"/", "/home"})
     public String mainPage(Model model, Authentication authentication) {
         if (authentication != null && authentication.isAuthenticated()) {
-            String email = authentication.getName(); // email is the principal
+            String email = authentication.getName();
             customerRepository.findByEmail(email).ifPresent(customer -> {
                 model.addAttribute("customerName", customer.getName());
+                model.addAttribute("user", customer);
             });
         }
-        return "index"; // return index.html from templates
+        return "index";
     }
 
     @GetMapping("/menu")
     public String menuPage() {
-        return "menu"; // menu.html, public
+        return "menu";
     }
 
     @GetMapping("/login")
     public String loginPage() {
-        return "login"; // login.html
+        return "login";
     }
 
     @GetMapping("/register")
     public String registerPage() {
-        return "register"; // register.html
+        return "register";
+    }
+
+    @GetMapping("/profile/edit")
+    public String editProfilePage(Model model, Authentication authentication) {
+        if (authentication != null && authentication.isAuthenticated()) {
+            String email = authentication.getName();
+            Customer customer = customerRepository.findByEmail(email).orElse(null);
+            if (customer != null) {
+                model.addAttribute("customer", customer);
+                return "customerInfoEdit";
+            }
+        }
+        return "redirect:/login";
     }
 }

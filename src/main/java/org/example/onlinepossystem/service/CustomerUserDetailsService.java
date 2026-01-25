@@ -19,10 +19,15 @@ public class CustomerUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String usernameOrPhone) throws UsernameNotFoundException {
+        System.out.println("=== Attempting to load user: " + usernameOrPhone);
+
         // Try email first, then phone1
         Customer customer = customerRepository.findByEmail(usernameOrPhone)
                 .or(() -> customerRepository.findByPhone1(usernameOrPhone))
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + usernameOrPhone));
+
+        System.out.println("=== User found: " + customer.getEmail());
+        System.out.println("=== Password hash from DB: " + customer.getPassword().substring(0, 20) + "...");
 
         return User.builder()
                 .username(customer.getEmail()) // Spring uses email as principal

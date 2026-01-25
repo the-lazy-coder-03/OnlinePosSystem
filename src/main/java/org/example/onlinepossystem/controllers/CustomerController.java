@@ -77,6 +77,6 @@ public class CustomerController {
         Authentication auth = authenticationManager.authenticate(authToken);
         SecurityContextHolder.getContext().setAuthentication(auth);
 
-        return "redirect:/home"; // now logged in
+        return "redirect:/"; // now logged in
     }
 }
