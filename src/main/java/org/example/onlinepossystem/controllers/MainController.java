@@ -16,6 +16,8 @@ public class MainController {
         this.customerRepository = customerRepository;
     }
 
+    // ====== Public Pages ======
+
     @GetMapping({"/", "/home"})
     public String mainPage(Model model, Authentication authentication) {
         if (authentication != null && authentication.isAuthenticated()) {
@@ -42,6 +44,8 @@ public class MainController {
     public String registerPage() {
         return "register";
     }
+
+    // ====== Private Pages ======
 
     @GetMapping("/profile/edit")
     public String editProfilePage(Model model, Authentication authentication) {

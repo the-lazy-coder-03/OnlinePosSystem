@@ -18,21 +18,27 @@ public class CustomerUserDetailsService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(String usernameOrPhone) throws UsernameNotFoundException {
-        System.out.println("=== Attempting to load user: " + usernameOrPhone);
+    public UserDetails loadUserByUsername(String usernameOrPhone)
+            throws UsernameNotFoundException {
 
-        // Try email first, then phone1
-        Customer customer = customerRepository.findByEmail(usernameOrPhone)
-                .or(() -> customerRepository.findByPhone1(usernameOrPhone))
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + usernameOrPhone));
+        if (usernameOrPhone == null || usernameOrPhone.isBlank()) {
+            throw new UsernameNotFoundException("Empty username or phone");
+        }
 
-        System.out.println("=== User found: " + customer.getEmail());
-        System.out.println("=== Password hash from DB: " + customer.getPassword().substring(0, 20) + "...");
+        // Normalize input (VERY important)
+        String input = usernameOrPhone.trim();
+
+        Customer customer = customerRepository.findByEmail(input)
+                .or(() -> customerRepository.findByPhone1(input))
+                .orElseThrow(() ->
+                        new UsernameNotFoundException("User not found"));
 
         return User.builder()
-                .username(customer.getEmail()) // Spring uses email as principal
-                .password(customer.getPassword()) // must be hashed
+                .username(customer.getEmail())      // principal
+                .password(customer.getPassword())   // already encoded
                 .roles("USER")
+                .accountLocked(false)
+                .disabled(false)
                 .build();
     }
 }

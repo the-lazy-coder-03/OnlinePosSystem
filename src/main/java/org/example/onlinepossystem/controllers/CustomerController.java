@@ -6,11 +6,11 @@ import org.example.onlinepossystem.service.CustomerUserDetailsService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 @Controller
 public class CustomerController {
@@ -58,7 +58,7 @@ public class CustomerController {
         Customer customer = new Customer();
         customer.setName(name);
         customer.setEmail(email);
-        customer.setPassword(passwordEncoder.encode(password)); // encrypt
+        customer.setPassword(passwordEncoder.encode(password));
         customer.setHouseNumber(house_number);
         customer.setStreet(street);
         customer.setArea(area);
@@ -70,10 +70,9 @@ public class CustomerController {
 
         customerRepository.save(customer);
 
-        // Perform actual authentication
+        // Authenticate immediately after registration
         UsernamePasswordAuthenticationToken authToken =
                 new UsernamePasswordAuthenticationToken(email, password);
-
         Authentication auth = authenticationManager.authenticate(authToken);
         SecurityContextHolder.getContext().setAuthentication(auth);
 
