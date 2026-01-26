@@ -36,8 +36,8 @@ public class CustomerService {
         customer.setName(name);
         customer.setEmail(email);
         customer.setPassword(passwordEncoder.encode(password)); // encode password
-        customer.setPhone1(phone);       // main phone
-        customer.setPhone2(phone2);     // optional second phone
+        customer.setPhone1(phone);        // main phone
+        customer.setPhone2(phone2);       // optional second phone
         customer.setHouseNumber(houseNumber);
         customer.setStreet(street);
         customer.setArea(area);

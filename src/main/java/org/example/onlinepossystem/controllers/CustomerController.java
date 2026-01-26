@@ -2,11 +2,6 @@ package org.example.onlinepossystem.controllers;
 
 import org.example.onlinepossystem.entity.Customer;
 import org.example.onlinepossystem.repository.CustomerRepository;
-import org.example.onlinepossystem.service.CustomerUserDetailsService;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,17 +12,11 @@ public class CustomerController {
 
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
-    private final CustomerUserDetailsService userDetailsService;
 
     public CustomerController(CustomerRepository customerRepository,
-                              PasswordEncoder passwordEncoder,
-                              AuthenticationManager authenticationManager,
-                              CustomerUserDetailsService userDetailsService) {
+                              PasswordEncoder passwordEncoder) {
         this.customerRepository = customerRepository;
         this.passwordEncoder = passwordEncoder;
-        this.authenticationManager = authenticationManager;
-        this.userDetailsService = userDetailsService;
     }
 
     @PostMapping("/register")
@@ -54,7 +43,7 @@ public class CustomerController {
             return "redirect:/register?error=phone";
         }
 
-        // Save customer
+        // Save customer with encoded password
         Customer customer = new Customer();
         customer.setName(name);
         customer.setEmail(email);
@@ -70,12 +59,7 @@ public class CustomerController {
 
         customerRepository.save(customer);
 
-        // Authenticate immediately after registration
-        UsernamePasswordAuthenticationToken authToken =
-                new UsernamePasswordAuthenticationToken(email, password);
-        Authentication auth = authenticationManager.authenticate(authToken);
-        SecurityContextHolder.getContext().setAuthentication(auth);
-
-        return "redirect:/"; // now logged in
+        // Redirect to login page after registration
+        return "redirect:/login?registered";
     }
 }
