@@ -208,3 +208,8 @@ footer {
     background-color: #3366ff;
     color: white;
 }
+input.error-field {
+    background-color: #ffe6e6; /* light red */
+    border-color: red;
+}
+

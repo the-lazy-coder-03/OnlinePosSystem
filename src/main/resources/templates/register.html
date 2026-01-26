@@ -7,7 +7,7 @@
     <style>
         /* =========================
            GLOBAL STYLES
-        ========================= */
+        ========================== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
@@ -18,7 +18,7 @@
 
         /* =========================
            HEADER
-        ========================= */
+        ========================== */
         header {
             background-color: #0052cc;
             color: white;
@@ -31,7 +31,7 @@
 
         /* =========================
            NAVIGATION
-        ========================= */
+        ========================== */
         nav {
             display: flex;
             justify-content: center;
@@ -58,7 +58,7 @@
 
         /* =========================
            FORM CONTAINER
-        ========================= */
+        ========================== */
         .container {
             max-width: 450px;
             margin: 40px auto;
@@ -81,7 +81,7 @@
 
         /* =========================
            FORM FIELDS
-        ========================= */
+        ========================== */
         form {
             display: flex;
             flex-direction: column;
@@ -109,9 +109,14 @@
             background-color: #e6f0ff;
         }
 
+        input.error-field {
+            background-color: #ffe6e6; /* light red */
+            border-color: red;
+        }
+
         /* =========================
            BUTTONS
-        ========================= */
+        ========================== */
         button {
             padding: 12px;
             margin-top: 15px;
@@ -149,7 +154,7 @@
 
         /* =========================
            ERROR MESSAGES
-        ========================= */
+        ========================== */
         .error {
             color: red;
             font-size: 0.95em;
@@ -159,7 +164,7 @@
 
         /* =========================
            LOGIN LINK
-        ========================= */
+        ========================== */
         .login-link {
             margin-top: 20px;
             text-align: center;
@@ -204,15 +209,19 @@
 ========================= -->
 <div class="container">
     <h2>Create an Account</h2>
-    <form action="/register" method="post">
-        <input type="text" name="name" placeholder="Full Name" required>
+    <form id="registerForm" action="/register" method="post">
+
+        <!-- First Name / Surname Stacked -->
+        <input type="text" name="firstName" placeholder="First Name" required>
+        <input type="text" name="lastName" placeholder="Surname" required>
+
         <input type="email" name="email" placeholder="Email Address" required>
         <input type="password" name="password" placeholder="Password" required>
         <input type="text" name="house_number" id="house_number" placeholder="House / Apartment Number / Complex Name">
         <input type="text" name="street" id="street" placeholder="Street Address" required>
         <input type="text" name="area" id="area" placeholder="Area / Suburb" required>
         <input type="text" name="postalCode" id="postalCode" placeholder="Postal Code" required>
-        <input type="text" name="phone" placeholder="Phone Number" required>
+        <input type="text" name="phone" id="phone" placeholder="Phone Number" maxlength="10" required>
 
         <!-- Preferred Store Dropdown -->
         <label for="preferredStore">Preferred Store:</label>
@@ -279,6 +288,57 @@
         console.warn(`ERROR(${err.code}): ${err.message}`);
         alert("Location access denied or unavailable.");
     }
+</script>
+
+<!-- =========================
+     FORM VALIDATION SCRIPT
+========================= -->
+<script>
+    const form = document.getElementById("registerForm");
+    const phoneInput = document.getElementById("phone");
+
+    // Allow only digits in phone input
+    phoneInput.addEventListener("input", function() {
+        this.value = this.value.replace(/\D/g,''); // remove non-digit characters
+        if(this.classList.contains("error-field")) this.classList.remove("error-field");
+    });
+
+    // Form submit validation
+    form.addEventListener("submit", function(e) {
+        let valid = true;
+
+        const inputs = form.querySelectorAll("input[required]");
+
+        inputs.forEach(input => {
+            input.classList.remove("error-field"); // reset
+
+            if(input.value.trim() === "") {
+                input.classList.add("error-field");
+                valid = false;
+            }
+        });
+
+        // Phone must be exactly 10 digits
+        if(phoneInput.value.trim().length !== 10) {
+            phoneInput.classList.add("error-field");
+            valid = false;
+        }
+
+        if(!valid) {
+            e.preventDefault(); // stop submission
+            alert("Please fill out all required fields correctly.");
+        }
+    });
+
+    // Remove red highlight when typing
+    const inputs = form.querySelectorAll("input[required]");
+    inputs.forEach(input => {
+        input.addEventListener("input", () => {
+            if(input.classList.contains("error-field")) {
+                input.classList.remove("error-field");
+            }
+        });
+    });
 </script>
 
 </body>

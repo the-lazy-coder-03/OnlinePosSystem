@@ -20,7 +20,8 @@ public class CustomerService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public Customer registerCustomer(String name,
+    public Customer registerCustomer(String firstName,
+                                     String lastName,
                                      String email,
                                      String password,
                                      String phone,
@@ -33,7 +34,8 @@ public class CustomerService {
                                      String postalCode) {
 
         Customer customer = new Customer();
-        customer.setName(name);
+        customer.setFirstName(firstName);
+        customer.setLastName(lastName);
         customer.setEmail(email);
         customer.setPassword(passwordEncoder.encode(password)); // encode password
         customer.setPhone1(phone);        // main phone

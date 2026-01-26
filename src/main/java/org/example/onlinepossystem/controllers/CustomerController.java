@@ -22,7 +22,8 @@ public class CustomerController {
 
     @PostMapping("/profile/update")
     public String updateProfile(
-            @RequestParam String name,
+            @RequestParam String firstName,
+            @RequestParam String lastName,
             @RequestParam(required = false) String houseNumber,
             @RequestParam(required = false) String street,
             @RequestParam(required = false) String area,
@@ -42,7 +43,8 @@ public class CustomerController {
         Customer customer = customerRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
 
-        customer.setName(name);
+        customer.setFirstName(firstName);
+        customer.setLastName(lastName);
         customer.setHouseNumber(houseNumber);
         customer.setStreet(street);
         customer.setArea(area);
@@ -63,7 +65,8 @@ public class CustomerController {
 
     @PostMapping("/register")
     public String handleRegister(
-            @RequestParam String name,
+            @RequestParam String firstName,
+            @RequestParam String lastName,
             @RequestParam String email,
             @RequestParam String password,
             @RequestParam(required = false) String house_number,
@@ -87,7 +90,8 @@ public class CustomerController {
 
         // Save customer with encoded password
         Customer customer = new Customer();
-        customer.setName(name);
+        customer.setFirstName(firstName);
+        customer.setLastName(lastName);
         customer.setEmail(email);
         customer.setPassword(passwordEncoder.encode(password));
         customer.setHouseNumber(house_number);

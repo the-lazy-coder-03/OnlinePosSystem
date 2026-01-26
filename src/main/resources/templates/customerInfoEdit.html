@@ -215,7 +215,10 @@
             <h2>Edit Profile</h2>
             <div th:if="${param.success}" class="message">Profile updated successfully!</div>
             <form id="profileForm" th:action="@{/profile/update}" method="post" th:object="${customer}">
-                <input type="text" id="name" th:field="*{name}" placeholder="Full Name" required>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="firstName" th:field="*{firstName}" placeholder="First Name" required style="flex: 1;">
+                    <input type="text" id="lastName" th:field="*{lastName}" placeholder="Surname" required style="flex: 1;">
+                </div>
                 <input type="email" id="email" th:field="*{email}" placeholder="Email Address" required readonly>
                 <input type="password" id="password" name="password" placeholder="New Password (leave blank to keep current)">
 
