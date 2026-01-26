@@ -8,142 +8,25 @@
     <link rel="stylesheet" href="/css/style.css">
 
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #e6f0ff;
-            color: #333;
-            margin: 0;
-        }
-
-        header {
-            background-color: #3366ff;
-            color: white;
-            padding: 20px;
-            text-align: center;
-            position: relative;
-        }
-
+        body { font-family: Arial, sans-serif; background-color: #e6f0ff; color: #333; margin: 0; }
+        header { background-color: #3366ff; color: white; padding: 20px; text-align: center; position: relative; }
         header h1 { font-size: 3em; margin: 0; }
         header p { margin: 5px 0 0; font-size: 1.2em; }
-
-        .profile-container {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
+        .profile-container { position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 10px; }
         .username { font-weight: bold; }
-
-        .profile-pic {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
-        .view-profile-btn {
-            background-color: #ff9900;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 5px;
-            font-weight: bold;
-            text-decoration: none;
-            font-size: 0.9em;
-        }
-
-        #logged-in {
-            background-color: #cce0ff;
-            color: #003366;
-            text-align: center;
-            padding: 10px;
-            font-weight: bold;
-        }
-
-        nav {
-            display: flex;
-            justify-content: center;
-            margin: 25px 0;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 20px;
-            flex-wrap: nowrap;
-        }
-
-        .nav-links a {
-            width: 150px;
-            height: 45px;
-            border: 2px solid #3366ff;
-            border-radius: 5px;
-            color: #3366ff;
-            font-weight: bold;
-            text-decoration: none;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
-
-            transition: all 0.3s;
-        }
-
-        .nav-links a:hover {
-            background-color: #3366ff;
-            color: white;
-        }
-
-        #locations {
-            display: flex;
-            gap: 20px;
-            padding: 0 20px 40px;
-            flex-wrap: wrap;
-        }
-
-        .map-container {
-            flex: 1;
-            min-width: 300px;
-            text-align: center;
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        }
-
-        .map-container h3 {
-            margin-bottom: 10px;
-        }
-
-        .view-menu-btn {
-            width: 150px;
-            height: 45px;
-            margin-bottom: 10px;
-
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-
-            border: 2px solid #3366ff;
-            border-radius: 5px;
-            color: #3366ff;
-            font-weight: bold;
-            text-decoration: none;
-            transition: all 0.3s;
-        }
-
-        .view-menu-btn:hover {
-            background-color: #3366ff;
-            color: white;
-        }
-
-        iframe {
-            width: 100%;
-            height: 450px;
-            border: 0;
-            border-radius: 5px;
-        }
+        .profile-pic { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .view-profile-btn { background-color: #ff9900; color: white; padding: 6px 12px; border-radius: 5px; font-weight: bold; text-decoration: none; font-size: 0.9em; }
+        #logged-in { background-color: #cce0ff; color: #003366; text-align: center; padding: 10px; font-weight: bold; }
+        nav { display: flex; justify-content: center; margin: 25px 0; }
+        .nav-links { display: flex; gap: 20px; flex-wrap: nowrap; }
+        .nav-links a { width: 150px; height: 45px; border: 2px solid #3366ff; border-radius: 5px; color: #3366ff; font-weight: bold; text-decoration: none; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+        .nav-links a:hover { background-color: #3366ff; color: white; }
+        #locations { display: flex; gap: 20px; padding: 0 20px 40px; flex-wrap: wrap; }
+        .map-container { flex: 1; min-width: 300px; text-align: center; background: white; border-radius: 10px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .map-container h3 { margin-bottom: 10px; }
+        .view-menu-btn { width: 150px; height: 45px; margin-bottom: 10px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #3366ff; border-radius: 5px; color: #3366ff; font-weight: bold; text-decoration: none; transition: all 0.3s; }
+        .view-menu-btn:hover { background-color: #3366ff; color: white; }
+        iframe { width: 100%; height: 450px; border: 0; border-radius: 5px; }
     </style>
 </head>
 
@@ -155,14 +38,13 @@
 
     <div class="profile-container">
         <sec:authorize access="isAuthenticated()">
-            <span class="username" sec:authentication="name">User</span>
+            <span class="username" th:text="${customerName}">User</span>
 
             <img th:if="${user != null and user.profilePictureUrl != null}"
                  th:src="${user.profilePictureUrl}"
                  class="profile-pic"
                  alt="Profile Picture">
 
-            <!-- VIEW PROFILE BUTTON -->
             <a th:href="@{/profile/edit}" class="view-profile-btn">View Profile</a>
         </sec:authorize>
 
@@ -182,23 +64,16 @@
     <div class="nav-links">
         <a href="/order">Order Online</a>
 
-        <!-- Anonymous user -->
         <th:block sec:authorize="isAnonymous()">
             <a href="/login">Login</a>
             <a href="/register">Sign Up</a>
         </th:block>
 
-        <!-- Logged-in user -->
         <th:block sec:authorize="isAuthenticated()">
-            <a href="#"
-               onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+            <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                 Logout
             </a>
-            <form id="logout-form"
-                  th:action="@{/logout}"
-                  method="post"
-                  style="display:none;">
-            </form>
+            <form id="logout-form" th:action="@{/logout}" method="post" style="display:none;"></form>
         </th:block>
     </div>
 </nav>
@@ -207,19 +82,13 @@
     <div class="map-container">
         <h3>Kenridge</h3>
         <a href="/menu/kenridge" class="view-menu-btn">View Menu</a>
-        <iframe
-                src="https://www.google.com/maps/embed?pb=!1m16!1m12!1m3!1d53020.54630933175!2d18.646045413647034!3d-33.84367690902686!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!2m1!1spete&#39;s%20pizza!5e0!3m2!1sen!2sza!4v1769270664296!5m2!1sen!2sza"
-                allowfullscreen>
-        </iframe>
+        <iframe src="https://www.google.com/maps/embed?pb=!1m16!1m12!1m3!1d53020.54630933175!2d18.646045413647034!3d-33.84367690902686!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!2m1!1spete&#39;s%20pizza!5e0!3m2!1sen!2sza!4v1769270664296!5m2!1sen!2sza" allowfullscreen></iframe>
     </div>
 
     <div class="map-container">
         <h3>Uitzicht</h3>
         <a href="/menu/uitzicht" class="view-menu-btn">View Menu</a>
-        <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d53020.54630933175!2d18.646045413647034!3d-33.84367690902686!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1dcc568e9ccd0cb5%3A0x62daf552123b8e9!2sPete&#39;s%20Pizza%20Uitzicht!5e0!3m2!1sen!2sza!4v1769270688975!5m2!1sen!2sza"
-                allowfullscreen>
-        </iframe>
+        <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d53020.54630933175!2d18.646045413647034!3d-33.84367690902686!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1dcc568e9ccd0cb5%3A0x62daf552123b8e9!2sPete&#39;s%20Pizza%20Uitzicht!5e0!3m2!1sen!2sza!4v1769270688975!5m2!1sen!2sza" allowfullscreen></iframe>
     </div>
 </section>
 

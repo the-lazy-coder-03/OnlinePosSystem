@@ -18,24 +18,21 @@ public class CustomerUserDetailsService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(String usernameOrPhone)
-            throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
 
-        if (usernameOrPhone == null || usernameOrPhone.isBlank()) {
-            throw new UsernameNotFoundException("Empty username or phone");
+        if (email == null || email.isBlank()) {
+            throw new UsernameNotFoundException("Email cannot be empty");
         }
 
-        // Normalize input (VERY important)
-        String input = usernameOrPhone.trim();
+        String normalizedEmail = email.trim();
 
-        Customer customer = customerRepository.findByEmail(input)
-                .or(() -> customerRepository.findByPhone1(input))
+        Customer customer = customerRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() ->
-                        new UsernameNotFoundException("User not found"));
+                        new UsernameNotFoundException("User not found with email: " + normalizedEmail));
 
         return User.builder()
-                .username(customer.getEmail())      // principal
-                .password(customer.getPassword())   // already encoded
+                .username(customer.getEmail())
+                .password(customer.getPassword()) // must be BCrypt-encoded
                 .roles("USER")
                 .accountLocked(false)
                 .disabled(false)

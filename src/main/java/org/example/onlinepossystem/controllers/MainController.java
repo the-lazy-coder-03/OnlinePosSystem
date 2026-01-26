@@ -51,11 +51,12 @@ public class MainController {
     public String editProfilePage(Model model, Authentication authentication) {
         if (authentication != null && authentication.isAuthenticated()) {
             String email = authentication.getName();
-            Customer customer = customerRepository.findByEmail(email).orElse(null);
-            if (customer != null) {
-                model.addAttribute("customer", customer);
-                return "customerInfoEdit";
-            }
+            return customerRepository.findByEmail(email)
+                    .map(customer -> {
+                        model.addAttribute("customer", customer);
+                        return "customerInfoEdit";
+                    })
+                    .orElse("redirect:/login");
         }
         return "redirect:/login";
     }
