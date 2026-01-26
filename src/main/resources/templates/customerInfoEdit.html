@@ -5,7 +5,7 @@
     <title>Account Details — Pete’s Pizza</title>
     <style>
         /* =========================
-           BODY & CONTAINER
+           1. BODY & CONTAINER
         ========================= */
         body {
             font-family: Arial, sans-serif;
@@ -18,7 +18,7 @@
         }
 
         header {
-            background-color: #0052cc; /* blue theme */
+            background-color: #0052cc;
             color: white;
             padding: 20px;
             text-align: center;
@@ -36,7 +36,7 @@
         }
 
         /* =========================
-           SIDEBAR
+           2. SIDEBAR
         ========================= */
         .sidebar {
             width: 250px;
@@ -69,14 +69,12 @@
             transition: all 0.3s;
         }
 
-        /* Hover and active state */
         .sidebar button:hover, .sidebar button.active {
             background-color: #0052cc;
             color: white;
             border: 2px solid #7a9ac5;
         }
 
-        /* Back button special color */
         .sidebar .back-btn {
             background: #ff9900;
             color: white;
@@ -89,7 +87,7 @@
         }
 
         /* =========================
-           CONTENT AREA
+           3. CONTENT AREA
         ========================= */
         .content {
             flex: 1;
@@ -106,7 +104,9 @@
             margin-bottom: 20px;
         }
 
-        /* Inputs & Select */
+        /* =========================
+           3.1 INPUTS & FORM
+        ========================= */
         input[type="text"], input[type="email"], input[type="password"], select {
             width: 100%;
             padding: 15px;
@@ -114,7 +114,6 @@
             border-radius: 15px;
             border: 2px solid #0052cc;
             font-size: 1em;
-            box-sizing: border-box;
             background-color: #f0f6ff;
         }
 
@@ -123,7 +122,6 @@
             border-color: #003d99;
         }
 
-        /* Save Button */
         button.save-btn {
             background: #0052cc;
             color: white;
@@ -143,31 +141,45 @@
             border: 2px solid #7a9ac5;
         }
 
-        /* Table */
-        table {
-            width: 100%;
-            border-collapse: collapse;
+        /* =========================
+           3.2 PAST ORDERS CARDS
+        ========================= */
+        .order-card {
+            background: #f0f6ff;
+            border-radius: 15px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
         }
 
-        th, td {
-            border: 1px solid #ccc;
-            padding: 10px;
-            text-align: left;
+        .order-card:hover {
+            transform: scale(1.02);
         }
 
-        th {
-            background-color: #f0f6ff;
+        .order-card h3 {
+            margin: 0 0 10px 0;
+            color: #0052cc;
+            font-size: 1.2em;
         }
 
-        /* Message */
-        .message {
-            color: green;
-            margin-top: 10px;
-            text-align: center;
+        .order-card .subsection {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+
+        .order-card .subsection span.label {
+            font-weight: bold;
+            color: #003366;
+        }
+
+        .order-card .subsection span.value {
+            color: #333;
         }
 
         /* =========================
-           TAB CONTENT
+           4. TAB CONTENT
         ========================= */
         .tab-content {
             display: none;
@@ -176,12 +188,13 @@
         .tab-content.active {
             display: block;
         }
+
     </style>
 </head>
 <body>
 
 <!-- =========================
-     HEADER
+     1. HEADER
 ========================= -->
 <header>
     <h1>Pete’s Pizza</h1>
@@ -189,30 +202,30 @@
 </header>
 
 <!-- =========================
-     MAIN CONTAINER
+     2. MAIN CONTAINER
 ========================= -->
 <div class="main-container">
 
     <!-- =========================
-         SIDEBAR
+         2.1 SIDEBAR
     ========================= -->
     <div class="sidebar">
         <button class="back-btn" onclick="goBack()">← Back to Home</button>
         <h3>Account Menu</h3>
-        <button class="tab-btn active" data-tab="profile">Edit Profile</button>
-        <button class="tab-btn" data-tab="orders">Past Orders</button>
+        <button class="tab-btn active" data-tab="profile">1. Edit Profile</button>
+        <button class="tab-btn" data-tab="orders">2. Past Orders</button>
     </div>
 
     <!-- =========================
-         CONTENT AREA
+         3. CONTENT AREA
     ========================= -->
     <div class="content">
 
         <!-- =========================
-             PROFILE TAB
+             3.1 PROFILE TAB
         ========================= -->
         <div class="tab-content active" id="profile">
-            <h2>Edit Profile</h2>
+            <h2>1. Edit Profile</h2>
             <div th:if="${param.success}" class="message">Profile updated successfully!</div>
             <form id="profileForm" th:action="@{/profile/update}" method="post" th:object="${customer}">
                 <div style="display: flex; gap: 10px;">
@@ -242,30 +255,21 @@
         </div>
 
         <!-- =========================
-             ORDERS TAB
+             3.2 ORDERS TAB
         ========================= -->
         <div class="tab-content" id="orders">
-            <h2>Past Orders</h2>
-            <table>
-                <thead>
-                <tr>
-                    <th>Order ID</th>
-                    <th>Date</th>
-                    <th>Items</th>
-                    <th>Total</th>
-                </tr>
-                </thead>
-                <tbody id="ordersTable">
-                <!-- Orders populate here -->
-                </tbody>
-            </table>
+            <h2>2. Past Orders</h2>
+            <div id="ordersContainer">
+                <!-- Orders populated here via JS -->
+            </div>
         </div>
+
     </div>
 
 </div>
 
 <!-- =========================
-     SCRIPT
+     5. SCRIPT
 ========================= -->
 <script>
     let isProfileDirty = false;
@@ -307,33 +311,67 @@
     const profileForm = document.getElementById("profileForm");
     profileForm.addEventListener("input", () => { isProfileDirty = true; });
 
-    // =========================
-    // SAVE PROFILE
-    // =========================
-    profileForm.addEventListener('submit', (e) => {
-        isProfileDirty = false;
-    });
+    profileForm.addEventListener('submit', () => { isProfileDirty = false; });
 
     // =========================
-    // LOAD ORDERS DATA (EXAMPLE)
+    // LOAD PAST ORDERS
     // =========================
     function loadOrders(){
         const orders = [
-            {id: 101, date: "2026-01-20", items: "Pizza, Chips", total: "R250"},
-            {id: 102, date: "2026-01-22", items: "Burger, Ribs", total: "R320"}
+            {
+                id: 101,
+                date: "2026-01-20",
+                items: [
+                    {name: "Margherita Pizza", qty: 1},
+                    {name: "Garlic Bread", qty: 2}
+                ],
+                total: "R250"
+            },
+            {
+                id: 102,
+                date: "2026-01-22",
+                items: [
+                    {name: "Pepperoni Pizza", qty: 1},
+                    {name: "Coke", qty: 2}
+                ],
+                total: "R320"
+            }
         ];
-        const tbody = document.getElementById("ordersTable");
-        tbody.innerHTML = "";
-        orders.forEach(o => {
-            const tr = document.createElement("tr");
-            tr.innerHTML = `<td>${o.id}</td><td>${o.date}</td><td>${o.items}</td><td>${o.total}</td>`;
-            tbody.appendChild(tr);
+
+        const container = document.getElementById("ordersContainer");
+        container.innerHTML = "";
+
+        orders.forEach((order, index) => {
+            const card = document.createElement("div");
+            card.classList.add("order-card");
+
+            // Order Header
+            const header = document.createElement("h3");
+            header.textContent = `${index + 1}. Order #${order.id}`;
+            card.appendChild(header);
+
+            // Subsection: Date
+            const dateSection = document.createElement("div");
+            dateSection.classList.add("subsection");
+            dateSection.innerHTML = `<span class="label">Date:</span> <span class="value">${order.date}</span>`;
+            card.appendChild(dateSection);
+
+            // Subsection: Items
+            const itemsSection = document.createElement("div");
+            itemsSection.classList.add("subsection");
+            itemsSection.innerHTML = `<span class="label">Items:</span> <span class="value">${order.items.map(i=>`${i.qty} x ${i.name}`).join(", ")}</span>`;
+            card.appendChild(itemsSection);
+
+            // Subsection: Total
+            const totalSection = document.createElement("div");
+            totalSection.classList.add("subsection");
+            totalSection.innerHTML = `<span class="label">Total:</span> <span class="value">${order.total}</span>`;
+            card.appendChild(totalSection);
+
+            container.appendChild(card);
         });
     }
 
-    // =========================
-    // UNSAVED CHANGES WARNING
-    // =========================
     window.addEventListener("beforeunload", (e) => {
         if(isProfileDirty){
             e.preventDefault();
@@ -341,9 +379,6 @@
         }
     });
 
-    // =========================
-    // INITIALIZE PAGE
-    // =========================
     loadOrders();
 </script>
 
