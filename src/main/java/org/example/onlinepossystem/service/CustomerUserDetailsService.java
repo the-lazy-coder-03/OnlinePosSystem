@@ -18,17 +18,19 @@ public class CustomerUserDetailsService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String identifier) throws UsernameNotFoundException {
 
-        if (email == null || email.isBlank()) {
-            throw new UsernameNotFoundException("Email cannot be empty");
+        if (identifier == null || identifier.isBlank()) {
+            throw new UsernameNotFoundException("Identifier cannot be empty");
         }
 
-        String normalizedEmail = email.trim();
+        String normalizedIdentifier = identifier.trim();
 
-        Customer customer = customerRepository.findByEmail(normalizedEmail)
+        Customer customer = customerRepository.findByEmail(normalizedIdentifier)
+                .or(() -> customerRepository.findByPhone1(normalizedIdentifier))
+                .or(() -> customerRepository.findByPhone2(normalizedIdentifier))
                 .orElseThrow(() ->
-                        new UsernameNotFoundException("User not found with email: " + normalizedEmail));
+                        new UsernameNotFoundException("User not found with identifier: " + normalizedIdentifier));
 
         return User.builder()
                 .username(customer.getEmail())

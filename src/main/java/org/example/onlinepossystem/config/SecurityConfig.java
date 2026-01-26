@@ -64,7 +64,7 @@ public class SecurityConfig {
                 )
                 .formLogin(form -> form
                         .loginPage("/login")
-                        .usernameParameter("email")
+                        .usernameParameter("username")
                         .passwordParameter("password")
                         .defaultSuccessUrl("/", false)
                         .permitAll()
