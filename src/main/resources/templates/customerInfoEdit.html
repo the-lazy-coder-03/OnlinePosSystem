@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <title>Account Details — Pete’s Pizza</title>
@@ -154,19 +154,18 @@
         <!-- Profile Tab -->
         <div class="tab-content" id="profile">
             <h2>Edit Profile</h2>
-            <form id="profileForm">
-                <input type="text" id="name" placeholder="Full Name" required>
-                <input type="email" id="email" placeholder="Email Address" required>
-                <input type="password" id="password" placeholder="Password" required>
+            <form id="profileForm" th:object="${customer}">
+                <input type="text" id="name" th:field="*{name}" placeholder="Full Name" required>
+                <input type="email" id="email" th:field="*{email}" placeholder="Email Address" required readonly>
+                <input type="password" id="password" th:field="*{password}" placeholder="Password" required>
 
-                <input type="text" id="houseNumber" placeholder="House / Apartment Number / Complex Name">
-                <input type="text" id="street" placeholder="Street Address">
-                <input type="text" id="area" placeholder="Area / Suburb">
-                <input type="text" id="city" placeholder="City">
-                <input type="text" id="postalCode" placeholder="Postal Code">
+                <input type="text" id="houseNumber" th:field="*{houseNumber}" placeholder="House / Apartment Number / Complex Name">
+                <input type="text" id="street" th:field="*{street}" placeholder="Street Address">
+                <input type="text" id="area" th:field="*{area}" placeholder="Area / Suburb">
+                <input type="text" id="postalCode" th:field="*{postalCode}" placeholder="Postal Code">
 
                 <label for="preferredStore">Preferred Store:</label>
-                <select id="preferredStore" required>
+                <select id="preferredStore" th:field="*{preferredStore}" required>
                     <option value="">Select a store</option>
                     <option value="Kenridge Branch">Kenridge Branch</option>
                     <option value="Uitzicht Branch">Uitzicht Branch</option>

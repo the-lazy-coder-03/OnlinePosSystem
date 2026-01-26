@@ -32,7 +32,22 @@ public class MainController {
 
     @GetMapping("/menu")
     public String menuPage() {
-        return "menu";
+        return "index";
+    }
+
+    @GetMapping("/menu/kenridge")
+    public String kenridgeMenu() {
+        return "index";
+    }
+
+    @GetMapping("/menu/uitzicht")
+    public String uitzichtMenu() {
+        return "index";
+    }
+
+    @GetMapping("/order")
+    public String orderPage() {
+        return "index";
     }
 
     @GetMapping("/login")

@@ -37,27 +37,31 @@ public class SecurityConfig {
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
-
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // Only protect the edit profile page
+                        .requestMatchers("/profile/edit").authenticated()
+
+                        // Public pages + static resources
                         .requestMatchers(
                                 "/",
+                                "/home",
                                 "/menu",
+                                "/menu/**",
+                                "/order",
                                 "/login",
                                 "/register",
+                                "/api/full-address",
                                 "/css/**",
                                 "/js/**",
                                 "/images/**"
                         ).permitAll()
-                        .requestMatchers(
-                                "/cart/**",
-                                "/checkout/**",
-                                "/order/**"
-                        ).authenticated()
-                        .anyRequest().authenticated()
+
+                        // All other requests public
+                        .anyRequest().permitAll()
                 )
                 .formLogin(form -> form
                         .loginPage("/login")
@@ -73,4 +77,5 @@ public class SecurityConfig {
 
         return http.build();
     }
+
 }

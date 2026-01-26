@@ -40,11 +40,6 @@
         <sec:authorize access="isAuthenticated()">
             <span class="username" th:text="${customerName}">User</span>
 
-            <img th:if="${user != null and user.profilePictureUrl != null}"
-                 th:src="${user.profilePictureUrl}"
-                 class="profile-pic"
-                 alt="Profile Picture">
-
             <a th:href="@{/profile/edit}" class="view-profile-btn">View Profile</a>
         </sec:authorize>
 
@@ -56,7 +51,7 @@
 
 <sec:authorize access="isAuthenticated()">
     <div id="logged-in" th:if="${customerName != null}">
-        Welcome back, <span th:text="${customerName}">User</span>!
+        Hello, <span th:text="${customerName}">User</span>!
     </div>
 </sec:authorize>
 
