@@ -1,0 +1,14 @@
+Prompt:
+"I want a modern, clean, and visually appealing multi-step order webpage. The main theme should be blue, with big, bold blocks for user selections. The page flow should be:
+Step 1 – Choose Branch: Large clickable blocks for each branch (e.g., Kenridge, Uitzicht).
+Step 2 – Choose Order Type: Large clickable blocks for Pickup or Delivery.
+Step 3 – Choose Time: Two big blocks: 'Now' and 'Later'. If 'Later' is chosen, show a nice dropdown menu with 15-minute increments between 5 PM and 9 PM. The dropdown should have rounded corners, large font, blue border, and light blue background to match the theme.
+Back and Next buttons should appear side by side only on this page, and their combined width should match the width of the 'Now'/'Later' blocks.
+Step 4 – Summary: Show a clean summary of selections.
+Visual styling details:
+Big, bold clickable blocks with rounded corners and hover effects: on hover, the block should turn white with blue text and a subtle medium blue-grey border.
+The font should be clean and modern, easy to read.
+The page background should be light blue (#e6f0ff), with the main container white and softly rounded with shadows.
+Layout should be responsive and centered, with all steps visually consistent.
+Optional: smooth sliding animations between steps for a polished, app-like feel.
+The overall feel should be intuitive, friendly, and easy to navigate, with strong visual cues for each step."

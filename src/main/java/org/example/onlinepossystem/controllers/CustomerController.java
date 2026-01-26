@@ -6,6 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.security.core.Authentication;
 
 @Controller
 public class CustomerController {
@@ -17,6 +18,47 @@ public class CustomerController {
                               PasswordEncoder passwordEncoder) {
         this.customerRepository = customerRepository;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    @PostMapping("/profile/update")
+    public String updateProfile(
+            @RequestParam String name,
+            @RequestParam(required = false) String houseNumber,
+            @RequestParam(required = false) String street,
+            @RequestParam(required = false) String area,
+            @RequestParam(required = false) String postalCode,
+            @RequestParam(required = false) String phone1,
+            @RequestParam(required = false) String phone2,
+            @RequestParam(required = false) String preferredStore,
+            @RequestParam(required = false) String complexName,
+            @RequestParam(required = false) String password,
+            Authentication authentication
+    ) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "redirect:/login";
+        }
+
+        String email = authentication.getName();
+        Customer customer = customerRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+
+        customer.setName(name);
+        customer.setHouseNumber(houseNumber);
+        customer.setStreet(street);
+        customer.setArea(area);
+        customer.setPostalCode(postalCode);
+        customer.setPhone1(phone1);
+        customer.setPhone2(phone2);
+        customer.setPreferredStore(preferredStore);
+        customer.setComplexName(complexName);
+
+        if (password != null && !password.isEmpty()) {
+            customer.setPassword(passwordEncoder.encode(password));
+        }
+
+        customerRepository.save(customer);
+
+        return "redirect:/profile/edit?success";
     }
 
     @PostMapping("/register")

@@ -46,8 +46,15 @@ public class MainController {
     }
 
     @GetMapping("/order")
-    public String orderPage() {
-        return "index";
+    public String orderPage(Model model, Authentication authentication) {
+        if (authentication != null && authentication.isAuthenticated()) {
+            String email = authentication.getName();
+            customerRepository.findByEmail(email).ifPresent(customer -> {
+                model.addAttribute("customerName", customer.getName());
+                model.addAttribute("user", customer);
+            });
+        }
+        return "PlaceOrder";
     }
 
     @GetMapping("/login")

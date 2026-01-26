@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <title>Account Details — Pete’s Pizza</title>
     <style>
+        /* =========================
+           BODY & CONTAINER
+        ========================= */
         body {
             font-family: Arial, sans-serif;
             background-color: #e6f0ff;
@@ -15,7 +18,7 @@
         }
 
         header {
-            background-color: #3366ff;
+            background-color: #0052cc; /* blue theme */
             color: white;
             padding: 20px;
             text-align: center;
@@ -32,85 +35,115 @@
             gap: 20px;
         }
 
-        /* Sidebar */
+        /* =========================
+           SIDEBAR
+        ========================= */
         .sidebar {
             width: 250px;
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             overflow-y: auto;
             max-height: 600px;
             padding: 20px;
         }
 
         .sidebar h3 {
-            color: #3366ff;
+            color: #0052cc;
             margin-bottom: 15px;
         }
 
         .sidebar button {
             display: block;
             width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
             border: none;
-            border-radius: 5px;
-            background: #f0f0f0;
+            border-radius: 15px;
+            background: #f0f6ff;
+            color: #0052cc;
             cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
             text-align: left;
-            transition: background 0.3s;
+            transition: all 0.3s;
         }
 
-        .sidebar button.active, .sidebar button:hover {
-            background: #3366ff;
+        /* Hover and active state */
+        .sidebar button:hover, .sidebar button.active {
+            background-color: #0052cc;
             color: white;
+            border: 2px solid #7a9ac5;
         }
 
+        /* Back button special color */
         .sidebar .back-btn {
             background: #ff9900;
             color: white;
-            margin-bottom: 15px;
         }
 
-        /* Content Area */
+        .sidebar .back-btn:hover {
+            background: white;
+            color: #ff9900;
+            border: 2px solid #e6a433;
+        }
+
+        /* =========================
+           CONTENT AREA
+        ========================= */
         .content {
             flex: 1;
             background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             padding: 20px;
             overflow-y: auto;
             max-height: 600px;
         }
 
         .content h2 {
-            color: #3366ff;
+            color: #0052cc;
             margin-bottom: 20px;
         }
 
+        /* Inputs & Select */
         input[type="text"], input[type="email"], input[type="password"], select {
             width: 100%;
-            padding: 10px;
+            padding: 15px;
             margin: 8px 0;
-            border-radius: 5px;
-            border: 1px solid #ccc;
+            border-radius: 15px;
+            border: 2px solid #0052cc;
+            font-size: 1em;
+            box-sizing: border-box;
+            background-color: #f0f6ff;
         }
 
+        input:focus, select:focus {
+            outline: none;
+            border-color: #003d99;
+        }
+
+        /* Save Button */
         button.save-btn {
-            background: #3366ff;
+            background: #0052cc;
             color: white;
             border: none;
-            padding: 12px;
-            border-radius: 5px;
+            padding: 15px;
+            border-radius: 15px;
             cursor: pointer;
             font-size: 16px;
             margin-top: 10px;
+            width: 100%;
+            transition: all 0.3s;
         }
 
         button.save-btn:hover {
-            background-color: #254eda;
+            background-color: white;
+            color: #0052cc;
+            border: 2px solid #7a9ac5;
         }
 
+        /* Table */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -123,25 +156,46 @@
         }
 
         th {
-            background-color: #f0f0f0;
+            background-color: #f0f6ff;
         }
 
+        /* Message */
         .message {
             color: green;
             margin-top: 10px;
             text-align: center;
         }
+
+        /* =========================
+           TAB CONTENT
+        ========================= */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
 
+<!-- =========================
+     HEADER
+========================= -->
 <header>
     <h1>Pete’s Pizza</h1>
     <p>Kenridge & Uitzicht Branch</p>
 </header>
 
+<!-- =========================
+     MAIN CONTAINER
+========================= -->
 <div class="main-container">
-    <!-- Sidebar -->
+
+    <!-- =========================
+         SIDEBAR
+    ========================= -->
     <div class="sidebar">
         <button class="back-btn" onclick="goBack()">← Back to Home</button>
         <h3>Account Menu</h3>
@@ -149,20 +203,29 @@
         <button class="tab-btn" data-tab="orders">Past Orders</button>
     </div>
 
-    <!-- Content Area -->
+    <!-- =========================
+         CONTENT AREA
+    ========================= -->
     <div class="content">
-        <!-- Profile Tab -->
-        <div class="tab-content" id="profile">
+
+        <!-- =========================
+             PROFILE TAB
+        ========================= -->
+        <div class="tab-content active" id="profile">
             <h2>Edit Profile</h2>
-            <form id="profileForm" th:object="${customer}">
+            <div th:if="${param.success}" class="message">Profile updated successfully!</div>
+            <form id="profileForm" th:action="@{/profile/update}" method="post" th:object="${customer}">
                 <input type="text" id="name" th:field="*{name}" placeholder="Full Name" required>
                 <input type="email" id="email" th:field="*{email}" placeholder="Email Address" required readonly>
-                <input type="password" id="password" th:field="*{password}" placeholder="Password" required>
+                <input type="password" id="password" name="password" placeholder="New Password (leave blank to keep current)">
 
-                <input type="text" id="houseNumber" th:field="*{houseNumber}" placeholder="House / Apartment Number / Complex Name">
+                <input type="text" id="houseNumber" th:field="*{houseNumber}" placeholder="House / Apartment Number">
+                <input type="text" id="complexName" th:field="*{complexName}" placeholder="Complex Name">
                 <input type="text" id="street" th:field="*{street}" placeholder="Street Address">
                 <input type="text" id="area" th:field="*{area}" placeholder="Area / Suburb">
                 <input type="text" id="postalCode" th:field="*{postalCode}" placeholder="Postal Code">
+                <input type="text" id="phone1" th:field="*{phone1}" placeholder="Phone Number" required>
+                <input type="text" id="phone2" th:field="*{phone2}" placeholder="Secondary Phone Number">
 
                 <label for="preferredStore">Preferred Store:</label>
                 <select id="preferredStore" th:field="*{preferredStore}" required>
@@ -172,12 +235,13 @@
                 </select>
 
                 <button type="submit" class="save-btn">Save Profile</button>
-                <div class="message" id="message"></div>
             </form>
         </div>
 
-        <!-- Orders Tab -->
-        <div class="tab-content" id="orders" style="display:none;">
+        <!-- =========================
+             ORDERS TAB
+        ========================= -->
+        <div class="tab-content" id="orders">
             <h2>Past Orders</h2>
             <table>
                 <thead>
@@ -189,95 +253,68 @@
                 </tr>
                 </thead>
                 <tbody id="ordersTable">
-                <!-- Orders will populate here -->
+                <!-- Orders populate here -->
                 </tbody>
             </table>
         </div>
     </div>
+
 </div>
 
+<!-- =========================
+     SCRIPT
+========================= -->
 <script>
     let isProfileDirty = false;
 
-    // Go back to home
+    // =========================
+    // BACK BUTTON
+    // =========================
     function goBack() {
-        if(isProfileDirty) {
+        if(isProfileDirty){
             if(!confirm("You have unsaved changes. Do you want to discard them and go back?")) return;
         }
         window.location.href = "/";
     }
 
-    // Tab switching with save/discard check
+    // =========================
+    // TAB SWITCHING
+    // =========================
     const tabs = document.querySelectorAll(".tab-btn");
     const contents = document.querySelectorAll(".tab-content");
 
     tabs.forEach(tab => {
         tab.addEventListener("click", () => {
-            if(isProfileDirty) {
+            if(isProfileDirty){
                 const proceed = confirm("You have unsaved changes. Do you want to discard them?");
                 if(!proceed) return;
             }
             tabs.forEach(t => t.classList.remove("active"));
             tab.classList.add("active");
 
-            contents.forEach(c => c.style.display = "none");
-            document.getElementById(tab.dataset.tab).style.display = "block";
+            contents.forEach(c => c.classList.remove("active"));
+            document.getElementById(tab.dataset.tab).classList.add("active");
             isProfileDirty = false;
         });
     });
 
-    // Track changes in profile form
+    // =========================
+    // TRACK FORM CHANGES
+    // =========================
     const profileForm = document.getElementById("profileForm");
-    profileForm.addEventListener("input", () => {
-        isProfileDirty = true;
-    });
+    profileForm.addEventListener("input", () => { isProfileDirty = true; });
 
-    // Load profile (example data, replace with backend call)
-    function loadProfile() {
-        const data = {
-            name: "John Doe",
-            email: "john@example.com",
-            password: "password123",
-            houseNumber: "12",
-            street: "Main St",
-            area: "Kenridge",
-            city: "Cape Town",
-            postalCode: "7708",
-            preferredStore: "Kenridge Branch"
-        };
-        document.getElementById('name').value = data.name;
-        document.getElementById('email').value = data.email;
-        document.getElementById('password').value = data.password;
-        document.getElementById('houseNumber').value = data.houseNumber;
-        document.getElementById('street').value = data.street;
-        document.getElementById('area').value = data.area;
-        document.getElementById('city').value = data.city;
-        document.getElementById('postalCode').value = data.postalCode;
-        document.getElementById('preferredStore').value = data.preferredStore;
-    }
-
-    // Save profile
+    // =========================
+    // SAVE PROFILE
+    // =========================
     profileForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const payload = {
-            name: document.getElementById('name').value,
-            email: document.getElementById('email').value,
-            password: document.getElementById('password').value,
-            houseNumber: document.getElementById('houseNumber').value,
-            street: document.getElementById('street').value,
-            area: document.getElementById('area').value,
-            city: document.getElementById('city').value,
-            postalCode: document.getElementById('postalCode').value,
-            preferredStore: document.getElementById('preferredStore').value
-        };
-        console.log("Saving profile...", payload);
-        document.getElementById('message').textContent = "Profile saved!";
-        setTimeout(() => { document.getElementById('message').textContent = ''; }, 3000);
         isProfileDirty = false;
     });
 
-    // Load orders (example data)
-    function loadOrders() {
+    // =========================
+    // LOAD ORDERS DATA (EXAMPLE)
+    // =========================
+    function loadOrders(){
         const orders = [
             {id: 101, date: "2026-01-20", items: "Pizza, Chips", total: "R250"},
             {id: 102, date: "2026-01-22", items: "Burger, Ribs", total: "R320"}
@@ -291,15 +328,19 @@
         });
     }
 
-    // Warn user if closing page with unsaved changes
+    // =========================
+    // UNSAVED CHANGES WARNING
+    // =========================
     window.addEventListener("beforeunload", (e) => {
-        if(isProfileDirty) {
+        if(isProfileDirty){
             e.preventDefault();
             e.returnValue = '';
         }
     });
 
-    loadProfile();
+    // =========================
+    // INITIALIZE PAGE
+    // =========================
     loadOrders();
 </script>
 

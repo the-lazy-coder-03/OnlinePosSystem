@@ -42,8 +42,8 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Only protect the edit profile page
-                        .requestMatchers("/profile/edit").authenticated()
+                        // Protect order and profile pages
+                        .requestMatchers("/order", "/profile/edit").authenticated()
 
                         // Public pages + static resources
                         .requestMatchers(
@@ -51,7 +51,6 @@ public class SecurityConfig {
                                 "/home",
                                 "/menu",
                                 "/menu/**",
-                                "/order",
                                 "/login",
                                 "/register",
                                 "/api/full-address",

@@ -3,33 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <title>Register — Pete’s Pizza</title>
-    <link rel="stylesheet" href="/css/style.css">
+
     <style>
+        /* =========================
+           GLOBAL STYLES
+        ========================= */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: 'Arial', sans-serif;
+            font-family: Arial, sans-serif;
             background-color: #e6f0ff;
             color: #333;
-            margin: 0;
-            padding: 0;
         }
 
+        /* =========================
+           HEADER
+        ========================= */
         header {
-            background-color: #3366ff;
+            background-color: #0052cc;
             color: white;
             padding: 20px;
             text-align: center;
         }
 
-        header h1 {
-            font-size: 3em;
-            margin: 0;
-        }
+        header h1 { font-size: 3em; margin: 0; }
+        header p { font-size: 1.2em; margin: 5px 0; }
 
-        header p {
-            font-size: 1.2em;
-            margin: 5px 0;
-        }
-
+        /* =========================
+           NAVIGATION
+        ========================= */
         nav {
             display: flex;
             justify-content: center;
@@ -39,34 +41,47 @@
 
         nav a {
             text-decoration: none;
-            color: #3366ff;
+            color: #0052cc;
             font-weight: bold;
-            padding: 10px 20px;
-            border: 2px solid #3366ff;
-            border-radius: 5px;
+            padding: 12px 25px;
+            border: 2px solid #0052cc;
+            border-radius: 15px;
             transition: all 0.3s;
+            font-size: 1em;
         }
 
         nav a:hover {
-            background-color: #3366ff;
+            background-color: #0052cc;
             color: white;
+            transform: scale(1.05);
         }
 
+        /* =========================
+           FORM CONTAINER
+        ========================= */
         .container {
             max-width: 450px;
             margin: 40px auto;
-            padding: 30px;
-            background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            padding: 35px 30px;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .container:hover {
+            transform: scale(1.02);
         }
 
         h2 {
             text-align: center;
-            color: #3366ff;
-            margin-bottom: 20px;
+            color: #0052cc;
+            margin-bottom: 25px;
         }
 
+        /* =========================
+           FORM FIELDS
+        ========================= */
         form {
             display: flex;
             flex-direction: column;
@@ -76,78 +91,126 @@
         input[type="email"],
         input[type="password"],
         select {
-            padding: 10px;
-            margin: 8px 0;
-            border-radius: 5px;
-            border: 1px solid #ccc;
+            padding: 12px 15px;
+            margin: 10px 0;
+            border-radius: 15px;
+            border: 2px solid #0052cc;
+            font-size: 1em;
+            background-color: #f0f6ff;
+            transition: all 0.3s;
         }
 
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        input[type="password"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #003d99;
+            background-color: #e6f0ff;
+        }
+
+        /* =========================
+           BUTTONS
+        ========================= */
         button {
             padding: 12px;
             margin-top: 15px;
-            background-color: #3366ff;
-            color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
             cursor: pointer;
-            font-size: 16px;
-        }
-
-        button:hover {
-            background-color: #254eda;
-        }
-
-        .login-link {
-            margin-top: 15px;
-            text-align: center;
-        }
-
-        .login-link a {
-            color: #3366ff;
-            text-decoration: none;
-        }
-
-        .login-link a:hover {
-            text-decoration: underline;
+            transition: all 0.3s;
         }
 
         #locationBtn {
             background-color: #ff9900;
-            margin-top: 10px;
+            color: white;
         }
 
         #locationBtn:hover {
-            background-color: #cc7a00;
+            background-color: white;
+            color: #ff9900;
+            border: 2px solid #e6a433;
+            transform: scale(1.03);
+        }
+
+        button[type="submit"] {
+            background-color: #0052cc;
+            color: white;
+        }
+
+        button[type="submit"]:hover {
+            background-color: white;
+            color: #0052cc;
+            border: 2px solid #7a9ac5;
+            transform: scale(1.03);
+        }
+
+        /* =========================
+           ERROR MESSAGES
+        ========================= */
+        .error {
+            color: red;
+            font-size: 0.95em;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        /* =========================
+           LOGIN LINK
+        ========================= */
+        .login-link {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .login-link a {
+            color: #0052cc;
+            text-decoration: none;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
+            color: #003d99;
         }
     </style>
 </head>
+
 <body>
 
+<!-- =========================
+     HEADER
+========================= -->
 <header>
     <h1>Pete’s Pizza</h1>
     <p>Kenridge & Uitzicht Branch</p>
     <p>Call Us: 021 914 3413 | 021 975 4332</p>
 </header>
 
+<!-- =========================
+     NAVIGATION
+========================= -->
 <nav>
     <a href="/order">Order Online</a>
     <a href="/login">Login</a>
     <a href="/register">Sign Up</a>
 </nav>
 
+<!-- =========================
+     REGISTRATION FORM
+========================= -->
 <div class="container">
     <h2>Create an Account</h2>
     <form action="/register" method="post">
         <input type="text" name="name" placeholder="Full Name" required>
         <input type="email" name="email" placeholder="Email Address" required>
         <input type="password" name="password" placeholder="Password" required>
-
-        <!-- House/Complex optional -->
         <input type="text" name="house_number" id="house_number" placeholder="House / Apartment Number / Complex Name">
-
         <input type="text" name="street" id="street" placeholder="Street Address" required>
         <input type="text" name="area" id="area" placeholder="Area / Suburb" required>
-
         <input type="text" name="postalCode" id="postalCode" placeholder="Postal Code" required>
         <input type="text" name="phone" placeholder="Phone Number" required>
 
@@ -157,25 +220,30 @@
             <option value="">Select a store</option>
             <option value="Kenridge Branch">Kenridge Branch</option>
             <option value="Uitzicht Branch">Uitzicht Branch</option>
-
         </select>
 
+        <!-- Buttons -->
         <button type="button" id="locationBtn">Use My Current Location</button>
         <button type="submit">Register</button>
 
-        <!-- ERROR MESSAGES -->
-        <div th:if="${param.error != null and param.error[0] == 'email'}" style="color: red; margin-top: 15px; text-align: center;">
+        <!-- Error Messages -->
+        <div th:if="${param.error != null and param.error[0] == 'email'}" class="error">
             This email is already registered. Please use a different email or <a href="/login">login here</a>.
         </div>
-        <div th:if="${param.error != null and param.error[0] == 'phone'}" style="color: red; margin-top: 15px; text-align: center;">
+        <div th:if="${param.error != null and param.error[0] == 'phone'}" class="error">
             This phone number is already registered. Please use a different phone number or <a href="/login">login here</a>.
         </div>
     </form>
+
+    <!-- Login Link -->
     <div class="login-link">
         Already have an account? <a href="/login">Login here</a>
     </div>
 </div>
 
+<!-- =========================
+     LOCATION SCRIPT
+========================= -->
 <script>
     const locationBtn = document.getElementById("locationBtn");
 
@@ -197,7 +265,7 @@
                 if(data.address) {
                     document.getElementById("street").value = data.address.road || "";
                     document.getElementById("house_number").value = data.address.house_number || "";
-                    document.getElementById("city").value = data.address.city || data.address.town || data.address.village || "";
+                    document.getElementById("area").value = data.address.suburb || data.address.city || "";
                     document.getElementById("postalCode").value = data.address.postcode || "";
                 }
             })
