@@ -1,5 +1,6 @@
 package org.example.onlinepossystem.controllers;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -12,8 +13,8 @@ import java.util.Map;
 @RestController
 public class LocationController {
 
-    // Hardcoded API key for now
-    private String googleMapsApiKey = "AIzaSyACQWLP46CeWOmNAMjJRcoWRYSNKkdrWGM";
+    @Value("${GOOGLE_MAPS_API_KEY}")
+    private String googleMapsApiKey;
 
     @GetMapping("/api/full-address")
     public String getFullAddress(@RequestParam double lat, @RequestParam double lon) {
