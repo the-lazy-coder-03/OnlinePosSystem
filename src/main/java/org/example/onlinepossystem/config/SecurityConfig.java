@@ -45,6 +45,9 @@ public class SecurityConfig {
                         // Protect order and profile pages
                         .requestMatchers("/order", "/profile/edit").authenticated()
 
+                        // All api endpoints are permit all for now
+                        .requestMatchers("/api/**").permitAll()
+
                         // Public pages + static resources
                         .requestMatchers(
                                 "/",
@@ -53,17 +56,22 @@ public class SecurityConfig {
                                 "/menu/**",
                                 "/login",
                                 "/register",
-                                "/api/full-address",
+                                "/input-orders",      // POS frontend page
+                                "/orders",            // Alias for POS frontend
+                                "/InputOrders",       // Case sensitive alias
+                                "/InputOrders.html",  // Direct file alias
+                                "/test",              // Test page
                                 "/css/**",
                                 "/js/**",
                                 "/images/**"
                         ).permitAll()
 
-                        // All other requests public
-                        .anyRequest().permitAll()
+                        // All other requests authenticated
+                        .anyRequest().authenticated()
                 )
                 .formLogin(form -> form
                         .loginPage("/login")
+                        .loginProcessingUrl("/login")
                         .usernameParameter("username")
                         .passwordParameter("password")
                         .defaultSuccessUrl("/", false)

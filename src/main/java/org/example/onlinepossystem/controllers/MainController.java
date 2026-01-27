@@ -67,6 +67,11 @@ public class MainController {
         return "register";
     }
 
+    @GetMapping({"/input-orders", "/orders", "/InputOrders", "/InputOrders.html"})
+    public String inputOrdersPage() {
+        return "InputOrders";
+    }
+
     // ====== Private Pages ======
 
     @GetMapping("/profile/edit")
