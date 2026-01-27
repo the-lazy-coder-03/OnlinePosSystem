@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>POS — Kenridge Orders</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #e6f0ff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #fff;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            width: 90%;
+            max-width: 700px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        h2 {
+            color: #0073e6;
+        }
+
+        .branchLabel {
+            font-weight: bold;
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            color: #0073e6;
+        }
+
+        /* ========================
+           ORDER QUEUE / DASHBOARD
+        ======================== */
+        .orderList {
+            list-style: none;
+            padding: 0;
+            text-align: left;
+        }
+
+        .orderItem {
+            background-color: #cce0ff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1rem;
+        }
+
+        .orderItem span.status {
+            font-weight: bold;
+            font-size: 0.95rem;
+            padding: 5px 10px;
+            border-radius: 8px;
+            color: white;
+        }
+
+        .status.Pending { background-color: #0073e6; }   /* blue */
+        .status.Accepted { background-color: #00b300; }  /* green */
+        .status.Rejected { background-color: #ff4d4d; }  /* red */
+
+        .orderItem button {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.1rem;
+            background-color: #0073e6;
+            color: white;
+            transition: all 0.2s ease;
+        }
+
+        .orderItem button:hover {
+            background-color: #0052cc;
+        }
+
+        /* ========================
+           SINGLE ORDER SCREEN
+        ======================== */
+        .orderCard {
+            background-color: #cce0ff;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+            text-align: left;
+            font-size: 1.1rem;
+        }
+
+        .topButtons {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 18px 30px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            font-size: 1.2rem;
+            margin: 5px;
+        }
+
+        .acceptBtn {
+            background-color: #0073e6;
+            color: white;
+        }
+
+        .acceptBtn:hover {
+            background-color: #0052cc;
+        }
+
+        .rejectBtn {
+            background-color: #ccc;
+        }
+
+        .rejectBtn:hover {
+            background-color: #999;
+        }
+
+        .homeBtn {
+            background-color: #00b300;
+        }
+
+        .homeBtn:hover {
+            background-color: #009900;
+        }
+
+        .backBtn {
+            background-color: #ff9999;
+        }
+
+        .backBtn:hover {
+            background-color: #ff6666;
+        }
+
+        /* ========================
+           SECTIONS
+        ======================== */
+        #loginSection { display: block; }
+        #queueSection { display: none; }
+        #singleOrderSection { display: none; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- LOGIN -->
+    <div id="loginSection">
+        <h2>Staff Login</h2>
+        <input type="password" id="codeInput" placeholder="Enter 16-character Code" maxlength="16" style="padding:10px;font-size:1.2rem;border-radius:10px;border:2px solid #0073e6; width: 60%;"><br><br>
+        <button onclick="login()" style="padding:10px 25px;font-size:1rem;background:#0073e6;color:white;border:none;border-radius:10px;">Login</button>
+        <p id="codeError" style="color:red; display:none;">Invalid Code</p>
+    </div>
+
+    <!-- ORDER QUEUE / DASHBOARD -->
+    <div id="queueSection">
+        <div class="branchLabel" id="branchLabelQueue"></div>
+        <h2>Online Orders Queue</h2>
+        <ul id="orderListQueue" class="orderList"></ul>
+        <button onclick="processNextOrder()" style="padding:15px 30px;font-size:1.2rem;background:#0073e6;color:white;border:none;border-radius:12px;margin-top:20px;">Process Next Order</button>
+    </div>
+
+    <!-- SINGLE ORDER SCREEN -->
+    <div id="singleOrderSection">
+        <div class="branchLabel" id="branchLabelSingle"></div>
+        <h2>Processing Order</h2>
+        <div class="topButtons">
+            <button class="homeBtn" onclick="goHome()">Home</button>
+            <button class="backBtn" onclick="goBack()">Previous Order</button>
+        </div>
+        <div id="currentOrderSingle"></div>
+    </div>
+</div>
+
+<script>
+    let currentBranch = '';
+    let branchOrders = [];
+    let orderIndex = 0;
+    let processedOrders = [];
+
+    // API BASE URL
+    const API_BASE_URL = '/api';
+
+    // LOGIN - Now connects to backend
+    async function login() {
+        const code = document.getElementById('codeInput').value;
+        document.getElementById('codeError').style.display = 'none';
+
+        if (code.length !== 16) {
+            document.getElementById('codeError').style.display = 'block';
+            document.getElementById('codeError').innerText = 'Code must be exactly 16 characters long';
+            return;
+        }
+
+        try {
+            // Call backend API to authenticate
+            const response = await fetch(`${API_BASE_URL}/staff/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: code })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Login successful
+                currentBranch = data.branch;
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('queueSection').style.display = 'block';
+                document.getElementById('branchLabelQueue').innerText = `Branch: ${currentBranch}`;
+
+                // Fetch orders for this branch
+                await fetchBranchOrders();
+                processedOrders = [];
+                showQueue();
+            } else {
+                // Login failed
+                document.getElementById('codeError').style.display = 'block';
+                document.getElementById('codeError').innerText = data.message || 'Invalid Code';
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            document.getElementById('codeError').style.display = 'block';
+            document.getElementById('codeError').innerText = 'Error connecting to server';
+        }
+    }
+
+    // FETCH ORDERS FROM BACKEND
+    async function fetchBranchOrders() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/orders?branch=${currentBranch}`);
+            branchOrders = await response.json();
+        } catch (error) {
+            console.error('Error fetching orders:', error);
+            branchOrders = [];
+        }
+    }
+
+    // SHOW QUEUE / DASHBOARD WITH STATUS
+    function showQueue() {
+        const list = document.getElementById('orderListQueue');
+        list.innerHTML = '';
+        if(branchOrders.length === 0) {
+            list.innerHTML = '<li>No orders for this branch.</li>';
+            return;
+        }
+
+        // Display all orders for this branch from backend
+        branchOrders.forEach(order => {
+            const li = document.createElement('li');
+            li.className = 'orderItem';
+            // Parse items JSON array
+            let itemsDisplay = '';
+            try {
+                const itemsArray = JSON.parse(order.items);
+                itemsDisplay = itemsArray.join(', ');
+            } catch {
+                itemsDisplay = order.items;
+            }
+            li.innerHTML = `<span>Order #${order.id} - ${order.customerName} (${order.type})</span>
+                        <span class="status ${order.status}">${order.status}</span>`;
+            list.appendChild(li);
+        });
+    }
+
+    // GO TO SINGLE ORDER SCREEN
+    function processNextOrder() {
+        const nextIndex = branchOrders.findIndex(o => o.status === 'Pending');
+        if(nextIndex === -1) return; // no pending orders
+        orderIndex = nextIndex;
+        document.getElementById('queueSection').style.display = 'none';
+        document.getElementById('singleOrderSection').style.display = 'block';
+        document.getElementById('branchLabelSingle').innerText = `Branch: ${currentBranch}`;
+        showSingleOrder();
+    }
+
+    // SHOW SINGLE ORDER
+    function showSingleOrder() {
+        const orderDiv = document.getElementById('currentOrderSingle');
+        orderDiv.innerHTML = '';
+
+        if(branchOrders.length === 0 || branchOrders.filter(o => o.status === 'Pending').length === 0) {
+            orderDiv.innerHTML = '<p>No pending orders to process.</p>';
+            return;
+        }
+
+        const order = branchOrders[orderIndex];
+
+        // Parse items JSON array
+        let itemsList = '';
+        try {
+            const itemsArray = JSON.parse(order.items);
+            itemsList = itemsArray.map(i => `<li>${i}</li>`).join('');
+        } catch {
+            itemsList = `<li>${order.items}</li>`;
+        }
+
+        orderDiv.innerHTML = `
+        <div class="orderCard">
+            <p><strong>Order #${order.id}</strong></p>
+            <p><strong>Customer:</strong> ${order.customerName}</p>
+            <p><strong>Type:</strong> ${order.type}</p>
+            <p><strong>Items:</strong></p>
+            <ul>${itemsList}</ul>
+            <div style="text-align:center; margin-top:15px;">
+                <button class="acceptBtn" onclick="acceptOrder()">Accept</button>
+                <button class="rejectBtn" onclick="rejectOrder()">Reject</button>
+            </div>
+        </div>
+    `;
+    }
+
+    // ACCEPT ORDER - Now updates backend
+    async function acceptOrder() {
+        const order = branchOrders[orderIndex];
+        try {
+            // Update status in backend
+            const response = await fetch(`${API_BASE_URL}/orders/${order.id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Accepted' })
+            });
+
+            if (response.ok) {
+                // Update local state
+                branchOrders[orderIndex].status = 'Accepted';
+                processedOrders.push(branchOrders[orderIndex]); // track processed
+
+                // Refresh orders from backend to stay in sync
+                await fetchBranchOrders();
+                showQueue(); // update dashboard
+
+                // Automatically go to next pending order
+                const nextPendingIndex = branchOrders.findIndex(o => o.status === 'Pending');
+                if(nextPendingIndex !== -1) {
+                    orderIndex = nextPendingIndex;
+                    showSingleOrder();
+                } else {
+                    // No more pending orders
+                    document.getElementById('singleOrderSection').innerHTML = '<p>All orders have been processed.</p><button onclick="goHome()" class="homeBtn">Go to Dashboard</button>';
+                }
+            } else {
+                alert('Failed to update order status');
+            }
+        } catch (error) {
+            console.error('Error accepting order:', error);
+            alert('Error connecting to server');
+        }
+    }
+
+    // REJECT ORDER - Now updates backend
+    async function rejectOrder() {
+        const order = branchOrders[orderIndex];
+        try {
+            // Update status in backend
+            const response = await fetch(`${API_BASE_URL}/orders/${order.id}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Rejected' })
+            });
+
+            if (response.ok) {
+                // Update local state
+                branchOrders[orderIndex].status = 'Rejected';
+                processedOrders.push(branchOrders[orderIndex]); // track processed
+
+                // Refresh orders from backend to stay in sync
+                await fetchBranchOrders();
+                showQueue(); // update dashboard
+
+                // Optionally move to next pending order automatically as well
+                const nextPendingIndex = branchOrders.findIndex(o => o.status === 'Pending');
+                if(nextPendingIndex !== -1) {
+                    orderIndex = nextPendingIndex;
+                    showSingleOrder();
+                } else {
+                    document.getElementById('singleOrderSection').innerHTML = '<p>All orders have been processed.</p><button onclick="goHome()" class="homeBtn">Go to Dashboard</button>';
+                }
+            } else {
+                alert('Failed to update order status');
+            }
+        } catch (error) {
+            console.error('Error rejecting order:', error);
+            alert('Error connecting to server');
+        }
+    }
+
+
+    // BACK TO PREVIOUS ORDER
+    function goBack() {
+        const prevIndex = processedOrders.length - 1;
+        if(prevIndex < 0) return;
+        orderIndex = branchOrders.findIndex(o => o.id === processedOrders[prevIndex].id);
+        processedOrders.pop();
+        showSingleOrder();
+    }
+
+    // GO HOME TO QUEUE SCREEN
+    async function goHome() {
+        // Refresh orders from backend when returning to dashboard
+        await fetchBranchOrders();
+        document.getElementById('singleOrderSection').style.display = 'none';
+        document.getElementById('queueSection').style.display = 'block';
+        showQueue();
+    }
+</script>
+
+</body>
+</html>
