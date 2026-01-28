@@ -96,6 +96,7 @@ public class OrderController {
      *   "type": "Pickup",
      *   "items": "[\"Pizza\",\"Soda\"]"
      * }
+     *
      * Response: Created Order object
      */
     @PostMapping
