@@ -7,6 +7,7 @@ import org.example.onlinepossystem.service.StaffService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
 import javax.sql.DataSource;
 import java.io.File;
 import java.sql.Connection;

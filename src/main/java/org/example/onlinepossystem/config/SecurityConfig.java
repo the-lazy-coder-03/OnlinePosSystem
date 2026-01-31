@@ -45,7 +45,12 @@ public class SecurityConfig {
                         // Protect order and profile pages
                         .requestMatchers("/order", "/profile/edit").authenticated()
 
-                        // All api endpoints are permit all for now
+                        // Protect sensitive API endpoints
+                        .requestMatchers("/api/staff/create").authenticated()
+                        .requestMatchers("/api/orders/**").permitAll() // Needed for POS frontend
+                        .requestMatchers("/api/staff/login").permitAll()
+
+                        // All other api endpoints
                         .requestMatchers("/api/**").permitAll()
 
                         // Public pages + static resources

@@ -32,7 +32,7 @@ public class CustomerController {
             @RequestParam(required = false) String phone2,
             @RequestParam(required = false) String preferredStore,
             @RequestParam(required = false) String complexName,
-            @RequestParam(required = false) String password,
+            @RequestParam(required = false, name = "password") String newPassword,
             Authentication authentication
     ) {
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -54,8 +54,8 @@ public class CustomerController {
         customer.setPreferredStore(preferredStore);
         customer.setComplexName(complexName);
 
-        if (password != null && !password.isEmpty()) {
-            customer.setPassword(passwordEncoder.encode(password));
+        if (newPassword != null && !newPassword.isEmpty()) {
+            customer.setPassword(passwordEncoder.encode(newPassword));
         }
 
         customerRepository.save(customer);
@@ -69,14 +69,13 @@ public class CustomerController {
             @RequestParam String lastName,
             @RequestParam String email,
             @RequestParam String password,
-            @RequestParam(required = false) String house_number,
+            @RequestParam(required = false, name = "house_number") String houseNumber,
             @RequestParam String street,
             @RequestParam String area,
             @RequestParam String postalCode,
             @RequestParam String phone,
             @RequestParam(required = false) String phone2,
-            @RequestParam String preferred_store,
-            @RequestParam(required = false) String complex_name
+            @RequestParam(required = false, name = "preferred_store") String preferredStore
     ) {
         // Check if email already exists
         if (customerRepository.findByEmail(email).isPresent()) {
@@ -94,14 +93,13 @@ public class CustomerController {
         customer.setLastName(lastName);
         customer.setEmail(email);
         customer.setPassword(passwordEncoder.encode(password));
-        customer.setHouseNumber(house_number);
+        customer.setHouseNumber(houseNumber);
         customer.setStreet(street);
         customer.setArea(area);
         customer.setPostalCode(postalCode);
         customer.setPhone1(phone);
         customer.setPhone2(phone2);
-        customer.setPreferredStore(preferred_store);
-        customer.setComplexName(complex_name);
+        customer.setPreferredStore(preferredStore);
 
         customerRepository.save(customer);
 
