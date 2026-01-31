@@ -262,15 +262,11 @@
         branchOrders.forEach(order => {
             const li = document.createElement('li');
             li.className = 'orderItem';
-            // Parse items JSON array
-            let itemsDisplay = '';
-            try {
-                const itemsArray = JSON.parse(order.items);
-                itemsDisplay = itemsArray.join(', ');
-            } catch {
-                itemsDisplay = order.items;
-            }
-            li.innerHTML = `<span>Order #${order.id} - ${order.customerName} (${order.type})</span>
+            
+            const customerName = order.customerName || 'Guest';
+            const itemsDisplay = order.orderItems ? order.orderItems.map(oi => oi.menuItem.name).join(', ') : 'No items';
+
+            li.innerHTML = `<span>Order #${order.id} - ${customerName} (${order.orderType || 'N/A'})</span>
                         <span class="status ${order.status}">${order.status}</span>`;
             list.appendChild(li);
         });
@@ -299,20 +295,25 @@
 
         const order = branchOrders[orderIndex];
 
-        // Parse items JSON array
+        const customerName = order.customerName || 'Guest';
         let itemsList = '';
-        try {
-            const itemsArray = JSON.parse(order.items);
-            itemsList = itemsArray.map(i => `<li>${i}</li>`).join('');
-        } catch {
-            itemsList = `<li>${order.items}</li>`;
+        if (order.orderItems) {
+            itemsList = order.orderItems.map(oi => {
+                let toppingsStr = '';
+                if (oi.toppings && oi.toppings.length > 0) {
+                    toppingsStr = ` (${oi.toppings.map(t => t.ingredient.name).join(', ')})`;
+                }
+                return `<li>${oi.qty}x ${oi.menuItem.name} (${oi.pizzaSize.cm}cm)${toppingsStr}</li>`;
+            }).join('');
+        } else {
+            itemsList = '<li>No items</li>';
         }
 
         orderDiv.innerHTML = `
         <div class="orderCard">
             <p><strong>Order #${order.id}</strong></p>
-            <p><strong>Customer:</strong> ${order.customerName}</p>
-            <p><strong>Type:</strong> ${order.type}</p>
+            <p><strong>Customer:</strong> ${customerName}</p>
+            <p><strong>Type:</strong> ${order.orderType || 'N/A'}</p>
             <p><strong>Items:</strong></p>
             <ul>${itemsList}</ul>
             <div style="text-align:center; margin-top:15px;">

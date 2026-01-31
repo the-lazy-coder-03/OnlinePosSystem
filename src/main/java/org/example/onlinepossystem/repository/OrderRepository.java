@@ -9,15 +9,7 @@ import java.util.List;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    /**
-     * Find all orders for a specific branch, ordered by creation time (FIFO).
-     * This ensures staff see orders in the order they were placed.
-     */
-    List<Order> findByBranchOrderByCreatedAtAsc(String branch);
+    List<Order> findByBranchIdOrderByCreatedAtAsc(Integer branchId);
 
-    /**
-     * Find all pending orders for a specific branch, ordered by creation time.
-     * Useful for fetching only unprocessed orders.
-     */
-    List<Order> findByBranchAndStatusOrderByCreatedAtAsc(String branch, String status);
+    List<Order> findByBranchIdAndStatusOrderByCreatedAtAsc(Integer branchId, String status);
 }

@@ -2,103 +2,63 @@ package org.example.onlinepossystem.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "customer_order")
 public class Order {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "order_id")
     private Long id;
 
-    @Column(nullable = false)
-    private String branch; // "Kenridge" or "Uitzicht"
+    @ManyToOne
+    @JoinColumn(name = "branch_id", nullable = false)
+    private Branch branch;
 
-    @Column(nullable = false, name = "customer_name")
+    @Column(name = "customer_name")
     private String customerName;
 
-    @Column(nullable = false)
-    private String type; // "Pickup" or "Delivery"
+    private String phone;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String items; // JSON string or comma-separated, e.g., "[\"Pizza\",\"Soda\"]"
+    @Column(name = "order_type", nullable = false)
+    private String orderType = "pickup";
 
     @Column(nullable = false)
-    private String status; // "Pending", "Accepted", "Rejected"
+    private String status = "created";
 
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @com.fasterxml.jackson.annotation.JsonManagedReference
+    private List<OrderItem> orderItems = new ArrayList<>();
 
     // Default constructor
-    public Order() {
-        this.createdAt = LocalDateTime.now();
-        this.status = "Pending"; // Default status
-    }
-
-    // Constructor with fields
-    public Order(String branch, String customerName, String type, String items) {
-        this.branch = branch;
-        this.customerName = customerName;
-        this.type = type;
-        this.items = items;
-        this.status = "Pending";
-        this.createdAt = LocalDateTime.now();
-    }
+    public Order() {}
 
     // Getters and Setters
-    public Long getId() {
-        return id;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public Branch getBranch() { return branch; }
+    public void setBranch(Branch branch) { this.branch = branch; }
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public String getOrderType() { return orderType; }
+    public void setOrderType(String orderType) { this.orderType = orderType; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public List<OrderItem> getOrderItems() { return orderItems; }
+    public void setOrderItems(List<OrderItem> orderItems) { this.orderItems = orderItems; }
 
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getBranch() {
-        return branch;
-    }
-
-    public void setBranch(String branch) {
-        this.branch = branch;
-    }
-
-    public String getCustomerName() {
-        return customerName;
-    }
-
-    public void setCustomerName(String customerName) {
-        this.customerName = customerName;
-    }
-
-    public String getType() {
-        return type;
-    }
-
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public String getItems() {
-        return items;
-    }
-
-    public void setItems(String items) {
-        this.items = items;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void addOrderItem(OrderItem item) {
+        orderItems.add(item);
+        item.setOrder(this);
     }
 }

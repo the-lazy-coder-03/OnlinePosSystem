@@ -1,0 +1,14 @@
+package org.example.onlinepossystem.repository;
+
+import org.example.onlinepossystem.entity.BranchMenuItemPrice;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface BranchMenuItemPriceRepository extends JpaRepository<BranchMenuItemPrice, BranchMenuItemPrice.BranchMenuItemPriceId> {
+    List<BranchMenuItemPrice> findByBranchId(Integer branchId);
+    Optional<BranchMenuItemPrice> findByBranchIdAndMenuItemIdAndPizzaSizeId(Integer branchId, Integer menuItemId, Integer pizzaSizeId);
+}
