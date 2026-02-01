@@ -11,42 +11,54 @@ public class Customer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String firstName;
-    private String lastName;
+    @Column(name = "phone1", unique = true)
+    private String phone1;
+
+    @Column(name = "phone2")
+    private String phone2;
+
+    @Column(name = "email", unique = true)
     private String email;
-    private String password;
 
     @Column(name = "house_number")
     private String houseNumber;
 
+    @Column(name = "street")
     private String street;
 
     @Column(name = "area")
     private String area;
 
-    @Column(name = "phone1")
-    private String phone1;   // ✅ field name matches repository method
-
-    @Column(name = "phone2")
-    private String phone2;
-
-    @Column(name = "postal_code")
-    private String postalCode;
-
-    @Column(name = "preferred_store")
-    private String preferredStore;
+    @Column(name = "complex_name")
+    private String complexName;
 
     @Column(name = "last_ordered_at")
     private LocalDateTime lastOrderedAt;
 
-    @Column(name = "complex_name")
-    private String complexName;
+    @Column(name = "preferred_store")
+    private String preferredStore;
+
+    @Column(name = "city")
+    private String city;
+
+    @Column(name = "password")
+    private String password;
+
+    @Column(name = "postal_code")
+    private String postalCode;
+
+    @Column(name = "first_name")
+    private String firstName;
+
+    @Column(name = "last_name")
+    private String lastName;
 
     // Default constructor
     public Customer() {}
 
     // Getters & Setters
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
     public String getFirstName() { return firstName; }
     public void setFirstName(String firstName) { this.firstName = firstName; }
@@ -88,4 +100,7 @@ public class Customer {
 
     public String getComplexName() { return complexName; }
     public void setComplexName(String complexName) { this.complexName = complexName; }
+
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
 }

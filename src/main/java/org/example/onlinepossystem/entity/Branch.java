@@ -1,0 +1,26 @@
+package org.example.onlinepossystem.entity;
+
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "branch")
+public class Branch {
+    @Id
+    @Column(name = "branch_id")
+    private Integer id;
+
+    @Column(nullable = false, unique = true)
+    private String name;
+
+    public Branch() {}
+
+    public Branch(Integer id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+}
