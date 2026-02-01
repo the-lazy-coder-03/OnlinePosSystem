@@ -3,16 +3,16 @@ package org.example.onlinepossystem.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "order_item_extra")
-public class OrderItemTopping {
+@Table(name = "order_pizza_item_extra")
+public class OrderPizzaItemExtra {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "order_item_extra_id")
+    @Column(name = "order_pizza_item_extra_id")
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "order_item_id", nullable = false)
-    private OrderItem orderItem;
+    @JoinColumn(name = "order_pizza_item_id", nullable = false)
+    private OrderPizzaItem orderPizzaItem;
 
     @ManyToOne
     @JoinColumn(name = "ingredient_id", nullable = false)
@@ -22,18 +22,18 @@ public class OrderItemTopping {
     private Integer qty = 1;
 
     @Column(name = "unit_price_at_time", nullable = false)
-    private Double price;
+    private Double unitPriceAtTime;
 
-    public OrderItemTopping() {}
+    public OrderPizzaItemExtra() {}
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    public OrderItem getOrderItem() { return orderItem; }
-    public void setOrderItem(OrderItem orderItem) { this.orderItem = orderItem; }
+    public OrderPizzaItem getOrderPizzaItem() { return orderPizzaItem; }
+    public void setOrderPizzaItem(OrderPizzaItem orderPizzaItem) { this.orderPizzaItem = orderPizzaItem; }
     public Ingredient getIngredient() { return ingredient; }
     public void setIngredient(Ingredient ingredient) { this.ingredient = ingredient; }
     public Integer getQty() { return qty; }
     public void setQty(Integer qty) { this.qty = qty; }
-    public Double getPrice() { return price; }
-    public void setPrice(Double price) { this.price = price; }
+    public Double getUnitPriceAtTime() { return unitPriceAtTime; }
+    public void setUnitPriceAtTime(Double unitPriceAtTime) { this.unitPriceAtTime = unitPriceAtTime; }
 }

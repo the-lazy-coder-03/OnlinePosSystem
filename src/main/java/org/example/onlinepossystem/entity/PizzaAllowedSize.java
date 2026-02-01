@@ -14,7 +14,7 @@ public class PizzaAllowedSize {
     @ManyToOne
     @MapsId("pizzaId")
     @JoinColumn(name = "pizza_id")
-    private MenuItem pizza;
+    private Pizza pizza;
 
     @ManyToOne
     @MapsId("pizzaSizeId")
@@ -23,7 +23,7 @@ public class PizzaAllowedSize {
 
     public PizzaAllowedSize() {}
 
-    public PizzaAllowedSize(MenuItem pizza, PizzaSize pizzaSize) {
+    public PizzaAllowedSize(Pizza pizza, PizzaSize pizzaSize) {
         this.pizza = pizza;
         this.pizzaSize = pizzaSize;
         this.id = new PizzaAllowedSizeId(pizza.getId(), pizzaSize.getId());
@@ -31,8 +31,8 @@ public class PizzaAllowedSize {
 
     public PizzaAllowedSizeId getId() { return id; }
     public void setId(PizzaAllowedSizeId id) { this.id = id; }
-    public MenuItem getPizza() { return pizza; }
-    public void setPizza(MenuItem pizza) { this.pizza = pizza; }
+    public Pizza getPizza() { return pizza; }
+    public void setPizza(Pizza pizza) { this.pizza = pizza; }
     public PizzaSize getPizzaSize() { return pizzaSize; }
     public void setPizzaSize(PizzaSize pizzaSize) { this.pizzaSize = pizzaSize; }
 

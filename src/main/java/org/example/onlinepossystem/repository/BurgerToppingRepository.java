@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface BurgerToppingRepository extends JpaRepository<BurgerTopping, Long> {
-    List<BurgerTopping> findByBurgerId(Long burgerId);
+public interface BurgerToppingRepository extends JpaRepository<BurgerTopping, Integer> {
+    List<BurgerTopping> findByBurgerId(Integer burgerId);
 }

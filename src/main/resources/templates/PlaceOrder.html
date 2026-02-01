@@ -16,7 +16,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #e6f0ff;
+            background-color: #f4f7f6;
             margin: 0;
             padding: 20px;
             color: var(--text-color);
@@ -31,21 +31,9 @@
             box-shadow: var(--shadow);
         }
 
-        h2, h3 {
-            color: var(--primary-color);
-        }
+        h2, h3 { color: var(--primary-color); }
 
         .hidden { display: none !important; }
-
-        /* Step Styles */
-        .step-container {
-            animation: fadeIn 0.4s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
 
         .btn-grid {
             display: grid;
@@ -55,28 +43,21 @@
         }
 
         .btn {
-            padding: 20px;
+            padding: 15px 25px;
             font-size: 1.1em;
             font-weight: 600;
             border: none;
             border-radius: var(--border-radius);
             cursor: pointer;
-            transition: all 0.3s;
+            transition: 0.3s;
             background-color: var(--primary-color);
             color: var(--white);
             text-align: center;
         }
 
-        .btn:hover {
-            opacity: 0.9;
-            transform: translateY(-2px);
-        }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn-secondary { background-color: #6c757d; }
 
-        .btn-secondary {
-            background-color: #6c757d;
-        }
-
-        /* Menu Layout */
         .menu-layout {
             display: grid;
             grid-template-columns: 200px 1fr;
@@ -84,12 +65,7 @@
             margin-top: 20px;
         }
 
-        .side-tabs {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
+        .side-tabs { display: flex; flex-direction: column; gap: 10px; }
         .tab {
             padding: 15px;
             background: var(--secondary-color);
@@ -98,7 +74,6 @@
             font-weight: 600;
             border: 2px solid transparent;
         }
-
         .tab.active {
             border-color: var(--primary-color);
             background: var(--white);
@@ -117,280 +92,139 @@
             padding: 15px;
             cursor: pointer;
             transition: 0.3s;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
         }
+        .item-card:hover { border-color: var(--primary-color); box-shadow: var(--shadow); }
 
-        .item-card:hover {
-            border-color: var(--primary-color);
-            box-shadow: var(--shadow);
-        }
-
-        .item-card.selected {
-            background-color: var(--secondary-color);
-            border-color: var(--primary-color);
-        }
-
-        /* Modal Styles */
         .modal {
             display: none;
             position: fixed;
             z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
+            left: 0; top: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.5);
         }
-
         .modal-content {
             background-color: var(--white);
             margin: 5% auto;
-            padding: 20px;
+            padding: 25px;
             border-radius: 20px;
             width: 80%;
-            max-width: 600px;
-            max-height: 85vh;
+            max-width: 500px;
+            max-height: 80vh;
             overflow-y: auto;
-            box-shadow: var(--shadow);
         }
+        .close { float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
 
-        .modal-header {
+        .custom-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-
-        .close {
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .custom-section {
-            margin-bottom: 20px;
-        }
-
-        .custom-section h4 {
-            margin-bottom: 10px;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 5px;
-        }
-
-        .option-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 10px;
-        }
-
-        .option-card {
-            border: 1px solid #ddd;
             padding: 10px;
-            border-radius: 8px;
-            cursor: pointer;
-            text-align: center;
-            transition: 0.3s;
+            border-bottom: 1px solid #eee;
         }
 
-        .option-card.selected {
-            background-color: var(--secondary-color);
-            border-color: var(--primary-color);
-        }
-
-        .item-header {
-            display: flex;
-            justify-content: space-between;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        .item-desc {
-            font-size: 0.9em;
-            color: #666;
-            margin-bottom: 10px;
-        }
-
-        /* Customization Modal-like view */
-        .customization {
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed #ccc;
-            font-size: 0.85em;
-        }
-
-        .option-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 4px;
-        }
-
-        /* Summary */
         .summary-card {
             background: var(--secondary-color);
             padding: 20px;
             border-radius: var(--border-radius);
             margin-top: 20px;
         }
-
-        .summary-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8px;
-        }
-
         .total-row {
             border-top: 2px solid var(--primary-color);
             padding-top: 10px;
             font-weight: bold;
             font-size: 1.2em;
             margin-top: 10px;
-        }
-
-        .footer-btns {
             display: flex;
-            gap: 15px;
-            margin-top: 30px;
+            justify-content: space-between;
         }
-
-        .footer-btns .btn { flex: 1; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <!-- Step 1: Branch Selection -->
-    <div id="step-branch" class="step-container">
-        <h2>Welcome</h2>
-        <p>Please select a branch to view the menu and prices.</p>
+    <div id="step-branch">
+        <h2>Select Branch</h2>
+        <p>Please select your branch to see the correct menu and prices.</p>
         <div class="btn-grid">
-            <button class="btn" onclick="selectBranch('Branch A')">Branch A</button>
-            <button class="btn" onclick="selectBranch('Branch B')">Branch B</button>
+            <button class="btn" onclick="selectBranch('Kenridge')">Kenridge</button>
+            <button class="btn" onclick="selectBranch('Uitzicht')">Uitzicht</button>
         </div>
     </div>
 
-    <!-- Step 2: Menu Selection -->
-    <div id="step-menu" class="step-container hidden">
+    <!-- Step 2: Menu -->
+    <div id="step-menu" class="hidden">
         <h2 id="menu-title">Menu</h2>
         <div class="menu-layout">
-            <div id="side-tabs" class="side-tabs">
-                <!-- Tabs will be injected here -->
-            </div>
-            <div id="items-container">
-                <div id="items-grid" class="items-grid">
-                    <!-- Items will be injected here -->
-                </div>
-            </div>
+            <div id="side-tabs" class="side-tabs"></div>
+            <div id="items-grid" class="items-grid"></div>
         </div>
-        <div class="footer-btns">
+        <div style="margin-top: 30px; display: flex; gap: 15px;">
             <button class="btn btn-secondary" onclick="showStep('branch')">Back</button>
-            <button class="btn" onclick="showSummary()">View Summary & Total</button>
+            <button class="btn" onclick="showSummary()">View Cart & Total</button>
         </div>
     </div>
 
     <!-- Step 3: Summary -->
-    <div id="step-summary" class="step-container hidden">
+    <div id="step-summary" class="hidden">
         <h2>Order Summary</h2>
-        <div id="summary-content" class="summary-card">
-            <!-- Summary will be injected here -->
-        </div>
-        <div class="footer-btns">
+        <div id="summary-content" class="summary-card"></div>
+        <div style="margin-top: 30px; display: flex; gap: 15px;">
             <button class="btn btn-secondary" onclick="showStep('menu')">Back to Menu</button>
-            <button class="btn" onclick="placeOrder()">Confirm & Place Order</button>
+            <button class="btn" onclick="placeOrder()">Confirm Order</button>
         </div>
     </div>
 
     <!-- Customization Modal -->
     <div id="custom-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modal-item-name">Customize Pizza</h2>
-                <span class="close" onclick="closeModal()">&times;</span>
-            </div>
-            <div id="modal-body">
-                <!-- Size Selection -->
-                <div class="custom-section">
-                    <h4>Choose Size</h4>
-                    <div id="modal-sizes" class="option-grid"></div>
-                </div>
-                <!-- Toppings Selection -->
-                <div class="custom-section">
-                    <h4>Add Extra Toppings</h4>
-                    <div id="modal-toppings" class="option-grid"></div>
-                </div>
-            </div>
-            <div class="footer-btns">
-                <button class="btn" onclick="addCustomizedToCart()">Add to Order</button>
-            </div>
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3 id="modal-title">Customize</h3>
+            <div id="modal-options"></div>
+            <button class="btn" style="width: 100%; margin-top: 20px;" onclick="addToCart()">Add to Order</button>
         </div>
     </div>
 </div>
 
-<!-- Thymeleaf variables for JS -->
-<script th:inline="javascript">
-    /*[+
-    const currentUser = [[${user}]];
-    const customerId = currentUser ? currentUser.id : 1; // Default to 1 for demo if no user
-    +]*/
-</script>
-
 <script>
     let state = {
         branch: '',
-        type: 'Pickup', // Default order type
-        menu: [], // Full menu fetched from API
+        menu: [],
         categories: [],
         selectedCategory: '',
-        cart: {}, // menuItemId-sizeId-toppingsHash -> { item, size, quantity, toppings: [] }
-        currentCustomizing: null // { item, size, toppings: [] }
+        cart: [],
+        currentCustomizing: null
     };
 
-    function selectBranch(branchName) {
+    function showStep(stepId) {
+        ['step-branch', 'step-menu', 'step-summary'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+        document.getElementById('step-' + stepId).classList.remove('hidden');
+    }
+
+    async function selectBranch(branchName) {
         state.branch = branchName;
         document.getElementById('menu-title').innerText = branchName + ' Menu';
-        fetchMenu(branchName);
+        await fetchMenu(branchName);
+        showStep('menu');
     }
 
     async function fetchMenu(branch) {
-        try {
-            console.log('Fetching menu for branch:', branch);
-            const response = await fetch(`/api/orders/menu?branch=${branch}`);
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-            }
-            const data = await response.json();
-            console.log('Menu data received:', data);
-            
-            if (!data || data.length === 0) {
-                alert('No menu items found for this branch.');
-                return;
-            }
-
-            state.menu = data;
-            
-            // Extract unique categories
-            state.categories = [...new Set(data.map(item => item.categoryName))];
-            state.selectedCategory = state.categories[0];
-            
-            renderTabs();
-            renderItems();
-            showStep('menu');
-        } catch (error) {
-            console.error('Error fetching menu:', error);
-            alert('Failed to load menu: ' + error.message);
-        }
+        const res = await fetch(`/api/orders/menu?branch=${branch}`);
+        state.menu = await res.json();
+        state.categories = [...new Set(state.menu.map(i => i.categoryName))];
+        state.selectedCategory = state.categories[0];
+        renderTabs();
+        renderItems();
     }
 
     function renderTabs() {
         const container = document.getElementById('side-tabs');
         container.innerHTML = state.categories.map(cat => `
-            <div class="tab ${cat === state.selectedCategory ? 'active' : ''}" 
-                 onclick="selectCategory('${cat}')">${cat}</div>
+            <div class="tab ${cat === state.selectedCategory ? 'active' : ''}" onclick="selectCategory('${cat}')">
+                ${cat}
+            </div>
         `).join('');
     }
 
@@ -403,216 +237,125 @@
     function renderItems() {
         const grid = document.getElementById('items-grid');
         const items = state.menu.filter(i => i.categoryName === state.selectedCategory);
-        
-        grid.innerHTML = items.map(item => {
-            const minPrice = Math.min(...item.availableSizes.map(s => s.price));
-            return `
-                <div class="item-card" onclick="openCustomization(${item.menuItemId})">
-                    <div class="item-header">
-                        <span>${item.menuItemName}</span>
-                        <span>From R${minPrice.toFixed(2)}</span>
-                    </div>
-                    <div class="item-desc">${item.description || ''}</div>
-                    <div style="color: var(--primary-color); font-weight: 600; font-size: 0.9em; margin-top: 10px;">
-                        Click to customize & add
-                    </div>
+        grid.innerHTML = items.map(item => `
+            <div class="item-card" onclick="openCustomization(${item.menuItemId}, ${item.pizza}, ${item.pizzaSizeId || 0}, ${item.price})">
+                <div style="font-weight: bold; display: flex; justify-content: space-between;">
+                    <span>${item.menuItemName}</span>
+                    <span>R${item.price.toFixed(2)}</span>
                 </div>
-            `;
-        }).join('');
+                <p style="font-size: 0.9em; color: #666;">${item.description || ''}</p>
+                <p style="color: var(--primary-color); font-weight: 600; font-size: 0.8em;">Click to add</p>
+            </div>
+        `).join('');
     }
 
-    function openCustomization(menuItemId) {
-        const item = state.menu.find(i => i.menuItemId === menuItemId);
+    function openCustomization(id, isPizza, pizzaSizeId, price) {
+        const item = state.menu.find(i => i.menuItemId === id && i.isPizza === isPizza && (i.pizzaSizeId || 0) === pizzaSizeId);
         state.currentCustomizing = {
             item: item,
-            size: item.availableSizes[0],
-            toppings: []
+            selectedCustoms: item.customizations.filter(c => c.default).map(c => c.id)
         };
-
-        document.getElementById('modal-item-name').innerText = `Customize ${item.menuItemName}`;
-        renderModalOptions();
+        
+        const optionsDiv = document.getElementById('modal-options');
+        if (item.customizations.length === 0) {
+            optionsDiv.innerHTML = '<p>No customizations available.</p>';
+        } else {
+            optionsDiv.innerHTML = item.customizations.map(c => `
+                <div class="custom-item">
+                    <span>${c.name} (R${c.price.toFixed(2)})</span>
+                    <input type="checkbox" ${c.default ? 'checked' : ''} onchange="toggleCustom(${c.id}, this.checked)">
+                </div>
+            `).join('');
+        }
+        
+        document.getElementById('modal-title').innerText = 'Customize ' + item.menuItemName;
         document.getElementById('custom-modal').style.display = 'block';
+    }
+
+    function toggleCustom(id, checked) {
+        if (checked) {
+            if (!state.currentCustomizing.selectedCustoms.includes(id)) 
+                state.currentCustomizing.selectedCustoms.push(id);
+        } else {
+            state.currentCustomizing.selectedCustoms = state.currentCustomizing.selectedCustoms.filter(cid => cid !== id);
+        }
     }
 
     function closeModal() {
         document.getElementById('custom-modal').style.display = 'none';
-        state.currentCustomizing = null;
     }
 
-    function renderModalOptions() {
-        const sizeContainer = document.getElementById('modal-sizes');
-        const toppingContainer = document.getElementById('modal-toppings');
-        const { item, size: selectedSize, toppings: selectedToppings } = state.currentCustomizing;
-
-        sizeContainer.innerHTML = item.availableSizes.map(s => `
-            <div class="option-card ${s.sizeId === selectedSize.sizeId ? 'selected' : ''}" 
-                 onclick="selectSize(${s.sizeId})">
-                ${s.cm}cm<br>R${s.price.toFixed(2)}
-            </div>
-        `).join('');
-
-        if (item.availableToppings && item.availableToppings.length > 0) {
-            toppingContainer.innerHTML = item.availableToppings.map(t => {
-                const extraPriceObj = t.extraPrices.find(ep => ep.sizeId === selectedSize.sizeId);
-                const price = extraPriceObj ? extraPriceObj.price : 0;
-                const isSelected = selectedToppings.some(st => st.id === t.id);
-                return `
-                    <div class="option-card ${isSelected ? 'selected' : ''}" 
-                         onclick="toggleTopping(${t.id})">
-                        ${t.name}<br>+R${price.toFixed(2)}
-                    </div>
-                `;
-            }).join('');
-        } else {
-            toppingContainer.innerHTML = '<p>No extra toppings available for this item.</p>';
-        }
-    }
-
-    function selectSize(sizeId) {
-        const size = state.currentCustomizing.item.availableSizes.find(s => s.sizeId === sizeId);
-        state.currentCustomizing.size = size;
-        renderModalOptions();
-    }
-
-    function toggleTopping(toppingId) {
-        const topping = state.currentCustomizing.item.availableToppings.find(t => t.id === toppingId);
-        const index = state.currentCustomizing.toppings.findIndex(st => st.id === toppingId);
-        
-        if (index > -1) {
-            state.currentCustomizing.toppings.splice(index, 1);
-        } else {
-            state.currentCustomizing.toppings.push(topping);
-        }
-        renderModalOptions();
-    }
-
-    function addCustomizedToCart() {
-        const { item, size, toppings } = state.currentCustomizing;
-        
-        // Create a unique key based on item, size and toppings
-        const toppingIds = toppings.map(t => t.id).sort().join(',');
-        const cartKey = `${item.menuItemId}-${size.sizeId}-${toppingIds}`;
-
-        if (state.cart[cartKey]) {
-            state.cart[cartKey].quantity++;
-        } else {
-            state.cart[cartKey] = {
-                item: item,
-                size: size,
-                toppings: [...toppings],
-                quantity: 1
-            };
-        }
-        
-        alert(`${item.menuItemName} added to order!`);
+    function addToCart() {
+        const { item, selectedCustoms } = state.currentCustomizing;
+        state.cart.push({
+            item: item,
+            customs: item.customizations.filter(c => selectedCustoms.includes(c.id)),
+            quantity: 1
+        });
+        alert(item.menuItemName + ' added to cart!');
         closeModal();
     }
 
-    function showStep(stepId) {
-        document.querySelectorAll('.step-container').forEach(el => el.classList.add('hidden'));
-        const target = document.getElementById('step-' + stepId);
-        if (target) {
-            target.classList.remove('hidden');
-        } else {
-            console.error('Step not found:', stepId);
-        }
-    }
-
     function showSummary() {
-        const content = document.getElementById('summary-content');
-        const cartEntries = Object.entries(state.cart);
+        if (state.cart.length === 0) return alert('Cart is empty');
         
-        if (cartEntries.length === 0) {
-            alert('Your cart is empty!');
-            return;
-        }
-
+        const content = document.getElementById('summary-content');
         let total = 0;
         let html = `<h3>Order for ${state.branch}</h3>`;
         
-        cartEntries.forEach(([key, entry]) => {
-            let itemPrice = entry.size.price;
-            let toppingsList = "";
+        state.cart.forEach(entry => {
+            let itemTotal = entry.item.price;
+            let customNames = entry.customs.map(c => {
+                itemTotal += c.price;
+                return c.name;
+            }).join(', ');
             
-            if (entry.toppings && entry.toppings.length > 0) {
-                const toppingNames = [];
-                entry.toppings.forEach(t => {
-                    const extraPriceObj = t.extraPrices.find(ep => ep.sizeId === entry.size.sizeId);
-                    const price = extraPriceObj ? extraPriceObj.price : 0;
-                    itemPrice += price;
-                    toppingNames.push(`${t.name} (R${price.toFixed(2)})`);
-                });
-                toppingsList = `<div style="font-size: 0.8em; color: #666; margin-left: 20px;">+ ${toppingNames.join(', ')}</div>`;
-            }
-
-            const lineTotal = itemPrice * entry.quantity;
-            total += lineTotal;
-            
+            total += itemTotal;
             html += `
-                <div style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
-                    <div class="summary-item">
-                        <span><strong>${entry.quantity}x ${entry.item.menuItemName} (${entry.size.cm}cm)</strong></span>
-                        <span>R${lineTotal.toFixed(2)}</span>
+                <div style="margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+                    <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                        <span>1x ${entry.item.menuItemName}</span>
+                        <span>R${itemTotal.toFixed(2)}</span>
                     </div>
-                    ${toppingsList}
+                    ${customNames ? `<div style="font-size: 0.85em; color: #666; margin-left: 15px;">+ ${customNames}</div>` : ''}
                 </div>
             `;
         });
-
-        html += `<div class="total-row">
-                    <span>Total Amount</span>
-                    <span>R${total.toFixed(2)}</span>
-                 </div>`;
         
+        html += `<div class="total-row"><span>Total</span><span>R${total.toFixed(2)}</span></div>`;
         content.innerHTML = html;
         showStep('summary');
     }
 
     async function placeOrder() {
-        const items = Object.entries(state.cart).map(([key, entry]) => {
-            const extras = entry.toppings.map(t => ({
-                ingredientId: t.id,
-                quantity: 1
-            }));
-
-            return {
-                pizzaId: parseInt(entry.item.menuItemId),
-                pizzaSizeId: entry.size.sizeId,
-                quantity: entry.quantity,
-                extras: extras,
-                notes: ''
-            };
-        });
+        const items = state.cart.map(entry => ({
+            menuItemId: entry.item.isPizza ? null : entry.item.menuItemId,
+            pizzaId: entry.item.isPizza ? entry.item.menuItemId : null,
+            pizzaSizeId: entry.item.isPizza ? entry.item.pizzaSizeId : null,
+            quantity: entry.quantity,
+            customizations: entry.customs.map(c => ({ id: c.id, quantity: 1 }))
+        }));
 
         const request = {
-            customerName: typeof currentUser !== 'undefined' && currentUser ? currentUser.firstName + ' ' + currentUser.lastName : 'Guest User',
-            phone: typeof currentUser !== 'undefined' && currentUser ? currentUser.phone1 : '0000000000',
             branchName: state.branch,
-            orderType: state.type.toLowerCase(),
-            items: items
+            items: items,
+            customerName: 'Guest User',
+            orderType: 'pickup'
         };
 
-        try {
-            const response = await fetch('/api/orders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(request)
-            });
-            
-            if (response.ok) {
-                const order = await response.json();
-                alert(`Order placed successfully! Order ID: ${order.id}`);
-                window.location.href = '/';
-            } else {
-                const error = await response.text();
-                alert('Failed to place order: ' + error);
-            }
-        } catch (error) {
-            console.error('Error placing order:', error);
-            alert('An error occurred. Please try again.');
+        const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request)
+        });
+
+        if (res.ok) {
+            alert('Order placed successfully!');
+            location.reload();
+        } else {
+            alert('Failed to place order');
         }
     }
-
 </script>
 
 </body>

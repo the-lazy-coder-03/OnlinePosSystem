@@ -22,32 +22,35 @@ public class OrderRequestDTO {
     public void setItems(List<OrderItemRequestDTO> items) { this.items = items; }
 
     public static class OrderItemRequestDTO {
+        private Integer menuItemId;
         private Integer pizzaId;
         private Integer pizzaSizeId;
         private Integer quantity;
-        private List<ExtraRequestDTO> extras;
+        private List<CustomizationRequestDTO> customizations;
         private String notes;
 
         // Getters and Setters
+        public Integer getMenuItemId() { return menuItemId; }
+        public void setMenuItemId(Integer menuItemId) { this.menuItemId = menuItemId; }
         public Integer getPizzaId() { return pizzaId; }
         public void setPizzaId(Integer pizzaId) { this.pizzaId = pizzaId; }
         public Integer getPizzaSizeId() { return pizzaSizeId; }
         public void setPizzaSizeId(Integer pizzaSizeId) { this.pizzaSizeId = pizzaSizeId; }
         public Integer getQuantity() { return quantity; }
         public void setQuantity(Integer quantity) { this.quantity = quantity; }
-        public List<ExtraRequestDTO> getExtras() { return extras; }
-        public void setExtras(List<ExtraRequestDTO> extras) { this.extras = extras; }
+        public List<CustomizationRequestDTO> getCustomizations() { return customizations; }
+        public void setCustomizations(List<CustomizationRequestDTO> customizations) { this.customizations = customizations; }
         public String getNotes() { return notes; }
         public void setNotes(String notes) { this.notes = notes; }
     }
 
-    public static class ExtraRequestDTO {
-        private Integer ingredientId;
+    public static class CustomizationRequestDTO {
+        private Integer id;
         private Integer quantity;
 
         // Getters and Setters
-        public Integer getIngredientId() { return ingredientId; }
-        public void setIngredientId(Integer ingredientId) { this.ingredientId = ingredientId; }
+        public Integer getId() { return id; }
+        public void setId(Integer id) { this.id = id; }
         public Integer getQuantity() { return quantity; }
         public void setQuantity(Integer quantity) { this.quantity = quantity; }
     }

@@ -6,8 +6,8 @@ import jakarta.persistence.*;
 @Table(name = "burger_toppings")
 public class BurgerTopping {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "id")
+    private Integer id;
 
     @ManyToOne
     @JoinColumn(name = "burger_id", nullable = false)
@@ -16,16 +16,16 @@ public class BurgerTopping {
     @Column(name = "topping_name", nullable = false)
     private String toppingName;
 
-    @Column(name = "is_default")
-    private boolean isDefault;
+    @Column(name = "is_default", nullable = false)
+    private boolean isDefault = true;
 
     @Column(nullable = false)
     private Double price;
 
     public BurgerTopping() {}
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
     public MenuItem getBurger() { return burger; }
     public void setBurger(MenuItem burger) { this.burger = burger; }
     public String getToppingName() { return toppingName; }

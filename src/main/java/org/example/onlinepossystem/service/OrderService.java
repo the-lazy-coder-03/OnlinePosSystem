@@ -31,16 +31,25 @@ public class OrderService {
     private BranchMenuItemPriceRepository branchMenuItemPriceRepository;
 
     @Autowired
+    private BurgerToppingRepository burgerToppingRepository;
+
+    @Autowired
+    private SaladIngredientRepository saladIngredientRepository;
+
+    @Autowired
     private PizzaSizeRepository pizzaSizeRepository;
 
     @Autowired
-    private PizzaAllowedSizeRepository pizzaAllowedSizeRepository;
-
-    @Autowired
-    private PriceCategoryRepository priceCategoryRepository;
-
-    @Autowired
     private IngredientRepository ingredientRepository;
+
+    @Autowired
+    private BranchPizzaPriceRepository branchPizzaPriceRepository;
+
+    @Autowired
+    private PizzaRepository pizzaRepository;
+
+    @Autowired
+    private PizzaAllowedSizeRepository pizzaAllowedSizeRepository;
 
     @Autowired
     private PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository;
@@ -55,55 +64,80 @@ public class OrderService {
         }
         Branch branch = branchOpt.get();
 
-        // 1. Get pizza prices for this branch
-        List<BranchMenuItemPrice> prices = branchMenuItemPriceRepository.findByBranchId(branch.getId());
-        Map<Integer, List<MenuDTO.SizePriceDTO>> pizzaPrices = prices.stream()
-                .collect(Collectors.groupingBy(p -> p.getMenuItem().getId(),
-                        Collectors.mapping(p -> {
-                            MenuDTO.SizePriceDTO s = new MenuDTO.SizePriceDTO();
-                            s.setSizeId(p.getPizzaSize().getId());
-                            s.setCm(p.getPizzaSize().getCm());
-                            s.setPrice(p.getPrice());
-                            return s;
-                        }, Collectors.toList())));
+        List<MenuDTO> menu = new ArrayList<>();
 
-        // 2. Get extra prices for this branch
-        List<BranchExtraPrice> extraPrices = branchExtraPriceRepository.findByBranchId(branch.getId());
-        Map<Integer, List<MenuDTO.SizePriceDTO>> categoryExtraPrices = extraPrices.stream()
-                .collect(Collectors.groupingBy(p -> p.getPriceCategory().getId(),
-                        Collectors.mapping(p -> {
-                            MenuDTO.SizePriceDTO s = new MenuDTO.SizePriceDTO();
-                            s.setSizeId(p.getPizzaSize().getId());
-                            s.setCm(p.getPizzaSize().getCm());
-                            s.setPrice(p.getPrice());
-                            return s;
-                        }, Collectors.toList())));
+        // 1. Regular Menu Items
+        List<BranchMenuItemPrice> menuItemPrices = branchMenuItemPriceRepository.findByBranchId(branch.getId());
+        Map<Integer, Double> itemPriceMap = menuItemPrices.stream()
+                .collect(Collectors.toMap(p -> p.getMenuItem().getId(), BranchMenuItemPrice::getPrice, (v1, v2) -> v1));
 
-        // 3. Get all active pizzas
-        List<MenuItem> pizzas = menuItemRepository.findAllByActiveTrue();
-        List<Ingredient> ingredients = ingredientRepository.findAllByActiveTrue();
+        List<MenuItem> items = menuItemRepository.findAllByActiveTrue();
+        for (MenuItem i : items) {
+            if (itemPriceMap.containsKey(i.getId())) {
+                MenuDTO dto = new MenuDTO();
+                dto.setCategoryName(i.getCategory() != null ? i.getCategory().getName() : "Uncategorized");
+                dto.setMenuItemId(i.getId());
+                dto.setMenuItemName(i.getName());
+                dto.setDescription(i.getDescription());
+                dto.setPrice(itemPriceMap.get(i.getId()));
+                dto.setIs300ml(i.isIs300ml());
+                dto.setIs2l(i.isIs2l());
+                dto.setPizza(false);
 
-        return pizzas.stream()
-                .filter(p -> pizzaPrices.containsKey(p.getId()))
-                .map(p -> {
+                List<MenuDTO.CustomizationDTO> customizations = new ArrayList<>();
+                List<BurgerTopping> toppings = burgerToppingRepository.findByBurgerId(i.getId());
+                for (BurgerTopping t : toppings) {
+                    MenuDTO.CustomizationDTO c = new MenuDTO.CustomizationDTO();
+                    c.setId(t.getId());
+                    c.setName(t.getToppingName());
+                    c.setPrice(t.getPrice());
+                    c.setDefault(t.isDefault());
+                    customizations.add(c);
+                }
+                List<SaladIngredient> ingredients = saladIngredientRepository.findBySaladId(i.getId());
+                for (SaladIngredient ing : ingredients) {
+                    MenuDTO.CustomizationDTO c = new MenuDTO.CustomizationDTO();
+                    c.setId(ing.getId());
+                    c.setName(ing.getIngredientName());
+                    c.setPrice(ing.getPrice());
+                    c.setDefault(false);
+                    customizations.add(c);
+                }
+                dto.setCustomizations(customizations);
+                menu.add(dto);
+            }
+        }
+
+        // 2. Pizzas
+        List<BranchPizzaPrice> pizzaPrices = branchPizzaPriceRepository.findByBranchId(branch.getId());
+        Map<Integer, List<BranchPizzaPrice>> pizzaPriceMap = pizzaPrices.stream()
+                .collect(Collectors.groupingBy(p -> p.getPizza().getId()));
+
+        List<Pizza> pizzas = pizzaRepository.findAllByActiveTrue();
+        for (Pizza p : pizzas) {
+            if (pizzaPriceMap.containsKey(p.getId())) {
+                List<BranchPizzaPrice> bppList = pizzaPriceMap.get(p.getId());
+                for (BranchPizzaPrice bpp : bppList) {
                     MenuDTO dto = new MenuDTO();
-                    dto.setCategoryName(p.getCategory() != null ? p.getCategory().getName() : "Uncategorized");
-                    dto.setMenuItemId(Long.valueOf(p.getId()));
-                    dto.setMenuItemName(p.getName());
+                    dto.setCategoryName(p.getCategory() != null ? p.getCategory().getName() : "Pizzas");
+                    dto.setMenuItemId(p.getId());
+                    dto.setMenuItemName(p.getName() + " (" + bpp.getPizzaSize().getCm() + "cm)");
                     dto.setDescription(p.getDescription());
-                    dto.setAvailableSizes(pizzaPrices.get(p.getId()));
-                    
-                    dto.setAvailableToppings(ingredients.stream().map(i -> {
-                        MenuDTO.ToppingDTO t = new MenuDTO.ToppingDTO();
-                        t.setId(i.getId());
-                        t.setName(i.getName());
-                        List<MenuDTO.SizePriceDTO> extras = categoryExtraPrices.get(i.getPriceCategory().getId());
-                        t.setExtraPrices(extras != null ? extras : new ArrayList<>());
-                        return t;
-                    }).collect(Collectors.toList()));
+                    dto.setPrice(bpp.getPrice());
+                    dto.setPizza(true);
+                    dto.setPizzaSizeId(bpp.getPizzaSize().getId());
 
-                    return dto;
-                }).collect(Collectors.toList());
+                    // Customizations for pizza (extra ingredients)
+                    List<MenuDTO.CustomizationDTO> customizations = new ArrayList<>();
+                    // Actually for pizza, we should show ALL ingredients and their branch-specific prices for this size
+                    // But for simplicity in this step, let's just mark it as pizza.
+                    dto.setCustomizations(customizations);
+                    menu.add(dto);
+                }
+            }
+        }
+
+        return menu;
     }
 
     @Transactional
@@ -116,62 +150,101 @@ public class OrderService {
         order.setCustomerName(request.getCustomerName());
         order.setPhone(request.getPhone());
         order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "pickup");
-        order.setStatus("created");
         order.setCreatedAt(LocalDateTime.now());
+        order.setStatus("created");
 
         for (OrderRequestDTO.OrderItemRequestDTO itemRequest : request.getItems()) {
-            MenuItem pizza = menuItemRepository.findById(itemRequest.getPizzaId())
-                    .orElseThrow(() -> new RuntimeException("Pizza not found"));
-            PizzaSize size = pizzaSizeRepository.findById(itemRequest.getPizzaSizeId())
-                    .orElseThrow(() -> new RuntimeException("Size not found"));
+            if (itemRequest.getPizzaId() != null) {
+                // Handle Pizza
+                Pizza pizza = pizzaRepository.findById(itemRequest.getPizzaId())
+                        .orElseThrow(() -> new RuntimeException("Pizza not found"));
+                PizzaSize size = pizzaSizeRepository.findById(itemRequest.getPizzaSizeId())
+                        .orElseThrow(() -> new RuntimeException("Pizza size not found"));
+                BranchPizzaPrice bpp = branchPizzaPriceRepository
+                        .findByBranchIdAndPizzaIdAndPizzaSizeId(branch.getId(), pizza.getId(), size.getId())
+                        .orElseThrow(() -> new RuntimeException("Pizza price not found for branch"));
 
-            BranchMenuItemPrice branchPrice = branchMenuItemPriceRepository
-                    .findByBranchIdAndMenuItemIdAndPizzaSizeId(branch.getId(), pizza.getId(), size.getId())
-                    .orElseThrow(() -> new RuntimeException("Price not found for branch"));
+                OrderPizzaItem pizzaItem = new OrderPizzaItem();
+                pizzaItem.setPizza(pizza);
+                pizzaItem.setPizzaSize(size);
+                pizzaItem.setQty(itemRequest.getQuantity());
+                pizzaItem.setBasePriceAtTime(bpp.getPrice());
+                pizzaItem.setNotes(itemRequest.getNotes());
 
-            OrderItem orderItem = new OrderItem();
-            orderItem.setMenuItem(pizza);
-            orderItem.setPizzaSize(size);
-            orderItem.setQty(itemRequest.getQuantity());
-            orderItem.setPrice(branchPrice.getPrice());
-            orderItem.setNotes(itemRequest.getNotes());
+                if (itemRequest.getCustomizations() != null) {
+                    for (OrderRequestDTO.CustomizationRequestDTO custReq : itemRequest.getCustomizations()) {
+                        Ingredient ing = ingredientRepository.findById(custReq.getId())
+                                .orElseThrow(() -> new RuntimeException("Ingredient not found"));
+                        
+                        BranchExtraPrice bep = branchExtraPriceRepository
+                                .findById(new BranchExtraPrice.BranchExtraPriceId(branch.getId(), ing.getPriceCategory().getId(), size.getId()))
+                                .orElseThrow(() -> new RuntimeException("Extra price not found"));
 
-            if (itemRequest.getExtras() != null) {
-                for (OrderRequestDTO.ExtraRequestDTO extraReq : itemRequest.getExtras()) {
-                    Ingredient ing = ingredientRepository.findById(extraReq.getIngredientId())
-                            .orElseThrow(() -> new RuntimeException("Ingredient not found"));
-                    
-                    BranchExtraPrice extraPrice = branchExtraPriceRepository.findAll().stream()
-                            .filter(ep -> ep.getBranch().getId().equals(branch.getId()) &&
-                                          ep.getPriceCategory().getId().equals(ing.getPriceCategory().getId()) &&
-                                          ep.getPizzaSize().getId().equals(size.getId()))
-                            .findFirst()
-                            .orElseThrow(() -> new RuntimeException("Extra price not found"));
-
-                    OrderItemTopping extra = new OrderItemTopping();
-                    extra.setIngredient(ing);
-                    extra.setQty(extraReq.getQuantity());
-                    extra.setPrice(extraPrice.getPrice());
-                    orderItem.addTopping(extra);
+                        OrderPizzaItemExtra extra = new OrderPizzaItemExtra();
+                        extra.setIngredient(ing);
+                        extra.setQty(custReq.getQuantity());
+                        extra.setUnitPriceAtTime(bep.getPrice());
+                        pizzaItem.addExtra(extra);
+                    }
                 }
-            }
+                order.addPizzaItem(pizzaItem);
 
-            order.addOrderItem(orderItem);
+            } else {
+                // Handle Menu Item
+                MenuItem menuItem = menuItemRepository.findById(itemRequest.getMenuItemId())
+                        .orElseThrow(() -> new RuntimeException("Menu item not found"));
+
+                BranchMenuItemPrice branchPrice = branchMenuItemPriceRepository
+                        .findByBranchIdAndMenuItemId(branch.getId(), menuItem.getId())
+                        .orElseThrow(() -> new RuntimeException("Price not found for branch"));
+
+                OrderMenuItem orderItem = new OrderMenuItem();
+                orderItem.setMenuItem(menuItem);
+                orderItem.setQty(itemRequest.getQuantity());
+                orderItem.setUnitPriceAtTime(branchPrice.getPrice());
+                orderItem.setNotes(itemRequest.getNotes());
+
+                if (itemRequest.getCustomizations() != null) {
+                    for (OrderRequestDTO.CustomizationRequestDTO custReq : itemRequest.getCustomizations()) {
+                        OrderMenuItemExtra extra = new OrderMenuItemExtra();
+                        // For non-pizza items, we'll use the name from BurgerTopping or SaladIngredient
+                        String extraName = "";
+                        Double extraPrice = 0.0;
+
+                        Optional<BurgerTopping> bt = burgerToppingRepository.findById(custReq.getId());
+                        if (bt.isPresent()) {
+                            extraName = bt.get().getToppingName();
+                            extraPrice = bt.get().getPrice();
+                        } else {
+                            Optional<SaladIngredient> si = saladIngredientRepository.findById(custReq.getId());
+                            if (si.isPresent()) {
+                                extraName = si.get().getIngredientName();
+                                extraPrice = si.get().getPrice();
+                            }
+                        }
+                        extra.setName(extraName);
+                        extra.setQty(custReq.getQuantity());
+                        extra.setUnitPriceAtTime(extraPrice);
+                        orderItem.addExtra(extra);
+                    }
+                }
+                order.addMenuItem(orderItem);
+            }
         }
 
         return orderRepository.save(order);
     }
 
     public List<Order> getOrdersByBranch(String branchName) {
-        Branch branch = branchRepository.findByName(branchName)
-                .orElseThrow(() -> new RuntimeException("Branch not found"));
-        return orderRepository.findByBranchIdOrderByCreatedAtAsc(branch.getId());
+        Optional<Branch> branchOpt = branchRepository.findByName(branchName);
+        if (branchOpt.isEmpty()) return new ArrayList<>();
+        return orderRepository.findByBranchId(branchOpt.get().getId());
     }
 
     public List<Order> getPendingOrdersByBranch(String branchName) {
-        Branch branch = branchRepository.findByName(branchName)
-                .orElseThrow(() -> new RuntimeException("Branch not found"));
-        return orderRepository.findByBranchIdAndStatusOrderByCreatedAtAsc(branch.getId(), "Pending");
+        Optional<Branch> branchOpt = branchRepository.findByName(branchName);
+        if (branchOpt.isEmpty()) return new ArrayList<>();
+        return orderRepository.findByBranchIdAndStatus(branchOpt.get().getId(), "created");
     }
 
     public Order updateOrderStatus(Long orderId, String newStatus) {

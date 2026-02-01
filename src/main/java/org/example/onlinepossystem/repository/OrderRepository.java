@@ -8,8 +8,6 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
-
-    List<Order> findByBranchIdOrderByCreatedAtAsc(Integer branchId);
-
-    List<Order> findByBranchIdAndStatusOrderByCreatedAtAsc(Integer branchId, String status);
+    List<Order> findByBranchId(Integer branchId);
+    List<Order> findByBranchIdAndStatus(Integer branchId, String status);
 }

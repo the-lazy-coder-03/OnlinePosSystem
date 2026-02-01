@@ -15,13 +15,12 @@ public class Order {
     private Long id;
 
     @ManyToOne
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
+
+    @ManyToOne
     @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
-
-    @Column(name = "customer_name")
-    private String customerName;
-
-    private String phone;
 
     @Column(name = "order_type", nullable = false)
     private String orderType = "pickup";
@@ -32,33 +31,51 @@ public class Order {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    @com.fasterxml.jackson.annotation.JsonManagedReference
-    private List<OrderItem> orderItems = new ArrayList<>();
+    @Column(name = "customer_name")
+    private String customerName;
 
-    // Default constructor
+    @Column
+    private String phone;
+
+    @Column(columnDefinition = "TEXT")
+    private String notes;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderMenuItem> menuItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderPizzaItem> pizzaItems = new ArrayList<>();
+
     public Order() {}
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Branch getBranch() { return branch; }
     public void setBranch(Branch branch) { this.branch = branch; }
-    public String getCustomerName() { return customerName; }
-    public void setCustomerName(String customerName) { this.customerName = customerName; }
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
+    public Customer getCustomer() { return customer; }
+    public void setCustomer(Customer customer) { this.customer = customer; }
     public String getOrderType() { return orderType; }
     public void setOrderType(String orderType) { this.orderType = orderType; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    public List<OrderItem> getOrderItems() { return orderItems; }
-    public void setOrderItems(List<OrderItem> orderItems) { this.orderItems = orderItems; }
-
-    public void addOrderItem(OrderItem item) {
-        orderItems.add(item);
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
+    public List<OrderMenuItem> getMenuItems() { return menuItems; }
+    public void setMenuItems(List<OrderMenuItem> menuItems) { this.menuItems = menuItems; }
+    public void addMenuItem(OrderMenuItem item) {
+        menuItems.add(item);
+        item.setOrder(this);
+    }
+    public List<OrderPizzaItem> getPizzaItems() { return pizzaItems; }
+    public void setPizzaItems(List<OrderPizzaItem> pizzaItems) { this.pizzaItems = pizzaItems; }
+    public void addPizzaItem(OrderPizzaItem item) {
+        pizzaItems.add(item);
         item.setOrder(this);
     }
 }

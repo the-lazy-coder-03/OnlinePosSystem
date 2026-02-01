@@ -10,5 +10,5 @@ import java.util.Optional;
 @Repository
 public interface BranchMenuItemPriceRepository extends JpaRepository<BranchMenuItemPrice, BranchMenuItemPrice.BranchMenuItemPriceId> {
     List<BranchMenuItemPrice> findByBranchId(Integer branchId);
-    Optional<BranchMenuItemPrice> findByBranchIdAndMenuItemIdAndPizzaSizeId(Integer branchId, Integer menuItemId, Integer pizzaSizeId);
+    Optional<BranchMenuItemPrice> findByBranchIdAndMenuItemId(Integer branchId, Integer menuItemId);
 }

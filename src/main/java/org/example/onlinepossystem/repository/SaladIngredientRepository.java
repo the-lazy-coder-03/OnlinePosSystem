@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface SaladIngredientRepository extends JpaRepository<SaladIngredient, Long> {
-    List<SaladIngredient> findBySaladId(Long saladId);
+public interface SaladIngredientRepository extends JpaRepository<SaladIngredient, Integer> {
+    List<SaladIngredient> findBySaladId(Integer saladId);
 }

@@ -5,7 +5,7 @@ import java.io.Serializable;
 import java.util.Objects;
 
 @Entity
-@Table(name = "branch_pizza_price")
+@Table(name = "branch_menu_item_price")
 public class BranchMenuItemPrice {
 
     @EmbeddedId
@@ -17,26 +17,20 @@ public class BranchMenuItemPrice {
     private Branch branch;
 
     @ManyToOne
-    @MapsId("pizzaId")
-    @JoinColumn(name = "pizza_id")
+    @MapsId("menuItemId")
+    @JoinColumn(name = "menu_item_id")
     private MenuItem menuItem;
-
-    @ManyToOne
-    @MapsId("pizzaSizeId")
-    @JoinColumn(name = "pizza_size_id")
-    private PizzaSize pizzaSize;
 
     @Column(nullable = false)
     private Double price;
 
     public BranchMenuItemPrice() {}
 
-    public BranchMenuItemPrice(Branch branch, MenuItem menuItem, PizzaSize pizzaSize, Double price) {
+    public BranchMenuItemPrice(Branch branch, MenuItem menuItem, Double price) {
         this.branch = branch;
         this.menuItem = menuItem;
-        this.pizzaSize = pizzaSize;
         this.price = price;
-        this.id = new BranchMenuItemPriceId(branch.getId(), menuItem.getId(), pizzaSize.getId());
+        this.id = new BranchMenuItemPriceId(branch.getId(), menuItem.getId());
     }
 
     public BranchMenuItemPriceId getId() { return id; }
@@ -45,42 +39,37 @@ public class BranchMenuItemPrice {
     public void setBranch(Branch branch) { this.branch = branch; }
     public MenuItem getMenuItem() { return menuItem; }
     public void setMenuItem(MenuItem menuItem) { this.menuItem = menuItem; }
-    public PizzaSize getPizzaSize() { return pizzaSize; }
-    public void setPizzaSize(PizzaSize pizzaSize) { this.pizzaSize = pizzaSize; }
     public Double getPrice() { return price; }
     public void setPrice(Double price) { this.price = price; }
 
     @Embeddable
     public static class BranchMenuItemPriceId implements Serializable {
         private Integer branchId;
-        private Integer pizzaId;
-        private Integer pizzaSizeId;
+        private Integer menuItemId;
 
         public BranchMenuItemPriceId() {}
-        public BranchMenuItemPriceId(Integer branchId, Integer pizzaId, Integer pizzaSizeId) {
+        public BranchMenuItemPriceId(Integer branchId, Integer menuItemId) {
             this.branchId = branchId;
-            this.pizzaId = pizzaId;
-            this.pizzaSizeId = pizzaSizeId;
+            this.menuItemId = menuItemId;
         }
 
         public Integer getBranchId() { return branchId; }
         public void setBranchId(Integer branchId) { this.branchId = branchId; }
-        public Integer getPizzaId() { return pizzaId; }
-        public void setPizzaId(Integer pizzaId) { this.pizzaId = pizzaId; }
-        public Integer getPizzaSizeId() { return pizzaSizeId; }
-        public void setPizzaSizeId(Integer pizzaSizeId) { this.pizzaSizeId = pizzaSizeId; }
+        public Integer getMenuItemId() { return menuItemId; }
+        public void setMenuItemId(Integer menuItemId) { this.menuItemId = menuItemId; }
 
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             BranchMenuItemPriceId that = (BranchMenuItemPriceId) o;
-            return Objects.equals(branchId, that.branchId) && Objects.equals(pizzaId, that.pizzaId) && Objects.equals(pizzaSizeId, that.pizzaSizeId);
+            return Objects.equals(branchId, that.branchId) && 
+                   Objects.equals(menuItemId, that.menuItemId);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(branchId, pizzaId, pizzaSizeId);
+            return Objects.hash(branchId, menuItemId);
         }
     }
 }

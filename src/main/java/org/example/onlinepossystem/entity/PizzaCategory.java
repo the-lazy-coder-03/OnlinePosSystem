@@ -3,10 +3,10 @@ package org.example.onlinepossystem.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "menu_category")
-public class MenuCategory {
+@Table(name = "pizza_category")
+public class PizzaCategory {
     @Id
-    @Column(name = "id")
+    @Column(name = "pizza_category_id")
     private Integer id;
 
     @Column(nullable = false, unique = true)
@@ -18,9 +18,9 @@ public class MenuCategory {
     @Column(nullable = false)
     private boolean active = true;
 
-    public MenuCategory() {}
+    public PizzaCategory() {}
 
-    public MenuCategory(Integer id, String name, Integer sortOrder) {
+    public PizzaCategory(Integer id, String name, Integer sortOrder) {
         this.id = id;
         this.name = name;
         this.sortOrder = sortOrder;

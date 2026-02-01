@@ -14,7 +14,7 @@ public class PizzaDefaultIngredient {
     @ManyToOne
     @MapsId("pizzaId")
     @JoinColumn(name = "pizza_id")
-    private MenuItem pizza;
+    private Pizza pizza;
 
     @ManyToOne
     @MapsId("ingredientId")
@@ -32,7 +32,7 @@ public class PizzaDefaultIngredient {
 
     public PizzaDefaultIngredient() {}
 
-    public PizzaDefaultIngredient(MenuItem pizza, Ingredient ingredient, boolean isRemovable, Integer defaultQty, Integer sortOrder) {
+    public PizzaDefaultIngredient(Pizza pizza, Ingredient ingredient, boolean isRemovable, Integer defaultQty, Integer sortOrder) {
         this.pizza = pizza;
         this.ingredient = ingredient;
         this.isRemovable = isRemovable;
@@ -43,8 +43,8 @@ public class PizzaDefaultIngredient {
 
     public PizzaDefaultIngredientId getId() { return id; }
     public void setId(PizzaDefaultIngredientId id) { this.id = id; }
-    public MenuItem getPizza() { return pizza; }
-    public void setPizza(MenuItem pizza) { this.pizza = pizza; }
+    public Pizza getPizza() { return pizza; }
+    public void setPizza(Pizza pizza) { this.pizza = pizza; }
     public Ingredient getIngredient() { return ingredient; }
     public void setIngredient(Ingredient ingredient) { this.ingredient = ingredient; }
     public boolean isRemovable() { return isRemovable; }

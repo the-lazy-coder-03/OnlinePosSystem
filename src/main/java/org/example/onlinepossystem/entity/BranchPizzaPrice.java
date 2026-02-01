@@ -1,0 +1,88 @@
+package org.example.onlinepossystem.entity;
+
+import jakarta.persistence.*;
+import java.io.Serializable;
+import java.util.Objects;
+
+@Entity
+@Table(name = "branch_pizza_price")
+public class BranchPizzaPrice {
+
+    @EmbeddedId
+    private BranchPizzaPriceId id;
+
+    @ManyToOne
+    @MapsId("branchId")
+    @JoinColumn(name = "branch_id")
+    private Branch branch;
+
+    @ManyToOne
+    @MapsId("pizzaId")
+    @JoinColumn(name = "pizza_id")
+    private Pizza pizza;
+
+    @ManyToOne
+    @MapsId("pizzaSizeId")
+    @JoinColumn(name = "pizza_size_id")
+    private PizzaSize pizzaSize;
+
+    @Column(nullable = false)
+    private Double price;
+
+    public BranchPizzaPrice() {}
+
+    public BranchPizzaPrice(Branch branch, Pizza pizza, PizzaSize pizzaSize, Double price) {
+        this.branch = branch;
+        this.pizza = pizza;
+        this.pizzaSize = pizzaSize;
+        this.price = price;
+        this.id = new BranchPizzaPriceId(branch.getId(), pizza.getId(), pizzaSize.getId());
+    }
+
+    public BranchPizzaPriceId getId() { return id; }
+    public void setId(BranchPizzaPriceId id) { this.id = id; }
+    public Branch getBranch() { return branch; }
+    public void setBranch(Branch branch) { this.branch = branch; }
+    public Pizza getPizza() { return pizza; }
+    public void setPizza(Pizza pizza) { this.pizza = pizza; }
+    public PizzaSize getPizzaSize() { return pizzaSize; }
+    public void setPizzaSize(PizzaSize pizzaSize) { this.pizzaSize = pizzaSize; }
+    public Double getPrice() { return price; }
+    public void setPrice(Double price) { this.price = price; }
+
+    @Embeddable
+    public static class BranchPizzaPriceId implements Serializable {
+        private Integer branchId;
+        private Integer pizzaId;
+        private Integer pizzaSizeId;
+
+        public BranchPizzaPriceId() {}
+        public BranchPizzaPriceId(Integer branchId, Integer pizzaId, Integer pizzaSizeId) {
+            this.branchId = branchId;
+            this.pizzaId = pizzaId;
+            this.pizzaSizeId = pizzaSizeId;
+        }
+
+        public Integer getBranchId() { return branchId; }
+        public void setBranchId(Integer branchId) { this.branchId = branchId; }
+        public Integer getPizzaId() { return pizzaId; }
+        public void setPizzaId(Integer pizzaId) { this.pizzaId = pizzaId; }
+        public Integer getPizzaSizeId() { return pizzaSizeId; }
+        public void setPizzaSizeId(Integer pizzaSizeId) { this.pizzaSizeId = pizzaSizeId; }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            BranchPizzaPriceId that = (BranchPizzaPriceId) o;
+            return Objects.equals(branchId, that.branchId) && 
+                   Objects.equals(pizzaId, that.pizzaId) &&
+                   Objects.equals(pizzaSizeId, that.pizzaSizeId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(branchId, pizzaId, pizzaSizeId);
+        }
+    }
+}

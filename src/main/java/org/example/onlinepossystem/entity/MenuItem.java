@@ -3,14 +3,14 @@ package org.example.onlinepossystem.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "pizza", uniqueConstraints = {@UniqueConstraint(name = "uq_pizza_name", columnNames = {"pizza_category_id", "name"})})
+@Table(name = "menu_item", uniqueConstraints = {@UniqueConstraint(name = "uq_menu_item_name", columnNames = {"category_id", "name"})})
 public class MenuItem {
     @Id
-    @Column(name = "pizza_id")
+    @Column(name = "id")
     private Integer id;
 
     @ManyToOne
-    @JoinColumn(name = "pizza_category_id", nullable = false)
+    @JoinColumn(name = "category_id", nullable = false)
     private MenuCategory category;
 
     @Column(nullable = false)
@@ -25,14 +25,22 @@ public class MenuItem {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(name = "is_300ml", nullable = false)
+    private boolean is300ml = false;
+
+    @Column(name = "is_2l", nullable = false)
+    private boolean is2l = false;
+
     public MenuItem() {}
 
-    public MenuItem(Integer id, MenuCategory category, String name, String description, Integer sortOrder) {
+    public MenuItem(Integer id, MenuCategory category, String name, String description, Integer sortOrder, boolean is300ml, boolean is2l) {
         this.id = id;
         this.category = category;
         this.name = name;
         this.description = description;
         this.sortOrder = sortOrder;
+        this.is300ml = is300ml;
+        this.is2l = is2l;
     }
 
     public Integer getId() { return id; }
@@ -47,4 +55,8 @@ public class MenuItem {
     public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    public boolean isIs300ml() { return is300ml; }
+    public void setIs300ml(boolean is300ml) { this.is300ml = is300ml; }
+    public boolean isIs2l() { return is2l; }
+    public void setIs2l(boolean is2l) { this.is2l = is2l; }
 }
