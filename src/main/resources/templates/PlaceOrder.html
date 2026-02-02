@@ -1,68 +1,225 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Place Order</title>
+    <!-- =========================================================
+         1) DOCUMENT META + THEME
+         ========================================================= -->
+    <!-- 1.1) Meta -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Place Order — Pete’s Pizza</title>
+
+    <!-- =========================================================
+         2) STYLES
+         ========================================================= -->
     <style>
+        /* =========================================================
+           2.1) THEME VARIABLES
+           ========================================================= */
         :root {
             --primary-color: #0052cc;
             --secondary-color: #f0f6ff;
             --text-color: #333;
             --white: #ffffff;
-            --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            --border-radius: 12px;
+            --shadow: 0 10px 25px rgba(0,0,0,0.1);
+            --border-radius: 15px;
+            --warning: #ff9900;
+
+            /* selection block border on hover */
+            --hover-border: #7a9ac5;
         }
 
+        /* =========================================================
+           2.2) GLOBAL LAYOUT
+           ========================================================= */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
+            font-family: Arial, sans-serif;
+            background-color: #e6f0ff;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
             color: var(--text-color);
         }
 
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            background: var(--white);
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: var(--shadow);
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            text-align: center;
         }
+        header h1 { font-size: 3em; margin: 0; }
+        header p { font-size: 1.2em; margin: 5px 0; }
 
-        h2, h3 { color: var(--primary-color); }
+        .main-container {
+            display: flex;
+            flex: 1;
+            margin: 20px auto;
+            max-width: 1200px;
+            gap: 20px;
+            width: calc(100% - 40px);
+        }
 
         .hidden { display: none !important; }
 
-        .btn-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
+        /* =========================================================
+           2.3) SIDEBAR
+           ========================================================= */
+        .sidebar {
+            width: 290px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            overflow-y: auto;
+            max-height: 720px;
+            padding: 20px;
+        }
+
+        .sidebar h3 {
+            color: var(--primary-color);
+            margin: 10px 0 15px;
+        }
+
+        .sidebar button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 12px;
+            border: none;
+            border-radius: var(--border-radius);
+            background: #f0f6ff;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1em;
+            text-align: left;
+            transition: all 0.25s;
+        }
+
+        .sidebar button:hover, .sidebar button.active {
+            background-color: var(--primary-color);
+            color: white;
+            border: 2px solid var(--hover-border);
+        }
+
+        .sidebar .back-btn {
+            background: var(--warning);
+            color: white;
+        }
+        .sidebar .back-btn:hover {
+            background: white;
+            color: var(--warning);
+            border: 2px solid #e6a433;
+        }
+
+        .hint {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #355a8a;
+            background: #f7fbff;
+            border: 1px solid #d6e6ff;
+            padding: 10px;
+            border-radius: 12px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.85em;
+            font-weight: 700;
+            background: #f0f6ff;
+            color: var(--primary-color);
+            border: 1px solid #dbe7ff;
+        }
+
+        /* =========================================================
+           2.4) CONTENT PANEL
+           ========================================================= */
+        .content {
+            flex: 1;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 720px;
+        }
+
+        h2, h3 { color: var(--primary-color); margin-top: 0; }
+
+        .btn-row {
+            margin-top: 18px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
         }
 
         .btn {
-            padding: 15px 25px;
-            font-size: 1.1em;
-            font-weight: 600;
+            padding: 14px 18px;
+            font-size: 1em;
+            font-weight: 700;
             border: none;
             border-radius: var(--border-radius);
             cursor: pointer;
             transition: 0.3s;
             background-color: var(--primary-color);
             color: var(--white);
+        }
+        .btn:hover { opacity: 0.92; transform: translateY(-2px); }
+        .btn-secondary { background-color: #6c757d; }
+        .btn-danger { background-color: #d33; }
+
+        /* =========================================================
+           2.5) STEP 1: BRANCH BIG BLOCKS
+           ========================================================= */
+        .choice-grid{
+            display:grid;
+            grid-template-columns:repeat(2, minmax(220px, 1fr));
+            gap:16px;
+            margin-top:16px;
+        }
+
+        .choice-block{
+            background: var(--primary-color);
+            color: white;
+            border-radius: 18px;
+            padding: 26px 22px;
+            cursor: pointer;
+            box-shadow: var(--shadow);
+            transition: all 0.25s;
+            border: 2px solid transparent;
             text-align: center;
         }
 
-        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
-        .btn-secondary { background-color: #6c757d; }
+        .choice-block:hover{
+            background: white;
+            color: var(--primary-color);
+            border: 2px solid var(--hover-border);
+            transform: translateY(-2px);
+        }
 
+        .choice-title{
+            font-size: 1.8em;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+        }
+
+        .choice-sub{
+            margin-top: 6px;
+            font-weight: 700;
+            opacity: 0.95;
+        }
+
+        /* =========================================================
+           2.6) MENU LAYOUT + CARDS
+           ========================================================= */
         .menu-layout {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.1fr 0.9fr;
             gap: 20px;
-            margin-top: 20px;
+            margin-top: 10px;
         }
 
         .items-grid {
@@ -72,43 +229,43 @@
         }
 
         .item-card {
-            border: 1px solid #ddd;
+            border: 1px solid #dbe7ff;
             border-radius: var(--border-radius);
             padding: 15px;
             cursor: pointer;
-            transition: 0.3s;
+            transition: 0.25s;
             background: var(--white);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
         }
-        .item-card:hover { border-color: var(--primary-color); box-shadow: var(--shadow); }
+        .item-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow);
+            transform: scale(1.01);
+        }
 
         .detail-panel {
-            border: 1px solid #ddd;
+            border: 1px solid #dbe7ff;
             border-radius: var(--border-radius);
             padding: 15px;
             background: var(--white);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
         }
 
-        .section {
-            margin-top: 16px;
-        }
+        .section { margin-top: 16px; }
 
-        .toppings {
-            columns: 2;
-        }
-        .topping-item {
-            break-inside: avoid;
-            margin-bottom: 8px;
-        }
+        .toppings { columns: 2; }
+        .topping-item { break-inside: avoid; margin-bottom: 8px; }
 
         .price-box {
             margin-top: 12px;
             padding: 12px;
             background: var(--secondary-color);
-            border-radius: 6px;
+            border-radius: 12px;
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 8px;
             text-align: center;
+            border: 1px solid #dbe7ff;
         }
 
         .payload {
@@ -116,27 +273,32 @@
             background: #111;
             color: #0f0;
             padding: 12px;
-            border-radius: 6px;
+            border-radius: 12px;
             font-size: 12px;
             overflow-x: auto;
         }
 
         .summary-card {
             background: var(--secondary-color);
-            padding: 20px;
+            padding: 18px;
             border-radius: var(--border-radius);
-            margin-top: 20px;
+            margin-top: 10px;
+            border: 1px solid #dbe7ff;
         }
+
         .total-row {
             border-top: 2px solid var(--primary-color);
             padding-top: 10px;
             font-weight: bold;
-            font-size: 1.2em;
-            margin-top: 10px;
+            font-size: 1.15em;
+            margin-top: 12px;
             display: flex;
             justify-content: space-between;
         }
 
+        /* =========================================================
+           2.7) MODAL
+           ========================================================= */
         .modal {
             display: none;
             position: fixed;
@@ -145,110 +307,222 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            background-color: rgba(0,0,0,0.55);
         }
-
         .modal-content {
             background-color: var(--white);
-            margin: 5% auto;
+            margin: 4% auto;
             padding: 25px;
             border-radius: 20px;
-            width: 90%;
-            max-width: 520px;
-            max-height: 80vh;
+            width: 92%;
+            max-width: 560px;
+            max-height: 82vh;
             overflow-y: auto;
+            box-shadow: var(--shadow);
         }
-
         .close {
             float: right;
             font-size: 28px;
             font-weight: bold;
             cursor: pointer;
+            color: #333;
         }
 
-        .modifier-group {
-            margin-top: 16px;
-        }
+        .modifier-group { margin-top: 16px; }
+        .modifier-meta { font-size: 0.85em; color: #666; margin-bottom: 6px; }
 
-        .modifier-meta {
-            font-size: 0.85em;
-            color: #666;
-            margin-bottom: 6px;
+        /* =========================================================
+           2.8) RESPONSIVE
+           ========================================================= */
+        @media (max-width: 900px) {
+            .main-container { flex-direction: column; }
+            .sidebar { width: 100%; max-height: none; }
+            .content { max-height: none; }
+            .menu-layout { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 700px){
+            .choice-grid{ grid-template-columns: 1fr; }
         }
     </style>
 </head>
+
 <body>
 
-<div class="container">
-    <div id="step-branch">
-        <h2>Select Branch</h2>
-        <p>Please select your branch to see the correct menu and prices.</p>
-        <div class="btn-grid">
-            <button class="btn" id="branchKenridge">Kenridge (Branch A)</button>
-            <button class="btn" id="branchUitzicht">Uitzicht (Branch B)</button>
-        </div>
-    </div>
+<!-- =========================================================
+     3) HEADER
+     ========================================================= -->
+<header>
+    <h1>Pete’s Pizza</h1>
+    <p>Kenridge & Uitzicht Branch</p>
+</header>
 
-    <div id="step-menu" class="hidden">
-        <h2 id="menu-title">Menu</h2>
-        <div class="menu-layout">
-            <div>
-                <h3>Choose a Pizza</h3>
-                <div id="pizzaList" class="items-grid"></div>
+<!-- =========================================================
+     4) PAGE LAYOUT: SIDEBAR + CONTENT
+     ========================================================= -->
+<div class="main-container">
 
-                <h3 style="margin-top: 24px;">Other Menu Items</h3>
-                <div id="menuItemList" class="items-grid"></div>
+    <!-- =========================================================
+         4.1) SIDEBAR
+         ========================================================= -->
+    <aside class="sidebar">
+        <button class="back-btn" onclick="goBack()">← Back to Home</button>
+
+        <!-- 4.1.1) Pre-Branch selection hint -->
+        <div id="sidebarBranchInfo" class="hint">
+            <div style="margin-bottom: 6px;">
+                <span class="badge" id="badgeBranch">Branch: Not selected</span>
             </div>
             <div>
-                <h3>Pizza Customization</h3>
-                <div id="pizzaDetail" class="detail-panel hidden">
-                    <h4 id="pizzaName"></h4>
+                <span class="badge" id="badgeCart">Cart: 0 item(s)</span>
+            </div>
+            <div style="margin-top: 8px;">
+                Choose a branch to load categories.
+            </div>
+        </div>
 
-                    <div class="section">
-                        <strong>Size</strong>
-                        <div id="sizeOptions"></div>
-                    </div>
+        <!-- 4.1.2) Category sidebar (shown after branch selected) -->
+        <div id="sidebarCategories" class="hidden">
+            <h3>Categories</h3>
+            <div id="categoryButtons"></div>
 
-                    <div class="section">
-                        <strong>Toppings</strong>
-                        <div id="toppingsList" class="toppings"></div>
-                    </div>
-
-                    <div class="price-box">
-                        <div>Base: <span id="basePrice">0.00</span></div>
-                        <div>Toppings: <span id="toppingsTotal">0.00</span></div>
-                        <div>Total: <span id="totalPrice">0.00</span></div>
-                    </div>
-
-                    <div class="section">
-                        <strong>Payload Preview</strong>
-                        <pre id="payloadPreview" class="payload"></pre>
-                    </div>
-
-                    <button class="btn" style="width: 100%; margin-top: 16px;" onclick="addPizzaToCart()">Add Pizza to Order</button>
+            <div class="hint">
+                <div style="margin-bottom: 6px;">
+                    <span class="badge" id="badgeBranch2">Branch: -</span>
+                </div>
+                <div>
+                    <span class="badge" id="badgeCart2">Cart: 0 item(s)</span>
+                </div>
+                <div style="margin-top: 8px;">
+                    Tip: Tap a category to filter items.
                 </div>
             </div>
-        </div>
-        <div style="margin-top: 30px; display: flex; gap: 15px;">
-            <button class="btn btn-secondary" onclick="showStep('branch')">Back</button>
-            <button class="btn" onclick="showSummary()">View Cart & Total</button>
-        </div>
-    </div>
 
-    <div id="step-summary" class="hidden">
-        <h2>Order Summary</h2>
-        <div id="summary-content" class="summary-card"></div>
-        <div class="section">
-            <strong>Order Payload</strong>
-            <pre id="orderPayload" class="payload"></pre>
+            <div class="btn-row">
+                <button class="btn" onclick="showSummary()">View Cart & Total</button>
+                <button class="btn btn-secondary" onclick="showStep('branch')">Change Branch</button>
+            </div>
         </div>
-        <div style="margin-top: 30px; display: flex; gap: 15px;">
-            <button class="btn btn-secondary" onclick="showStep('menu')">Back to Menu</button>
-            <button class="btn" onclick="placeOrder()">Confirm Order</button>
-        </div>
-    </div>
+    </aside>
+
+    <!-- =========================================================
+         4.2) MAIN CONTENT
+         ========================================================= -->
+    <main class="content">
+
+        <!-- =========================================================
+             5) STEP 1 — BRANCH SELECT (BIG BLOCKS)
+             ========================================================= -->
+        <section id="step-branch">
+            <h2>Select Branch</h2>
+            <p>Please select your branch to see the correct menu and prices.</p>
+
+            <div class="choice-grid">
+                <div class="choice-block" id="branchKenridge">
+                    <div class="choice-title">Kenridge</div>
+                    <div class="choice-sub">Branch A</div>
+                </div>
+
+                <div class="choice-block" id="branchUitzicht">
+                    <div class="choice-title">Uitzicht</div>
+                    <div class="choice-sub">Branch B</div>
+                </div>
+            </div>
+
+            <div class="section" style="color:#355a8a;">
+                Your branch changes prices, pizza sizes, and extras.
+            </div>
+        </section>
+
+        <!-- =========================================================
+             6) STEP 2 — MENU
+             ========================================================= -->
+        <section id="step-menu" class="hidden">
+            <h2 id="menu-title">Menu</h2>
+
+            <div class="menu-layout">
+                <!-- 6.1) Items -->
+                <div>
+                    <h3>Choose a Pizza</h3>
+                    <div id="pizzaList" class="items-grid"></div>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top: 24px;">
+                        <h3 style="margin:0;">Other Menu Items</h3>
+                        <span class="badge" id="activeCategoryBadge">Category: Everything</span>
+                    </div>
+                    <div id="menuItemList" class="items-grid"></div>
+
+                    <div class="btn-row">
+                        <button class="btn btn-secondary" onclick="showStep('branch')">Back</button>
+                        <button class="btn" onclick="showSummary()">View Cart & Total</button>
+                    </div>
+                </div>
+
+                <!-- 6.2) Pizza customization panel -->
+                <div>
+                    <h3>Pizza Customization</h3>
+
+                    <div id="pizzaDetail" class="detail-panel hidden">
+                        <h4 id="pizzaName" style="margin: 0 0 6px 0;"></h4>
+
+                        <div class="section">
+                            <strong>Size</strong>
+                            <div id="sizeOptions"></div>
+                        </div>
+
+                        <div class="section">
+                            <strong>Toppings</strong>
+                            <div id="toppingsList" class="toppings"></div>
+                        </div>
+
+                        <div class="price-box">
+                            <div>Base: <span id="basePrice">0.00</span></div>
+                            <div>Toppings: <span id="toppingsTotal">0.00</span></div>
+                            <div>Total: <span id="totalPrice">0.00</span></div>
+                        </div>
+
+                        <div class="section">
+                            <strong>Payload Preview</strong>
+                            <pre id="payloadPreview" class="payload"></pre>
+                        </div>
+
+                        <button class="btn" style="width: 100%; margin-top: 16px;" onclick="addPizzaToCart()">
+                            Add Pizza to Order
+                        </button>
+                    </div>
+
+                    <div class="section" style="font-size: 0.92em; color:#355a8a;">
+                        Select a pizza on the left to customize.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================================
+             7) STEP 3 — SUMMARY
+             ========================================================= -->
+        <section id="step-summary" class="hidden">
+            <h2>Order Summary</h2>
+
+            <div id="summary-content" class="summary-card"></div>
+
+            <div class="section">
+                <strong>Order Payload</strong>
+                <pre id="orderPayload" class="payload"></pre>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="showStep('menu')">Back to Menu</button>
+                <button class="btn" onclick="placeOrder()">Confirm Order</button>
+                <button class="btn btn-danger" onclick="clearCart()">Clear Cart</button>
+            </div>
+        </section>
+
+    </main>
 </div>
 
+<!-- =========================================================
+     8) MODAL — MENU ITEM CUSTOMIZATION
+     ========================================================= -->
 <div id="menuItemModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeMenuModal()">&times;</span>
@@ -261,49 +535,74 @@
             <div>Total: <span id="menuTotalPrice">0.00</span></div>
         </div>
 
-        <button class="btn" style="width: 100%; margin-top: 16px;" onclick="addMenuItemToCart()">Add to Order</button>
+        <button class="btn" style="width: 100%; margin-top: 16px;" onclick="addMenuItemToCart()">
+            Add to Order
+        </button>
     </div>
 </div>
 
+<!-- =========================================================
+     9) SCRIPT
+     ========================================================= -->
 <script>
+    /* =========================================================
+       9.1) API + CONSTANTS
+       ========================================================= */
     const apiBase = '/api/branches';
     const BRANCH_A_ID = 1;
     const BRANCH_B_ID = 2;
 
+    /* =========================================================
+       9.2) STATE
+       ========================================================= */
     const state = {
         branchId: null,
         branchName: '',
         pizzas: [],
         menuItems: [],
+        filteredMenuItems: [],
+        activeCategory: 'Everything',
+
         selectedPizzaId: null,
         selectedSizeCm: null,
         selectedToppings: new Set(),
         extraPrices: new Map(),
         currentDetail: null,
         lastQuote: null,
+
         selectedMenuItem: null,
         menuSelections: new Map(),
         menuOptionPrice: new Map(),
         menuOptionName: new Map(),
         menuOptionMenuItemId: new Map(),
+
         cart: []
     };
 
-    document.getElementById('branchKenridge').addEventListener('click', () => {
-        selectBranch(BRANCH_A_ID, 'Kenridge (Branch A)').catch(err => alert(err.message));
-    });
+    let isOrderDirty = false;
 
-    document.getElementById('branchUitzicht').addEventListener('click', () => {
-        selectBranch(BRANCH_B_ID, 'Uitzicht (Branch B)').catch(err => alert(err.message));
-    });
+    /* =========================================================
+       9.3) FIXED CATEGORY LIST (your required sidebar)
+       ========================================================= */
+    const FIXED_CATEGORIES = [
+        'Everything',
+        'Favourite',
+        'Supreme',
+        'Burgers',
+        'Combos',
+        'Pastas',
+        'Salads',
+        'Ribs'
+    ];
 
-    function showStep(stepId) {
-        ['step-branch', 'step-menu', 'step-summary'].forEach(id => {
-            document.getElementById(id).classList.add('hidden');
-        });
-        document.getElementById('step-' + stepId).classList.remove('hidden');
-    }
+    const CATEGORY_ID_BY_LABEL = {
+        'Favourite': 1,
+        'Supreme': 2
+    };
 
+    /* =========================================================
+       9.4) HELPERS
+       ========================================================= */
     function money(value) {
         return Number(value).toFixed(2);
     }
@@ -315,7 +614,6 @@
             timer = setTimeout(() => fn(...args), delay);
         };
     }
-
     const debouncedQuote = debounce(fetchQuote, 200);
 
     async function fetchJson(url, options) {
@@ -327,14 +625,78 @@
         return response.json();
     }
 
+    /* =========================================================
+       9.5) NAV / BACK
+       ========================================================= */
+    function goBack() {
+        if (isOrderDirty && state.cart.length > 0) {
+            const ok = confirm("You have items in your cart. Leave and discard the cart?");
+            if (!ok) return;
+        }
+        window.location.href = "/";
+    }
+
+    function showStep(stepId) {
+        ['step-branch', 'step-menu', 'step-summary'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+        document.getElementById('step-' + stepId).classList.remove('hidden');
+
+        // Sidebar mode
+        if (stepId === 'branch') {
+            document.getElementById('sidebarBranchInfo').classList.remove('hidden');
+            document.getElementById('sidebarCategories').classList.add('hidden');
+        } else {
+            document.getElementById('sidebarBranchInfo').classList.add('hidden');
+            document.getElementById('sidebarCategories').classList.remove('hidden');
+        }
+
+        updateBadges();
+    }
+
+    function updateBadges() {
+        const branchText = state.branchId ? `Branch: ${state.branchName}` : 'Branch: Not selected';
+        const cartText = `Cart: ${state.cart.length} item(s)`;
+
+        document.getElementById('badgeBranch').textContent = branchText;
+        document.getElementById('badgeCart').textContent = cartText;
+
+        document.getElementById('badgeBranch2').textContent = branchText;
+        document.getElementById('badgeCart2').textContent = cartText;
+
+        document.getElementById('activeCategoryBadge').textContent = `Category: ${state.activeCategory}`;
+    }
+
+    /* =========================================================
+       9.6) BRANCH SELECT (BIG BLOCKS)
+       ========================================================= */
+    document.getElementById('branchKenridge').addEventListener('click', () => {
+        selectBranch(BRANCH_A_ID, 'Kenridge (Branch A)').catch(err => alert(err.message));
+    });
+
+    document.getElementById('branchUitzicht').addEventListener('click', () => {
+        selectBranch(BRANCH_B_ID, 'Uitzicht (Branch B)').catch(err => alert(err.message));
+    });
+
     async function selectBranch(branchId, branchName) {
+        if (state.branchId && state.branchId !== branchId && state.cart.length > 0) {
+            const ok = confirm("Switching branch will clear your current cart. Continue?");
+            if (!ok) return;
+            state.cart = [];
+            isOrderDirty = false;
+        }
+
         state.branchId = branchId;
         state.branchName = branchName;
         document.getElementById('menu-title').innerText = branchName + ' Menu';
+
         await Promise.all([loadPizzas(), loadMenuItems()]);
         showStep('menu');
     }
 
+    /* =========================================================
+       9.7) LOAD DATA
+       ========================================================= */
     async function loadPizzas() {
         state.pizzas = await fetchJson(`${apiBase}/${state.branchId}/pizzas`);
         renderPizzaList();
@@ -343,73 +705,174 @@
 
     async function loadMenuItems() {
         state.menuItems = await fetchJson(`${apiBase}/${state.branchId}/menu-items`);
-        renderMenuItems();
+
+        // Build fixed categories (always show)
+        buildCategorySidebar();
+
+        // default view: Everything
+        applyCategoryFilter('Everything');
     }
 
+    /* =========================================================
+       9.8) CATEGORY SIDEBAR (FIXED LIST)
+       ========================================================= */
+    function normalizeCategory(name) {
+        const raw = (name || '').trim().toLowerCase();
+        if (!raw) return 'Other';
+        if (raw === 'burgers' || raw === 'burger') return 'Burgers';
+        if (raw === 'combos' || raw === 'combo') return 'Combos';
+        if (raw === 'pastas' || raw === 'pasta') return 'Pastas';
+        if (raw === 'salads' || raw === 'salad') return 'Salads';
+        if (raw === 'ribs' || raw === 'rib') return 'Ribs';
+
+        return name.trim();
+    }
+
+    function buildCategorySidebar() {
+        const container = document.getElementById('categoryButtons');
+        container.innerHTML = '';
+
+        FIXED_CATEGORIES.forEach(cat => container.appendChild(makeCategoryBtn(cat)));
+        state.activeCategory = 'Everything';
+        highlightActiveCategoryBtn();
+    }
+
+    function makeCategoryBtn(category) {
+        const btn = document.createElement('button');
+        btn.textContent = category;
+        btn.dataset.category = category;
+        btn.addEventListener('click', () => applyCategoryFilter(category));
+        return btn;
+    }
+
+    function highlightActiveCategoryBtn() {
+        const buttons = document.querySelectorAll('#categoryButtons button');
+        buttons.forEach(b => b.classList.remove('active'));
+        const active = Array.from(buttons).find(b => b.dataset.category === state.activeCategory);
+        if (active) active.classList.add('active');
+    }
+
+    function applyCategoryFilter(category) {
+        state.activeCategory = category;
+
+        if (category === 'Everything') {
+            state.filteredMenuItems = [...state.menuItems];
+        } else if (CATEGORY_ID_BY_LABEL[category]) {
+            const categoryId = CATEGORY_ID_BY_LABEL[category];
+            state.filteredMenuItems = state.menuItems.filter(i => Number(i.categoryId) === categoryId);
+        } else {
+            state.filteredMenuItems = state.menuItems.filter(i => normalizeCategory(i.categoryName) === category);
+        }
+
+        highlightActiveCategoryBtn();
+        updateBadges();
+        renderMenuItems(state.filteredMenuItems);
+    }
+
+    /* =========================================================
+       9.9) RENDER PIZZAS
+       ========================================================= */
     function renderPizzaList() {
         const pizzaListEl = document.getElementById('pizzaList');
         pizzaListEl.innerHTML = '';
+
         if (state.pizzas.length === 0) {
             pizzaListEl.innerHTML = '<p>No pizzas found for this branch.</p>';
             return;
         }
-        state.pizzas.forEach(pizza => {
+
+        const favourites = state.pizzas.filter(pizza => Number(pizza.pizzaCategoryId) === 1);
+        const supremes = state.pizzas.filter(pizza => Number(pizza.pizzaCategoryId) === 2);
+        const others = state.pizzas.filter(pizza => Number(pizza.pizzaCategoryId) !== 1 && Number(pizza.pizzaCategoryId) !== 2);
+
+        renderPizzaSection(pizzaListEl, 'Favourite', favourites);
+        renderPizzaSection(pizzaListEl, 'Supreme', supremes);
+        if (others.length) {
+            const grouped = groupPizzaByCategoryName(others);
+            Object.keys(grouped).forEach(categoryName => {
+                renderPizzaSection(pizzaListEl, categoryName, grouped[categoryName]);
+            });
+        }
+    }
+
+    function renderPizzaSection(container, title, pizzas) {
+        if (!pizzas.length) {
+            return;
+        }
+        const header = document.createElement('div');
+        header.style.gridColumn = '1 / -1';
+        header.style.marginTop = '10px';
+        header.innerHTML = `<strong>${title}</strong>`;
+        container.appendChild(header);
+
+        pizzas.forEach(pizza => {
             const card = document.createElement('div');
             card.className = 'item-card';
             card.innerHTML = `
-                <div style="font-weight: bold; display: flex; justify-content: space-between;">
-                    <span>${pizza.name}</span>
-                    <span>From R${money(pizza.basePrice)}</span>
-                </div>
-                <p style="font-size: 0.85em; color: #666;">Default: ${pizza.defaultSizeCm} cm</p>
-                <p style="color: var(--primary-color); font-weight: 600; font-size: 0.8em;">Click to customize</p>
-            `;
+        <div style="font-weight: bold; display: flex; justify-content: space-between; gap: 10px;">
+          <span>${pizza.name}</span>
+          <span>From R${money(pizza.basePrice)}</span>
+        </div>
+        <p style="font-size: 0.85em; color: #666; margin: 6px 0 0;">
+          Default: ${pizza.defaultSizeCm} cm
+        </p>
+        <p style="color: var(--primary-color); font-weight: 700; font-size: 0.82em; margin: 10px 0 0;">
+          Click to customize
+        </p>
+      `;
             card.addEventListener('click', () => loadPizzaDetail(pizza.pizzaId));
-            pizzaListEl.appendChild(card);
+            container.appendChild(card);
         });
     }
 
-    function renderMenuItems() {
+    function groupPizzaByCategoryName(pizzas) {
+        return pizzas.reduce((acc, pizza) => {
+            const key = pizza.pizzaCategoryName || 'Other';
+            if (!acc[key]) {
+                acc[key] = [];
+            }
+            acc[key].push(pizza);
+            return acc;
+        }, {});
+    }
+
+    /* =========================================================
+       9.10) RENDER MENU ITEMS (FILTERED)
+       ========================================================= */
+    function renderMenuItems(items) {
         const menuListEl = document.getElementById('menuItemList');
         menuListEl.innerHTML = '';
-        if (state.menuItems.length === 0) {
-            menuListEl.innerHTML = '<p>No menu items found for this branch.</p>';
+
+        if (!items || items.length === 0) {
+            menuListEl.innerHTML = '<p>No items in this category.</p>';
             return;
         }
 
-        const sorted = [...state.menuItems].sort((a, b) => {
-            if (a.categoryName === b.categoryName) {
-                return a.name.localeCompare(b.name);
-            }
-            return a.categoryName.localeCompare(b.categoryName);
-        });
+        const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name));
 
-        let currentCategory = null;
         sorted.forEach(item => {
-            if (item.categoryName !== currentCategory) {
-                currentCategory = item.categoryName;
-                const header = document.createElement('div');
-                header.style.gridColumn = '1 / -1';
-                header.style.marginTop = '10px';
-                header.innerHTML = `<strong>${currentCategory}</strong>`;
-                menuListEl.appendChild(header);
-            }
-
             const card = document.createElement('div');
             card.className = 'item-card';
             card.innerHTML = `
-                <div style="font-weight: bold; display: flex; justify-content: space-between;">
-                    <span>${item.name}</span>
-                    <span>R${money(item.price)}</span>
-                </div>
-                <p style="font-size: 0.85em; color: #666;">${item.description || ''}</p>
-                <p style="color: var(--primary-color); font-weight: 600; font-size: 0.8em;">Click to customize</p>
-            `;
+        <div style="font-weight: bold; display: flex; justify-content: space-between; gap: 10px;">
+          <span>${item.name}</span>
+          <span>R${money(item.price)}</span>
+        </div>
+        <p style="font-size: 0.85em; color: #666; margin: 6px 0 0;">
+          ${item.description || ''}
+        </p>
+        <p style="color: var(--primary-color); font-weight: 700; font-size: 0.82em; margin: 10px 0 0;">
+          Click to customize
+        </p>
+      `;
             card.addEventListener('click', () => openMenuItemModal(item.menuItemId));
             menuListEl.appendChild(card);
         });
     }
 
+    /* =========================================================
+       9.11) PIZZA DETAIL
+       ========================================================= */
     async function loadPizzaDetail(pizzaId, sizeCmOverride, preserveSelection = false) {
         state.selectedPizzaId = pizzaId;
         const sizeParam = sizeCmOverride ? `?sizeCm=${sizeCmOverride}` : '';
@@ -436,29 +899,39 @@
     function renderSizes(sizes) {
         const sizeOptionsEl = document.getElementById('sizeOptions');
         sizeOptionsEl.innerHTML = '';
+
         const select = document.createElement('select');
+        select.style.width = "100%";
+        select.style.padding = "15px";
+        select.style.borderRadius = "15px";
+        select.style.border = "2px solid var(--primary-color)";
+        select.style.background = "var(--secondary-color)";
+        select.style.fontSize = "1em";
+
         sizes.forEach(size => {
             const option = document.createElement('option');
             option.value = size.sizeCm;
             option.textContent = `${size.sizeCm} cm (Base R${money(size.basePrice)})`;
-            if (Number(size.sizeCm) === Number(state.selectedSizeCm)) {
-                option.selected = true;
-            }
+            if (Number(size.sizeCm) === Number(state.selectedSizeCm)) option.selected = true;
             select.appendChild(option);
         });
+
         select.addEventListener('change', async (e) => {
             const newSize = Number(e.target.value);
             state.selectedSizeCm = newSize;
             await loadPizzaDetail(state.selectedPizzaId, newSize, true);
         });
+
         sizeOptionsEl.appendChild(select);
     }
 
     function renderToppings(toppings) {
         const toppingsListEl = document.getElementById('toppingsList');
         toppingsListEl.innerHTML = '';
+
         toppings.forEach(topping => {
             const price = state.extraPrices.get(topping.toppingId) ?? 0;
+
             const wrapper = document.createElement('div');
             wrapper.className = 'topping-item';
 
@@ -467,16 +940,14 @@
             checkbox.id = `topping-${topping.toppingId}`;
             checkbox.checked = state.selectedToppings.has(topping.toppingId);
             checkbox.addEventListener('change', () => {
-                if (checkbox.checked) {
-                    state.selectedToppings.add(topping.toppingId);
-                } else {
-                    state.selectedToppings.delete(topping.toppingId);
-                }
+                if (checkbox.checked) state.selectedToppings.add(topping.toppingId);
+                else state.selectedToppings.delete(topping.toppingId);
                 debouncedQuote();
             });
 
             const label = document.createElement('label');
             label.setAttribute('for', checkbox.id);
+            label.style.marginLeft = "6px";
             label.textContent = `${topping.name} (+R${money(price)})`;
 
             wrapper.appendChild(checkbox);
@@ -486,18 +957,19 @@
     }
 
     async function fetchQuote() {
-        if (!state.selectedPizzaId || !state.selectedSizeCm) {
-            return;
-        }
+        if (!state.selectedPizzaId || !state.selectedSizeCm) return;
+
         const payload = {
             sizeCm: state.selectedSizeCm,
             selectedToppingIds: Array.from(state.selectedToppings)
         };
+
         const response = await fetchJson(`${apiBase}/${state.branchId}/pizzas/${state.selectedPizzaId}/quote`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+
         state.lastQuote = response;
 
         document.getElementById('basePrice').textContent = money(response.basePrice);
@@ -510,6 +982,14 @@
             sizeCm: state.selectedSizeCm,
             selectedToppingIds: payload.selectedToppingIds
         }, null, 2);
+    }
+
+    /* =========================================================
+       9.12) CART
+       ========================================================= */
+    function markDirty() {
+        isOrderDirty = state.cart.length > 0;
+        updateBadges();
     }
 
     function addPizzaToCart() {
@@ -540,14 +1020,28 @@
             total: quote.total
         });
 
+        markDirty();
         alert(state.currentDetail.name + ' added to cart!');
     }
 
+    function clearCart() {
+        if (state.cart.length === 0) return;
+        const ok = confirm("Clear your cart?");
+        if (!ok) return;
+        state.cart = [];
+        isOrderDirty = false;
+        updateBadges();
+        alert("Cart cleared.");
+        showStep('menu');
+    }
+
+    /* =========================================================
+       9.13) MENU ITEM MODAL
+       ========================================================= */
     function openMenuItemModal(menuItemId) {
         const item = state.menuItems.find(menuItem => menuItem.menuItemId === menuItemId);
-        if (!item) {
-            return;
-        }
+        if (!item) return;
+
         state.selectedMenuItem = item;
         state.menuSelections = new Map();
         state.menuOptionPrice = new Map();
@@ -595,6 +1089,7 @@
 
                     const label = document.createElement('label');
                     label.setAttribute('for', optionId);
+                    label.style.marginLeft = "6px";
                     label.textContent = `${option.name} (+R${money(option.price)})`;
 
                     optionRow.appendChild(input);
@@ -617,17 +1112,13 @@
 
         if (inputType === 'radio') {
             selected.clear();
-            if (checked) {
-                selected.add(optionId);
-            }
+            if (checked) selected.add(optionId);
         } else {
             if (checked) {
                 if (maxSelect > 0 && selected.size >= maxSelect) {
                     alert(`You can only select up to ${maxSelect} option(s) for ${group.name}.`);
                     const input = document.getElementById(`option-${groupId}-${optionId}`);
-                    if (input) {
-                        input.checked = false;
-                    }
+                    if (input) input.checked = false;
                     return;
                 }
                 selected.add(optionId);
@@ -641,17 +1132,18 @@
     }
 
     function updateMenuTotals() {
-        if (!state.selectedMenuItem) {
-            return;
-        }
+        if (!state.selectedMenuItem) return;
+
         let extras = 0;
         state.menuSelections.forEach(optionSet => {
             optionSet.forEach(optionId => {
                 extras += Number(state.menuOptionPrice.get(optionId) || 0);
             });
         });
+
         const base = Number(state.selectedMenuItem.price || 0);
         const total = base + extras;
+
         document.getElementById('menuExtrasPrice').textContent = money(extras);
         document.getElementById('menuTotalPrice').textContent = money(total);
     }
@@ -662,9 +1154,7 @@
 
     function addMenuItemToCart() {
         const item = state.selectedMenuItem;
-        if (!item) {
-            return;
-        }
+        if (!item) return;
 
         if (item.modifierGroups) {
             for (const group of item.modifierGroups) {
@@ -709,10 +1199,14 @@
             total
         });
 
+        markDirty();
         alert(item.name + ' added to cart!');
         closeMenuModal();
     }
 
+    /* =========================================================
+       9.14) SUMMARY
+       ========================================================= */
     function buildOrderPayload() {
         return {
             branchId: state.branchId,
@@ -737,6 +1231,11 @@
     }
 
     function showSummary() {
+        if (!state.branchId) {
+            alert("Please select a branch first.");
+            showStep('branch');
+            return;
+        }
         if (state.cart.length === 0) {
             alert('Cart is empty');
             return;
@@ -750,24 +1249,34 @@
             total += entry.total;
             if (entry.type === 'pizza') {
                 html += `
-                    <div style="margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
-                        <div style="display: flex; justify-content: space-between; font-weight: bold;">
-                            <span>1x ${entry.name} (${entry.sizeCm} cm)</span>
-                            <span>R${money(entry.total)}</span>
-                        </div>
-                        ${entry.selectedToppingNames.length ? `<div style="font-size: 0.85em; color: #666; margin-left: 15px;">Toppings: ${entry.selectedToppingNames.join(', ')}</div>` : ''}
-                    </div>
-                `;
+          <div style="margin-bottom: 14px; border-bottom: 1px solid #dbe7ff; padding-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; gap: 10px;">
+              <span>1x ${entry.name} (${entry.sizeCm} cm)</span>
+              <span>R${money(entry.total)}</span>
+            </div>
+            ${entry.selectedToppingNames.length
+                    ? `<div style="font-size: 0.85em; color: #666; margin-left: 12px; margin-top: 6px;">
+                   Toppings: ${entry.selectedToppingNames.join(', ')}
+                 </div>`
+                    : ''
+                }
+          </div>
+        `;
             } else {
                 html += `
-                    <div style="margin-bottom: 15px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
-                        <div style="display: flex; justify-content: space-between; font-weight: bold;">
-                            <span>1x ${entry.name}</span>
-                            <span>R${money(entry.total)}</span>
-                        </div>
-                        ${entry.selectedOptionNames.length ? `<div style="font-size: 0.85em; color: #666; margin-left: 15px;">Options: ${entry.selectedOptionNames.join(', ')}</div>` : ''}
-                    </div>
-                `;
+          <div style="margin-bottom: 14px; border-bottom: 1px solid #dbe7ff; padding-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; gap: 10px;">
+              <span>1x ${entry.name}</span>
+              <span>R${money(entry.total)}</span>
+            </div>
+            ${entry.selectedOptionNames.length
+                    ? `<div style="font-size: 0.85em; color: #666; margin-left: 12px; margin-top: 6px;">
+                   Options: ${entry.selectedOptionNames.join(', ')}
+                 </div>`
+                    : ''
+                }
+          </div>
+        `;
             }
         });
 
@@ -783,6 +1292,21 @@
         console.log('Order payload', payload);
         alert('Order payload ready. Integrate with your backend when available.');
     }
+
+    /* =========================================================
+       9.15) WARN IF LEAVING WITH CART
+       ========================================================= */
+    window.addEventListener("beforeunload", (e) => {
+        if (isOrderDirty && state.cart.length > 0) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    /* =========================================================
+       9.16) INIT
+       ========================================================= */
+    updateBadges();
 </script>
 
 </body>

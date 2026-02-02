@@ -82,6 +82,7 @@ public class MenuService {
                     row.menuItemId(),
                     row.name(),
                     row.description(),
+                    row.categoryId(),
                     row.categoryName(),
                     toBigDecimal(row.price()),
                     groups

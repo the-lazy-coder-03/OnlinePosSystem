@@ -17,6 +17,7 @@ public interface MenuReadRepository extends JpaRepository<MenuItem, Integer> {
                 mi.id,
                 mi.name,
                 mi.description,
+                mc.id,
                 mc.name,
                 coalesce(bmp.price, 0)
             )

@@ -41,6 +41,8 @@ public class PizzaService {
                 cards.put(row.pizzaId(), new PizzaCard(
                         row.pizzaId(),
                         row.name(),
+                        row.pizzaCategoryId(),
+                        row.pizzaCategoryName(),
                         row.sizeCm(),
                         toBigDecimal(row.basePrice())
                 ));

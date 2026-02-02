@@ -17,6 +17,8 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
             select new org.example.onlinepossystem.pizza.dto.PizzaCardRow(
                 p.id,
                 p.name,
+                p.category.id,
+                p.category.name,
                 s.cm,
                 bpp.price,
                 p.sortOrder,

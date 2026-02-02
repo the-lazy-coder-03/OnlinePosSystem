@@ -76,6 +76,7 @@ public class OrderService {
             if (itemPriceMap.containsKey(i.getId())) {
                 MenuDTO dto = new MenuDTO();
                 dto.setCategoryName(i.getCategory() != null ? i.getCategory().getName() : "Uncategorized");
+                dto.setCategoryId(i.getCategory() != null ? i.getCategory().getId() : null);
                 dto.setMenuItemId(i.getId());
                 dto.setMenuItemName(i.getName());
                 dto.setDescription(i.getDescription());
@@ -120,6 +121,7 @@ public class OrderService {
                 for (BranchPizzaPrice bpp : bppList) {
                     MenuDTO dto = new MenuDTO();
                     dto.setCategoryName(p.getCategory() != null ? p.getCategory().getName() : "Pizzas");
+                    dto.setCategoryId(p.getCategory() != null ? p.getCategory().getId() : null);
                     dto.setMenuItemId(p.getId());
                     dto.setMenuItemName(p.getName() + " (" + bpp.getPizzaSize().getCm() + "cm)");
                     dto.setDescription(p.getDescription());
