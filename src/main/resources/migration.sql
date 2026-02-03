@@ -677,4 +677,49 @@ DELETE FROM menu_category
 WHERE id <> 2
   AND LOWER(name) IN ('supreme', 'supremes');
 
+-- Normalize pizza categories to Favourite/Supreme with fixed IDs
+UPDATE pizza_category
+SET name = 'Favourite',
+    sort_order = 1
+WHERE LOWER(name) IN ('favourite', 'favourites');
+
+UPDATE pizza_category
+SET name = 'Supreme',
+    sort_order = 2
+WHERE LOWER(name) IN ('supreme', 'supremes');
+
+INSERT INTO pizza_category (pizza_category_id, name, sort_order)
+VALUES (1, 'Favourite', 1)
+ON CONFLICT (pizza_category_id) DO UPDATE
+SET name = EXCLUDED.name,
+    sort_order = EXCLUDED.sort_order;
+
+INSERT INTO pizza_category (pizza_category_id, name, sort_order)
+VALUES (2, 'Supreme', 2)
+ON CONFLICT (pizza_category_id) DO UPDATE
+SET name = EXCLUDED.name,
+    sort_order = EXCLUDED.sort_order;
+
+UPDATE pizza
+SET pizza_category_id = 1
+WHERE pizza_category_id IN (
+    SELECT pizza_category_id FROM pizza_category
+    WHERE LOWER(name) IN ('favourite', 'favourites')
+);
+
+UPDATE pizza
+SET pizza_category_id = 2
+WHERE pizza_category_id IN (
+    SELECT pizza_category_id FROM pizza_category
+    WHERE LOWER(name) IN ('supreme', 'supremes')
+);
+
+DELETE FROM pizza_category
+WHERE pizza_category_id <> 1
+  AND LOWER(name) IN ('favourite', 'favourites');
+
+DELETE FROM pizza_category
+WHERE pizza_category_id <> 2
+  AND LOWER(name) IN ('supreme', 'supremes');
+
 COMMIT;

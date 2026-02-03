@@ -89,7 +89,8 @@
         <button id="loadMenu">Load Menu</button>
     </div>
 
-    <div id="pizzaList" class="card-list"></div>
+    <section id="favourites" class="card-list"></section>
+    <section id="supremes" class="card-list" style="margin-top: 16px;"></section>
 
     <div id="pizzaDetail" class="detail hidden">
         <h2 id="pizzaName"></h2>
@@ -125,10 +126,13 @@
         sizeCm: null,
         selectedToppings: new Set(),
         extraPrices: new Map(),
-        availableSizes: []
+        availableSizes: [],
+        favouritePizzas: [],
+        supremePizzas: []
     };
 
-    const pizzaListEl = document.getElementById('pizzaList');
+    const favouritesEl = document.getElementById('favourites');
+    const supremesEl = document.getElementById('supremes');
     const pizzaDetailEl = document.getElementById('pizzaDetail');
     const pizzaNameEl = document.getElementById('pizzaName');
     const sizeOptionsEl = document.getElementById('sizeOptions');
@@ -163,13 +167,38 @@
 
     async function loadMenu() {
         state.branchId = Number(document.getElementById('branchId').value || 1);
-        const pizzas = await fetchJson(`${apiBase}/${state.branchId}/pizzas`);
-        renderPizzaList(pizzas);
+        const response = await fetchJson(`${apiBase}/${state.branchId}/pizzas`);
+        state.favouritePizzas = response.favouritePizzas || [];
+        state.supremePizzas = response.supremePizzas || [];
+        renderPizzaList();
         pizzaDetailEl.classList.add('hidden');
     }
 
-    function renderPizzaList(pizzas) {
-        pizzaListEl.innerHTML = '';
+    function renderPizzaList() {
+        favouritesEl.innerHTML = '';
+        supremesEl.innerHTML = '';
+
+        renderPizzaSection(favouritesEl, 'Favourite', state.favouritePizzas);
+        renderPizzaSection(supremesEl, 'Supreme', state.supremePizzas);
+    }
+
+    function renderPizzaSection(container, title, pizzas) {
+        const header = document.createElement('div');
+        header.style.gridColumn = '1 / -1';
+        header.style.fontWeight = '700';
+        header.style.marginTop = '10px';
+        header.textContent = title;
+        container.appendChild(header);
+
+        if (!pizzas || pizzas.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.gridColumn = '1 / -1';
+            empty.style.color = '#666';
+            empty.textContent = `No ${title.toLowerCase()} pizzas found.`;
+            container.appendChild(empty);
+            return;
+        }
+
         pizzas.forEach(pizza => {
             const card = document.createElement('div');
             card.className = 'card';
@@ -179,7 +208,7 @@
                 <div>From: ${money(pizza.basePrice)}</div>
             `;
             card.addEventListener('click', () => loadPizzaDetail(pizza.pizzaId));
-            pizzaListEl.appendChild(card);
+            container.appendChild(card);
         });
     }
 

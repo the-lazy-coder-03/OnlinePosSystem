@@ -1,6 +1,6 @@
 package org.example.onlinepossystem.pizza.web;
 
-import org.example.onlinepossystem.pizza.dto.PizzaCard;
+import org.example.onlinepossystem.pizza.dto.PizzaCategorySplit;
 import org.example.onlinepossystem.pizza.dto.PizzaDetail;
 import org.example.onlinepossystem.pizza.dto.PriceQuoteRequest;
 import org.example.onlinepossystem.pizza.dto.PriceQuoteResponse;
@@ -27,8 +27,8 @@ public class PizzaController {
     }
 
     @GetMapping
-    public List<PizzaCard> listPizzas(@PathVariable Integer branchId) {
-        return pizzaService.listPizzas(branchId);
+    public PizzaCategorySplit listPizzas(@PathVariable Integer branchId) {
+        return pizzaService.listPizzasByCategory(branchId);
     }
 
     @GetMapping("/{pizzaId}")

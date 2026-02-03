@@ -443,7 +443,8 @@
                 <!-- 6.1) Items -->
                 <div>
                     <h3>Choose a Pizza</h3>
-                    <div id="pizzaList" class="items-grid"></div>
+                <section id="favourites" class="items-grid"></section>
+                <section id="supremes" class="items-grid" style="margin-top: 16px;"></section>
 
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top: 24px;">
                         <h3 style="margin:0;">Other Menu Items</h3>
@@ -558,7 +559,8 @@
     const state = {
         branchId: null,
         branchName: '',
-        pizzas: [],
+        favouritePizzas: [],
+        supremePizzas: [],
         menuItems: [],
         filteredMenuItems: [],
         activeCategory: 'Everything',
@@ -698,7 +700,9 @@
        9.7) LOAD DATA
        ========================================================= */
     async function loadPizzas() {
-        state.pizzas = await fetchJson(`${apiBase}/${state.branchId}/pizzas`);
+        const response = await fetchJson(`${apiBase}/${state.branchId}/pizzas`);
+        state.favouritePizzas = response.favouritePizzas || [];
+        state.supremePizzas = response.supremePizzas || [];
         renderPizzaList();
         document.getElementById('pizzaDetail').classList.add('hidden');
     }
@@ -773,37 +777,32 @@
        9.9) RENDER PIZZAS
        ========================================================= */
     function renderPizzaList() {
-        const pizzaListEl = document.getElementById('pizzaList');
-        pizzaListEl.innerHTML = '';
+        const favouritesSection = document.getElementById('favourites');
+        const supremesSection = document.getElementById('supremes');
 
-        if (state.pizzas.length === 0) {
-            pizzaListEl.innerHTML = '<p>No pizzas found for this branch.</p>';
-            return;
-        }
+        favouritesSection.innerHTML = '';
+        supremesSection.innerHTML = '';
 
-        const favourites = state.pizzas.filter(pizza => Number(pizza.pizzaCategoryId) === 1);
-        const supremes = state.pizzas.filter(pizza => Number(pizza.pizzaCategoryId) === 2);
-        const others = state.pizzas.filter(pizza => Number(pizza.pizzaCategoryId) !== 1 && Number(pizza.pizzaCategoryId) !== 2);
-
-        renderPizzaSection(pizzaListEl, 'Favourite', favourites);
-        renderPizzaSection(pizzaListEl, 'Supreme', supremes);
-        if (others.length) {
-            const grouped = groupPizzaByCategoryName(others);
-            Object.keys(grouped).forEach(categoryName => {
-                renderPizzaSection(pizzaListEl, categoryName, grouped[categoryName]);
-            });
-        }
+        renderPizzaSection(favouritesSection, 'Favourite', state.favouritePizzas);
+        renderPizzaSection(supremesSection, 'Supreme', state.supremePizzas);
     }
 
     function renderPizzaSection(container, title, pizzas) {
-        if (!pizzas.length) {
-            return;
-        }
         const header = document.createElement('div');
         header.style.gridColumn = '1 / -1';
         header.style.marginTop = '10px';
         header.innerHTML = `<strong>${title}</strong>`;
         container.appendChild(header);
+
+        if (!pizzas || pizzas.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.gridColumn = '1 / -1';
+            empty.style.color = '#666';
+            empty.style.fontSize = '0.9em';
+            empty.textContent = `No ${title.toLowerCase()} pizzas found for this branch.`;
+            container.appendChild(empty);
+            return;
+        }
 
         pizzas.forEach(pizza => {
             const card = document.createElement('div');
@@ -823,17 +822,6 @@
             card.addEventListener('click', () => loadPizzaDetail(pizza.pizzaId));
             container.appendChild(card);
         });
-    }
-
-    function groupPizzaByCategoryName(pizzas) {
-        return pizzas.reduce((acc, pizza) => {
-            const key = pizza.pizzaCategoryName || 'Other';
-            if (!acc[key]) {
-                acc[key] = [];
-            }
-            acc[key].push(pizza);
-            return acc;
-        }, {});
     }
 
     /* =========================================================

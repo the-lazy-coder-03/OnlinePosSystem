@@ -2,6 +2,7 @@ package org.example.onlinepossystem.pizza.service;
 
 import org.example.onlinepossystem.pizza.dto.PizzaCard;
 import org.example.onlinepossystem.pizza.dto.PizzaCardRow;
+import org.example.onlinepossystem.pizza.dto.PizzaCategorySplit;
 import org.example.onlinepossystem.pizza.dto.PizzaDetail;
 import org.example.onlinepossystem.pizza.dto.PizzaSizePriceRow;
 import org.example.onlinepossystem.pizza.dto.PriceQuoteResponse;
@@ -30,25 +31,14 @@ public class PizzaService {
         this.pizzaReadRepository = pizzaReadRepository;
     }
 
-    public List<PizzaCard> listPizzas(Integer branchId) {
-        List<PizzaCardRow> rows = pizzaReadRepository.findPizzaCardsByBranch(branchId);
-        if (rows.isEmpty()) {
-            return List.of();
-        }
-        Map<Integer, PizzaCard> cards = new LinkedHashMap<>();
-        for (PizzaCardRow row : rows) {
-            if (!cards.containsKey(row.pizzaId())) {
-                cards.put(row.pizzaId(), new PizzaCard(
-                        row.pizzaId(),
-                        row.name(),
-                        row.pizzaCategoryId(),
-                        row.pizzaCategoryName(),
-                        row.sizeCm(),
-                        toBigDecimal(row.basePrice())
-                ));
-            }
-        }
-        return new ArrayList<>(cards.values());
+    public PizzaCategorySplit listPizzasByCategory(Integer branchId) {
+        List<PizzaCard> favouritePizzas = mapPizzaCards(
+                pizzaReadRepository.findPizzaCardsByBranchAndCategory(branchId, 1)
+        );
+        List<PizzaCard> supremePizzas = mapPizzaCards(
+                pizzaReadRepository.findPizzaCardsByBranchAndCategory(branchId, 2)
+        );
+        return new PizzaCategorySplit(favouritePizzas, supremePizzas);
     }
 
     public PizzaDetail getPizzaDetail(Integer branchId, Integer pizzaId, Integer sizeCmParam) {
@@ -121,5 +111,25 @@ public class PizzaService {
             return BigDecimal.ZERO;
         }
         return BigDecimal.valueOf(value);
+    }
+
+    private List<PizzaCard> mapPizzaCards(List<PizzaCardRow> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return List.of();
+        }
+        Map<Integer, PizzaCard> cards = new LinkedHashMap<>();
+        for (PizzaCardRow row : rows) {
+            if (!cards.containsKey(row.pizzaId())) {
+                cards.put(row.pizzaId(), new PizzaCard(
+                        row.pizzaId(),
+                        row.name(),
+                        row.pizzaCategoryId(),
+                        row.pizzaCategoryName(),
+                        row.sizeCm(),
+                        toBigDecimal(row.basePrice())
+                ));
+            }
+        }
+        return new ArrayList<>(cards.values());
     }
 }
