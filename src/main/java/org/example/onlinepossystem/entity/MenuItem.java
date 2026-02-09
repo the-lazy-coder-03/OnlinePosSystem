@@ -1,6 +1,12 @@
 package org.example.onlinepossystem.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
 @Table(name = "menu_item", uniqueConstraints = {@UniqueConstraint(name = "uq_menu_item_name", columnNames = {"category_id", "name"})})

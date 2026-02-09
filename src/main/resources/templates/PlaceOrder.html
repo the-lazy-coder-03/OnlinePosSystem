@@ -4,7 +4,6 @@
     <!-- =========================================================
          1) DOCUMENT META + THEME
          ========================================================= -->
-    <!-- 1.1) Meta -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Place Order — Pete’s Pizza</title>
@@ -24,8 +23,6 @@
             --shadow: 0 10px 25px rgba(0,0,0,0.1);
             --border-radius: 15px;
             --warning: #ff9900;
-
-            /* selection block border on hover */
             --hover-border: #7a9ac5;
         }
 
@@ -97,7 +94,8 @@
             transition: all 0.25s;
         }
 
-        .sidebar button:hover, .sidebar button.active {
+        .sidebar button:hover,
+        .sidebar button.active {
             background-color: var(--primary-color);
             color: white;
             border: 2px solid var(--hover-border);
@@ -222,7 +220,15 @@
             margin-top: 10px;
         }
 
-        .items-grid {
+        /* Wider pizza cards */
+        .pizza-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 12px;
+        }
+
+        /* Normal other items */
+        .menu-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
             gap: 12px;
@@ -339,35 +345,25 @@
             .sidebar { width: 100%; max-height: none; }
             .content { max-height: none; }
             .menu-layout { grid-template-columns: 1fr; }
+            .pizza-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
         }
         @media (max-width: 700px){
             .choice-grid{ grid-template-columns: 1fr; }
+            .pizza-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 
 <body>
-
-<!-- =========================================================
-     3) HEADER
-     ========================================================= -->
 <header>
     <h1>Pete’s Pizza</h1>
-    <p>Kenridge & Uitzicht Branch</p>
+    <p>Kenridge &amp; Uitzicht Branch</p>
 </header>
 
-<!-- =========================================================
-     4) PAGE LAYOUT: SIDEBAR + CONTENT
-     ========================================================= -->
 <div class="main-container">
-
-    <!-- =========================================================
-         4.1) SIDEBAR
-         ========================================================= -->
     <aside class="sidebar">
         <button class="back-btn" onclick="goBack()">← Back to Home</button>
 
-        <!-- 4.1.1) Pre-Branch selection hint -->
         <div id="sidebarBranchInfo" class="hint">
             <div style="margin-bottom: 6px;">
                 <span class="badge" id="badgeBranch">Branch: Not selected</span>
@@ -380,7 +376,6 @@
             </div>
         </div>
 
-        <!-- 4.1.2) Category sidebar (shown after branch selected) -->
         <div id="sidebarCategories" class="hidden">
             <h3>Categories</h3>
             <div id="categoryButtons"></div>
@@ -398,20 +393,15 @@
             </div>
 
             <div class="btn-row">
-                <button class="btn" onclick="showSummary()">View Cart & Total</button>
+                <button class="btn" onclick="showSummary()">View Cart &amp; Total</button>
                 <button class="btn btn-secondary" onclick="showStep('branch')">Change Branch</button>
             </div>
         </div>
     </aside>
 
-    <!-- =========================================================
-         4.2) MAIN CONTENT
-         ========================================================= -->
     <main class="content">
 
-        <!-- =========================================================
-             5) STEP 1 — BRANCH SELECT (BIG BLOCKS)
-             ========================================================= -->
+        <!-- STEP 1 -->
         <section id="step-branch">
             <h2>Select Branch</h2>
             <p>Please select your branch to see the correct menu and prices.</p>
@@ -433,32 +423,40 @@
             </div>
         </section>
 
-        <!-- =========================================================
-             6) STEP 2 — MENU
-             ========================================================= -->
+        <!-- STEP 2 -->
         <section id="step-menu" class="hidden">
             <h2 id="menu-title">Menu</h2>
 
             <div class="menu-layout">
-                <!-- 6.1) Items -->
+                <!-- LEFT -->
                 <div>
-                    <h3>Choose a Pizza</h3>
-                <section id="favourites" class="items-grid"></section>
-                <section id="supremes" class="items-grid" style="margin-top: 16px;"></section>
-
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top: 24px;">
-                        <h3 style="margin:0;">Other Menu Items</h3>
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                        <h3 style="margin:0;">Menu</h3>
                         <span class="badge" id="activeCategoryBadge">Category: Everything</span>
                     </div>
-                    <div id="menuItemList" class="items-grid"></div>
+
+                    <div id="pizzaSections" class="section">
+                        <h3>Choose a Pizza</h3>
+
+                        <!-- ✅ wider grids -->
+                        <section id="favourites" class="pizza-grid"></section>
+                        <section id="supremes" class="pizza-grid" style="margin-top: 16px;"></section>
+                    </div>
+
+                    <div id="otherItemsHeader" style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top: 24px;">
+                        <h3 style="margin:0;">Other Menu Items</h3>
+                    </div>
+
+                    <!-- ✅ normal grid -->
+                    <div id="menuItemList" class="menu-grid"></div>
 
                     <div class="btn-row">
                         <button class="btn btn-secondary" onclick="showStep('branch')">Back</button>
-                        <button class="btn" onclick="showSummary()">View Cart & Total</button>
+                        <button class="btn" onclick="showSummary()">View Cart &amp; Total</button>
                     </div>
                 </div>
 
-                <!-- 6.2) Pizza customization panel -->
+                <!-- RIGHT -->
                 <div>
                     <h3>Pizza Customization</h3>
 
@@ -498,9 +496,7 @@
             </div>
         </section>
 
-        <!-- =========================================================
-             7) STEP 3 — SUMMARY
-             ========================================================= -->
+        <!-- STEP 3 -->
         <section id="step-summary" class="hidden">
             <h2>Order Summary</h2>
 
@@ -521,9 +517,7 @@
     </main>
 </div>
 
-<!-- =========================================================
-     8) MODAL — MENU ITEM CUSTOMIZATION
-     ========================================================= -->
+<!-- MODAL -->
 <div id="menuItemModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeMenuModal()">&times;</span>
@@ -542,9 +536,6 @@
     </div>
 </div>
 
-<!-- =========================================================
-     9) SCRIPT
-     ========================================================= -->
 <script>
     /* =========================================================
        9.1) API + CONSTANTS
@@ -584,7 +575,7 @@
     let isOrderDirty = false;
 
     /* =========================================================
-       9.3) FIXED CATEGORY LIST (your required sidebar)
+       9.3) FIXED CATEGORY LIST
        ========================================================= */
     const FIXED_CATEGORIES = [
         'Everything',
@@ -606,7 +597,7 @@
        9.4) HELPERS
        ========================================================= */
     function money(value) {
-        return Number(value).toFixed(2);
+        return Number(value || 0).toFixed(2);
     }
 
     function debounce(fn, delay) {
@@ -627,6 +618,23 @@
         return response.json();
     }
 
+    function setElHidden(id, hidden) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('hidden', hidden);
+    }
+
+    function normalizeCategory(name) {
+        const raw = (name || '').trim().toLowerCase();
+        if (!raw) return 'Other';
+        if (raw === 'burgers' || raw === 'burger') return 'Burgers';
+        if (raw === 'combos' || raw === 'combo') return 'Combos';
+        if (raw === 'pastas' || raw === 'pasta') return 'Pastas';
+        if (raw === 'salads' || raw === 'salad') return 'Salads';
+        if (raw === 'ribs' || raw === 'rib') return 'Ribs';
+        return (name || 'Other').trim();
+    }
+
     /* =========================================================
        9.5) NAV / BACK
        ========================================================= */
@@ -644,13 +652,12 @@
         });
         document.getElementById('step-' + stepId).classList.remove('hidden');
 
-        // Sidebar mode
         if (stepId === 'branch') {
-            document.getElementById('sidebarBranchInfo').classList.remove('hidden');
-            document.getElementById('sidebarCategories').classList.add('hidden');
+            setElHidden('sidebarBranchInfo', false);
+            setElHidden('sidebarCategories', true);
         } else {
-            document.getElementById('sidebarBranchInfo').classList.add('hidden');
-            document.getElementById('sidebarCategories').classList.remove('hidden');
+            setElHidden('sidebarBranchInfo', true);
+            setElHidden('sidebarCategories', false);
         }
 
         updateBadges();
@@ -662,7 +669,6 @@
 
         document.getElementById('badgeBranch').textContent = branchText;
         document.getElementById('badgeCart').textContent = cartText;
-
         document.getElementById('badgeBranch2').textContent = branchText;
         document.getElementById('badgeCart2').textContent = cartText;
 
@@ -670,7 +676,7 @@
     }
 
     /* =========================================================
-       9.6) BRANCH SELECT (BIG BLOCKS)
+       9.6) BRANCH SELECT
        ========================================================= */
     document.getElementById('branchKenridge').addEventListener('click', () => {
         selectBranch(BRANCH_A_ID, 'Kenridge (Branch A)').catch(err => alert(err.message));
@@ -704,34 +710,27 @@
         state.favouritePizzas = response.favouritePizzas || [];
         state.supremePizzas = response.supremePizzas || [];
         renderPizzaList();
-        document.getElementById('pizzaDetail').classList.add('hidden');
+        setElHidden('pizzaDetail', true);
     }
 
     async function loadMenuItems() {
-        state.menuItems = await fetchJson(`${apiBase}/${state.branchId}/menu-items`);
+        const raw = await fetchJson(`${apiBase}/${state.branchId}/menu-items`);
 
-        // Build fixed categories (always show)
+        // normalize snake_case/camelCase
+        state.menuItems = (raw || []).map(x => ({
+            ...x,
+            menuItemId: x.menuItemId ?? x.menu_item_id,
+            categoryId: x.categoryId ?? x.category_id,
+            categoryName: x.categoryName ?? x.category_name
+        }));
+
         buildCategorySidebar();
-
-        // default view: Everything
         applyCategoryFilter('Everything');
     }
 
     /* =========================================================
-       9.8) CATEGORY SIDEBAR (FIXED LIST)
+       9.8) CATEGORY SIDEBAR
        ========================================================= */
-    function normalizeCategory(name) {
-        const raw = (name || '').trim().toLowerCase();
-        if (!raw) return 'Other';
-        if (raw === 'burgers' || raw === 'burger') return 'Burgers';
-        if (raw === 'combos' || raw === 'combo') return 'Combos';
-        if (raw === 'pastas' || raw === 'pasta') return 'Pastas';
-        if (raw === 'salads' || raw === 'salad') return 'Salads';
-        if (raw === 'ribs' || raw === 'rib') return 'Ribs';
-
-        return name.trim();
-    }
-
     function buildCategorySidebar() {
         const container = document.getElementById('categoryButtons');
         container.innerHTML = '';
@@ -756,8 +755,27 @@
         if (active) active.classList.add('active');
     }
 
+    function setPizzaVisibilityByCategory(category) {
+        let showFav = true;
+        let showSup = true;
+
+        if (category === 'Favourite') { showFav = true; showSup = false; }
+        else if (category === 'Supreme') { showFav = false; showSup = true; }
+        else if (category !== 'Everything') { showFav = false; showSup = false; }
+
+        setElHidden('pizzaSections', !(showFav || showSup));
+        setElHidden('favourites', !showFav);
+        setElHidden('supremes', !showSup);
+    }
+
     function applyCategoryFilter(category) {
         state.activeCategory = category;
+
+        setPizzaVisibilityByCategory(category);
+
+        const pizzaOnly = (category === 'Favourite' || category === 'Supreme');
+        setElHidden('otherItemsHeader', pizzaOnly);
+        setElHidden('menuItemList', pizzaOnly);
 
         if (category === 'Everything') {
             state.filteredMenuItems = [...state.menuItems];
@@ -770,11 +788,12 @@
 
         highlightActiveCategoryBtn();
         updateBadges();
-        renderMenuItems(state.filteredMenuItems);
+
+        if (!pizzaOnly) renderMenuItems(state.filteredMenuItems);
     }
 
     /* =========================================================
-       9.9) RENDER PIZZAS
+       9.9) RENDER PIZZAS (✅ name then toppings under it)
        ========================================================= */
     function renderPizzaList() {
         const favouritesSection = document.getElementById('favourites');
@@ -785,6 +804,14 @@
 
         renderPizzaSection(favouritesSection, 'Favourite', state.favouritePizzas);
         renderPizzaSection(supremesSection, 'Supreme', state.supremePizzas);
+    }
+
+    function readPizzaToppings(pizza) {
+        // Supports: defaultToppings: [{name}], toppings: [{name}] OR toppings: ["Cheese", "Ham"]
+        const arr = pizza.defaultToppings || pizza.toppings || pizza.default_toppings || pizza.toppings_list || [];
+        return (arr || [])
+            .map(t => (typeof t === 'string' ? t : (t.name || t.toppingName || t.topping_name)))
+            .filter(Boolean);
     }
 
     function renderPizzaSection(container, title, pizzas) {
@@ -805,27 +832,34 @@
         }
 
         pizzas.forEach(pizza => {
+            const toppingNames = readPizzaToppings(pizza);
+            const toppingsText = toppingNames.length
+                ? toppingNames.slice(0, 10).join(', ') + (toppingNames.length > 10 ? '…' : '')
+                : 'Toppings not provided';
+
             const card = document.createElement('div');
             card.className = 'item-card';
             card.innerHTML = `
-        <div style="font-weight: bold; display: flex; justify-content: space-between; gap: 10px;">
-          <span>${pizza.name}</span>
-          <span>From R${money(pizza.basePrice)}</span>
+        <div style="font-weight: 800; font-size: 1.05em;">
+          ${pizza.name}
         </div>
-        <p style="font-size: 0.85em; color: #666; margin: 6px 0 0;">
-          Default: ${pizza.defaultSizeCm} cm
-        </p>
-        <p style="color: var(--primary-color); font-weight: 700; font-size: 0.82em; margin: 10px 0 0;">
-          Click to customize
-        </p>
+
+        <div style="margin-top: 8px; font-size: 0.88em; color: #666; line-height: 1.35;">
+          <strong>Toppings:</strong> ${toppingsText}
+        </div>
+
+        <div style="margin-top: 10px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <span style="color: var(--primary-color); font-weight: 800;">From R${money(pizza.basePrice)}</span>
+          <span style="color: var(--primary-color); font-weight: 700; font-size: 0.82em;">Click to customize</span>
+        </div>
       `;
-            card.addEventListener('click', () => loadPizzaDetail(pizza.pizzaId));
+            card.addEventListener('click', () => loadPizzaDetail(pizza.pizzaId).catch(err => alert(err.message)));
             container.appendChild(card);
         });
     }
 
     /* =========================================================
-       9.10) RENDER MENU ITEMS (FILTERED)
+       9.10) RENDER MENU ITEMS
        ========================================================= */
     function renderMenuItems(items) {
         const menuListEl = document.getElementById('menuItemList');
@@ -836,7 +870,7 @@
             return;
         }
 
-        const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name));
+        const sorted = [...items].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
         sorted.forEach(item => {
             const card = document.createElement('div');
@@ -868,18 +902,18 @@
         state.currentDetail = detail;
 
         if (!preserveSelection) {
-            state.selectedToppings = new Set(detail.defaultToppings.map(t => t.toppingId));
+            state.selectedToppings = new Set((detail.defaultToppings || []).map(t => t.toppingId));
         }
 
-        state.selectedSizeCm = sizeCmOverride || (detail.availableSizes[0] ? detail.availableSizes[0].sizeCm : null);
-        state.extraPrices = new Map(detail.extraPrices.map(p => [p.toppingId, p.extraPrice]));
+        state.selectedSizeCm = sizeCmOverride || (detail.availableSizes && detail.availableSizes[0] ? detail.availableSizes[0].sizeCm : null);
+        state.extraPrices = new Map((detail.extraPrices || []).map(p => [p.toppingId, p.extraPrice]));
 
-        document.getElementById('pizzaName').textContent = detail.name;
+        document.getElementById('pizzaName').textContent = detail.name || '';
         document.getElementById('basePrice').textContent = money(detail.basePriceForSelectedSize);
 
-        renderSizes(detail.availableSizes);
-        renderToppings(detail.allToppings);
-        document.getElementById('pizzaDetail').classList.remove('hidden');
+        renderSizes(detail.availableSizes || []);
+        renderToppings(detail.allToppings || []);
+        setElHidden('pizzaDetail', false);
 
         debouncedQuote();
     }
@@ -887,6 +921,11 @@
     function renderSizes(sizes) {
         const sizeOptionsEl = document.getElementById('sizeOptions');
         sizeOptionsEl.innerHTML = '';
+
+        if (!sizes || sizes.length === 0) {
+            sizeOptionsEl.innerHTML = '<p>No sizes available.</p>';
+            return;
+        }
 
         const select = document.createElement('select');
         select.style.width = "100%";
@@ -916,6 +955,11 @@
     function renderToppings(toppings) {
         const toppingsListEl = document.getElementById('toppingsList');
         toppingsListEl.innerHTML = '';
+
+        if (!toppings || toppings.length === 0) {
+            toppingsListEl.innerHTML = '<p>No toppings available.</p>';
+            return;
+        }
 
         toppings.forEach(topping => {
             const price = state.extraPrices.get(topping.toppingId) ?? 0;
@@ -986,7 +1030,7 @@
             return;
         }
 
-        const toppingNameMap = new Map(state.currentDetail.allToppings.map(t => [t.toppingId, t.name]));
+        const toppingNameMap = new Map((state.currentDetail.allToppings || []).map(t => [t.toppingId, t.name]));
         const selectedToppingIds = Array.from(state.selectedToppings);
         const selectedToppingNames = selectedToppingIds.map(id => toppingNameMap.get(id)).filter(Boolean);
 
@@ -1027,7 +1071,7 @@
        9.13) MENU ITEM MODAL
        ========================================================= */
     function openMenuItemModal(menuItemId) {
-        const item = state.menuItems.find(menuItem => menuItem.menuItemId === menuItemId);
+        const item = state.menuItems.find(menuItem => Number(menuItem.menuItemId) === Number(menuItemId));
         if (!item) return;
 
         state.selectedMenuItem = item;
@@ -1036,7 +1080,7 @@
         state.menuOptionName = new Map();
         state.menuOptionMenuItemId = new Map();
 
-        document.getElementById('menuModalTitle').textContent = item.name;
+        document.getElementById('menuModalTitle').textContent = item.name || '';
         document.getElementById('menuBasePrice').textContent = money(item.price);
         document.getElementById('menuExtrasPrice').textContent = money(0);
         document.getElementById('menuTotalPrice').textContent = money(item.price);
@@ -1058,7 +1102,7 @@
                 const maxSelect = group.maxSelect ?? 0;
                 const inputType = maxSelect === 1 ? 'radio' : 'checkbox';
 
-                group.options.forEach(option => {
+                (group.options || []).forEach(option => {
                     state.menuOptionPrice.set(option.optionId, option.price);
                     state.menuOptionName.set(option.optionId, option.name);
                     state.menuOptionMenuItemId.set(option.optionId, option.menuItemId);
