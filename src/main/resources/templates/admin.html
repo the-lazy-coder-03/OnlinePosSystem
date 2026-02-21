@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard - Pete's Pizza</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background: #f4f4f4; }
+        h1, h2 { color: #333; }
+        .container { max-width: 1200px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .tabs { display: flex; border-bottom: 2px solid #ccc; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; cursor: pointer; border: 1px solid transparent; border-bottom: none; }
+        .tab.active { background: #fff; border-color: #ccc; border-bottom: 2px solid #fff; margin-bottom: -2px; font-weight: bold; }
+        .section { display: none; }
+        .section.active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f2f2f2; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: #fff; }
+        .btn-primary { background: #007bff; }
+        .btn-danger { background: #dc3545; }
+        .btn-success { background: #28a745; }
+        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); }
+        .modal-content { background: #fff; margin: 10% auto; padding: 20px; border-radius: 8px; width: 50%; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Admin Dashboard</h1>
+    <a href="/" style="display: inline-block; margin-bottom: 20px;">&larr; Back to Home</a>
+
+    <div class="tabs">
+        <div class="tab active" onclick="showSection('pizzas')">Pizzas</div>
+        <div class="tab" onclick="showSection('menuItems')">Menu Items</div>
+        <div class="tab" onclick="showSection('toppings')">Extra Toppings</div>
+    </div>
+
+    <!-- Pizzas Section -->
+    <div id="pizzas" class="section active">
+        <h2>Manage Pizzas</h2>
+        <button class="btn btn-primary" onclick="openModal('pizzaModal')">Add New Pizza</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Default Toppings</th>
+                    <th>Description</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="p : ${pizzas}">
+                    <td th:text="${p.id}">1</td>
+                    <td th:text="${p.name}">Margherita</td>
+                    <td th:text="${p.category.name}">Favourite</td>
+                    <td>
+                        <div style="font-size: 0.8em;">
+                            <th:block th:each="pdi : ${pizzaDefaultIngredients}" th:if="${pdi.pizza.id == p.id}">
+                                <span th:text="${pdi.ingredient.name}"></span><br/>
+                            </th:block>
+                        </div>
+                    </td>
+                    <td th:text="${p.description}">Classic</td>
+                    <td th:text="${p.active}">true</td>
+                    <td>
+                        <div style="font-size: 0.8em; margin-bottom: 5px;">
+                            <th:block th:each="bp : ${branchPizzaPrices}" th:if="${bp.pizza.id == p.id}">
+                                <span th:text="${bp.branch.name} + ' (' + ${bp.pizzaSize.cm} + 'cm): R' + ${bp.price}"></span><br/>
+                            </th:block>
+                        </div>
+                        <button class="btn btn-success" th:onclick="'openPriceModal(' + ${p.id} + ', \'pizza\')'">Set Prices</button>
+                        <button class="btn btn-primary" th:onclick="'openPizzaEdit(' + ${p.id} + ', \'' + ${#strings.escapeJavaScript(p.name)} + '\', ' + ${p.category.id} + ', \'' + ${#strings.escapeJavaScript(p.description != null ? p.description : '')} + '\', ' + ${p.sortOrder} + ', ' + ${p.active} + ', [' + ${#strings.listJoin(pizzaDefaultIngredients.?[pizza.id == __${p.id}__].![ingredient.id], ',')} + '])'" style="background: #17a2b8;">Edit</button>
+                        <form th:action="@{/admin/pizzas/delete/{id}(id=${p.id})}" method="post" style="display:inline;">
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Menu Items Section -->
+    <div id="menuItems" class="section">
+        <h2>Manage Menu Items</h2>
+        <button class="btn btn-primary" onclick="openModal('menuItemModal')">Add New Menu Item</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="m : ${menuItems}">
+                    <td th:text="${m.id}">1</td>
+                    <td th:text="${m.name}">Coke</td>
+                    <td th:text="${m.category.name}">Drinks</td>
+                    <td th:text="${m.description}">500ml</td>
+                    <td th:text="${m.active}">true</td>
+                    <td>
+                        <div style="font-size: 0.8em; margin-bottom: 5px;">
+                            <th:block th:each="bm : ${branchMenuItemPrices}" th:if="${bm.menuItem.id == m.id}">
+                                <span th:text="${bm.branch.name} + ': R' + ${bm.price}"></span><br/>
+                            </th:block>
+                        </div>
+                        <button class="btn btn-success" th:onclick="'openPriceModal(' + ${m.id} + ', \'menuItem\')'">Set Prices</button>
+                        <form th:action="@{/admin/menu-items/delete/{id}(id=${m.id})}" method="post" style="display:inline;">
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Extra Toppings Section -->
+    <div id="toppings" class="section">
+        <h2>Manage Extra Topping Prices</h2>
+        <button class="btn btn-primary" onclick="openPriceModal(null, 'topping')">Set Topping Price</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>Branch</th>
+                    <th>Price Category</th>
+                    <th>Size</th>
+                    <th>Price</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="ep : ${branchExtraPrices}">
+                    <td th:text="${ep.branch.name}">Branch</td>
+                    <td th:text="${ep.priceCategory.name}">Category</td>
+                    <td th:text="${ep.pizzaSize.cm} + 'cm'">Size</td>
+                    <td th:text="'R' + ${ep.price}">Price</td>
+                    <td>
+                        <button class="btn btn-success" th:onclick="'openPriceModal(' + ${ep.priceCategory.id} + ', \'topping\', ' + ${ep.branch.id} + ', ' + ${ep.pizzaSize.id} + ', ' + ${ep.price} + ')'">Edit</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pizza Modal -->
+<div id="pizzaModal" class="modal">
+    <div class="modal-content">
+        <h2>Add/Edit Pizza</h2>
+        <form th:action="@{/admin/pizzas/save}" method="post">
+            <input type="hidden" name="id" id="pizzaId">
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" name="name" required>
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select name="categoryId">
+                    <option th:each="cat : ${pizzaCategories}" th:value="${cat.id}" th:text="${cat.name}"></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description" id="pizzaDescription"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Default Toppings</label>
+                <div style="max-height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;">
+                    <th:block th:each="ing : ${ingredients}">
+                        <label style="font-weight: normal; display: block;">
+                            <input type="checkbox" name="ingredientIds" th:value="${ing.id}" class="pizza-ingredient-checkbox">
+                            <span th:text="${ing.name}">Ingredient</span>
+                        </label>
+                    </th:block>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Sort Order</label>
+                <input type="number" name="sortOrder" value="0">
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" name="active" checked> Active</label>
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" class="btn btn-danger" onclick="closeModal('pizzaModal')">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<!-- Menu Item Modal -->
+<div id="menuItemModal" class="modal">
+    <div class="modal-content">
+        <h2>Add/Edit Menu Item</h2>
+        <form th:action="@{/admin/menu-items/save}" method="post">
+            <input type="hidden" name="id" id="menuItemId">
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" name="name" required>
+            </div>
+            <div class="form-group">
+                <label>Category</label>
+                <select name="categoryId">
+                    <option th:each="cat : ${menuCategories}" th:value="${cat.id}" th:text="${cat.name}"></option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea name="description"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Sort Order</label>
+                <input type="number" name="sortOrder" value="0">
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" name="active" checked> Active</label>
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" class="btn btn-danger" onclick="closeModal('menuItemModal')">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<!-- Price Modal -->
+<div id="priceModal" class="modal">
+    <div class="modal-content">
+        <h2 id="priceModalTitle">Set Price</h2>
+        <form id="priceForm" method="post">
+            <input type="hidden" name="pizzaId" id="pricePizzaId">
+            <input type="hidden" name="menuItemId" id="priceMenuItemId">
+            
+            <div class="form-group">
+                <label>Branch</label>
+                <select name="branchId" id="priceBranchId" required>
+                    <option th:each="b : ${branches}" th:value="${b.id}" th:text="${b.name}"></option>
+                </select>
+            </div>
+
+            <div id="toppingCategoryGroup" class="form-group" style="display:none;">
+                <label>Price Category (Toppings)</label>
+                <select name="priceCategoryId" id="priceCategoryId">
+                    <option th:each="pc : ${priceCategories}" th:value="${pc.id}" th:text="${pc.name}"></option>
+                </select>
+            </div>
+
+            <div id="pizzaSizeGroup" class="form-group" style="display:none;">
+                <label>Size</label>
+                <select name="pizzaSizeId" id="pricePizzaSizeId">
+                    <option th:each="s : ${pizzaSizes}" th:value="${s.id}" th:text="${s.cm} + 'cm'"></option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Price (R)</label>
+                <input type="number" step="0.01" name="price" id="priceValue" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Price</button>
+            <button type="button" class="btn btn-danger" onclick="closeModal('priceModal')">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function showSection(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    function openModal(id) {
+        document.getElementById(id).style.display = 'block';
+        if (id === 'pizzaModal') {
+            // Reset for new pizza
+            document.getElementById('pizzaId').value = '';
+            document.querySelector('#pizzaModal [name="name"]').value = '';
+            document.getElementById('pizzaDescription').value = '';
+            document.querySelector('#pizzaModal [name="sortOrder"]').value = 0;
+            document.querySelector('#pizzaModal [name="active"]').checked = true;
+            const checkboxes = document.querySelectorAll('.pizza-ingredient-checkbox');
+            checkboxes.forEach(cb => cb.checked = false);
+        }
+    }
+
+    function openPizzaEdit(id, name, categoryId, description, sortOrder, active, ingredientIds) {
+        document.getElementById('pizzaModal').style.display = 'block';
+        document.getElementById('pizzaId').value = id;
+        document.querySelector('#pizzaModal [name="name"]').value = name;
+        document.querySelector('#pizzaModal [name="categoryId"]').value = categoryId;
+        document.getElementById('pizzaDescription').value = description;
+        document.querySelector('#pizzaModal [name="sortOrder"]').value = sortOrder;
+        document.querySelector('#pizzaModal [name="active"]').checked = active;
+        
+        const checkboxes = document.querySelectorAll('.pizza-ingredient-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = ingredientIds.includes(parseInt(cb.value));
+        });
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+
+    function openPriceModal(id, type, branchId, sizeId, price) {
+        const modal = document.getElementById('priceModal');
+        const form = document.getElementById('priceForm');
+        const pizzaIdInput = document.getElementById('pricePizzaId');
+        const menuItemIdInput = document.getElementById('priceMenuItemId');
+        const sizeGroup = document.getElementById('pizzaSizeGroup');
+        const toppingGroup = document.getElementById('toppingCategoryGroup');
+        const branchSelect = document.getElementById('priceBranchId');
+        const sizeSelect = document.getElementById('pricePizzaSizeId');
+        const toppingSelect = document.getElementById('priceCategoryId');
+        const priceInput = document.getElementById('priceValue');
+
+        // Reset
+        pizzaIdInput.value = '';
+        menuItemIdInput.value = '';
+        toppingSelect.value = '';
+        priceInput.value = price || '';
+        if (branchId) branchSelect.value = branchId;
+        if (sizeId) sizeSelect.value = sizeId;
+
+        if (type === 'pizza') {
+            document.getElementById('priceModalTitle').innerText = 'Set Pizza Price';
+            form.action = '/admin/pizzas/price';
+            pizzaIdInput.value = id;
+            sizeGroup.style.display = 'block';
+            toppingGroup.style.display = 'none';
+        } else if (type === 'menuItem') {
+            document.getElementById('priceModalTitle').innerText = 'Set Menu Item Price';
+            form.action = '/admin/menu-items/price';
+            menuItemIdInput.value = id;
+            sizeGroup.style.display = 'none';
+            toppingGroup.style.display = 'none';
+        } else if (type === 'topping') {
+            document.getElementById('priceModalTitle').innerText = 'Set Topping Category Price';
+            form.action = '/admin/toppings/price';
+            if (id) toppingSelect.value = id;
+            sizeGroup.style.display = 'block';
+            toppingGroup.style.display = 'block';
+        }
+        modal.style.display = 'block';
+    }
+
+    window.onclick = function(event) {
+        if (event.target.className === 'modal') {
+            event.target.style.display = "none";
+        }
+    }
+</script>
+
+</body>
+</html>

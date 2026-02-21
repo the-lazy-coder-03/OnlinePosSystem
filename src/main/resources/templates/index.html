@@ -221,6 +221,7 @@
 
         <!-- 9.1 COMMON LINK -->
         <a href="/order">Order Online</a>
+        <a href="/admin" sec:authorize="isAuthenticated()">Admin Panel</a>
 
         <!-- 9.2 GUEST LINKS -->
         <th:block sec:authorize="isAnonymous()">

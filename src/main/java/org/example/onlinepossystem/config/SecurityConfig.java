@@ -43,7 +43,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         // Protect order and profile pages
-                        .requestMatchers("/order", "/profile/edit").authenticated()
+                        .requestMatchers("/order", "/profile/edit", "/admin/**").authenticated()
 
                         // Protect sensitive API endpoints
                         .requestMatchers("/api/staff/create").authenticated()
