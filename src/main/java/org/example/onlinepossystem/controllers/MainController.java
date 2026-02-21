@@ -6,6 +6,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
 
 @Controller
 public class MainController {
@@ -46,7 +48,11 @@ public class MainController {
     }
 
     @GetMapping("/order")
-    public String orderPage(Model model, Authentication authentication) {
+    public String orderPage(
+            @RequestParam(value = "branchId", required = false) Integer branchId,
+            Model model,
+            Authentication authentication
+    ) {
         if (authentication != null && authentication.isAuthenticated()) {
             String email = authentication.getName();
             customerRepository.findByEmail(email).ifPresent(customer -> {
@@ -54,6 +60,10 @@ public class MainController {
                 model.addAttribute("user", customer);
             });
         }
+        
+        // Default to branch 1 if nothing is provided
+        model.addAttribute("branchId", branchId != null ? branchId : 1);
+        
         return "PlaceOrder";
     }
 
