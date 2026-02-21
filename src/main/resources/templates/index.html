@@ -116,6 +116,13 @@
             transition: all 0.3s;
         }
 
+        .nav-links a.nav-btn--order,
+        .nav-links a.nav-btn--logout {
+            width: 190px;
+            height: 60px;
+            font-size: 1.05em;
+        }
+
         .nav-links a:hover {
             background-color: #0052cc;
             color: white;
@@ -220,8 +227,7 @@
     <div class="nav-links">
 
         <!-- 9.1 COMMON LINK -->
-        <a href="/order">Order Online</a>
-        <a href="/admin" sec:authorize="isAuthenticated()">Admin Panel</a>
+        <a href="/order" class="nav-btn--order">Order Online</a>
 
         <!-- 9.2 GUEST LINKS -->
         <th:block sec:authorize="isAnonymous()">
@@ -231,7 +237,7 @@
 
         <!-- 9.3 LOGOUT -->
         <th:block sec:authorize="isAuthenticated()">
-            <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+            <a href="#" class="nav-btn--logout" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                 Logout
             </a>
             <form id="logout-form" th:action="@{/logout}" method="post" style="display:none;"></form>

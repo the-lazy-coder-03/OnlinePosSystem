@@ -75,7 +75,16 @@
                             </th:block>
                         </div>
                         <button class="btn btn-success" th:onclick="'openPriceModal(' + ${p.id} + ', \'pizza\')'">Set Prices</button>
-                        <button class="btn btn-primary" th:onclick="'openPizzaEdit(' + ${p.id} + ', \'' + ${#strings.escapeJavaScript(p.name)} + '\', ' + ${p.category.id} + ', \'' + ${#strings.escapeJavaScript(p.description != null ? p.description : '')} + '\', ' + ${p.sortOrder} + ', ' + ${p.active} + ', [' + ${#strings.listJoin(pizzaDefaultIngredients.?[pizza.id == __${p.id}__].![ingredient.id], ',')} + '])'" style="background: #17a2b8;">Edit</button>
+                        <button class="btn btn-primary"
+                                onclick="openPizzaEditFromButton(this)"
+                                th:data-id="${p.id}"
+                                th:data-name="${p.name}"
+                                th:data-category-id="${p.category.id}"
+                                th:data-description="${p.description != null ? p.description : ''}"
+                                th:data-sort-order="${p.sortOrder}"
+                                th:data-active="${p.active}"
+                                th:data-ingredient-ids="${#strings.listJoin(pizzaDefaultIngredients.?[pizza.id == __${p.id}__].![ingredient.id], ',')}"
+                                style="background: #17a2b8;">Edit</button>
                         <form th:action="@{/admin/pizzas/delete/{id}(id=${p.id})}" method="post" style="display:inline;">
                             <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
                         </form>
@@ -288,6 +297,24 @@
             const checkboxes = document.querySelectorAll('.pizza-ingredient-checkbox');
             checkboxes.forEach(cb => cb.checked = false);
         }
+    }
+
+    function openPizzaEditFromButton(button) {
+        const ingredientIdsRaw = button.dataset.ingredientIds || '';
+        const ingredientIds = ingredientIdsRaw
+            .split(',')
+            .filter(Boolean)
+            .map(id => parseInt(id, 10));
+
+        openPizzaEdit(
+            parseInt(button.dataset.id, 10),
+            button.dataset.name || '',
+            parseInt(button.dataset.categoryId, 10),
+            button.dataset.description || '',
+            parseInt(button.dataset.sortOrder, 10),
+            button.dataset.active === 'true',
+            ingredientIds
+        );
     }
 
     function openPizzaEdit(id, name, categoryId, description, sortOrder, active, ingredientIds) {

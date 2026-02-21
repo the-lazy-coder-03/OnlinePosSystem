@@ -1,12 +1,23 @@
 package org.example.onlinepossystem.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
 import java.util.List;
 
 public class OrderRequestDTO {
+    @NotBlank
     private String customerName;
     private String phone;
+    @NotBlank
     private String branchName;
     private String orderType; // "pickup" or "delivery"
+    @NotNull
+    @Size(min = 1)
+    @Valid
     private List<OrderItemRequestDTO> items;
 
     // Getters and Setters
@@ -25,7 +36,10 @@ public class OrderRequestDTO {
         private Integer menuItemId;
         private Integer pizzaId;
         private Integer pizzaSizeId;
+        @NotNull
+        @Positive
         private Integer quantity;
+        @Valid
         private List<CustomizationRequestDTO> customizations;
         private String notes;
 
@@ -45,7 +59,10 @@ public class OrderRequestDTO {
     }
 
     public static class CustomizationRequestDTO {
+        @NotNull
         private Integer id;
+        @NotNull
+        @Positive
         private Integer quantity;
 
         // Getters and Setters

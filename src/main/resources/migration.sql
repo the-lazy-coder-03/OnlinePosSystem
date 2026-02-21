@@ -24,6 +24,9 @@ DROP TABLE IF EXISTS order_menu_item        CASCADE;
 DROP TABLE IF EXISTS customer_order         CASCADE;
 
 -- Menu tables
+DROP TABLE IF EXISTS menu_item_modifier_group CASCADE;
+DROP TABLE IF EXISTS modifier_option        CASCADE;
+DROP TABLE IF EXISTS modifier_group         CASCADE;
 DROP TABLE IF EXISTS salad_ingredients        CASCADE;
 DROP TABLE IF EXISTS burger_toppings          CASCADE;
 DROP TABLE IF EXISTS branch_menu_item_price   CASCADE;
@@ -122,6 +125,27 @@ CREATE TABLE branch_menu_item_price (
   menu_item_id INT NOT NULL REFERENCES menu_item(id)     ON UPDATE RESTRICT ON DELETE RESTRICT,
   price        NUMERIC(10,2) NOT NULL CHECK (price >= 0),
   PRIMARY KEY (branch_id, menu_item_id)
+);
+
+CREATE TABLE modifier_group (
+  id         INT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  required   BOOLEAN NOT NULL DEFAULT FALSE,
+  min_select INT NOT NULL DEFAULT 0,
+  max_select INT NOT NULL DEFAULT 1
+);
+
+CREATE TABLE modifier_option (
+  id           INT PRIMARY KEY,
+  group_id     INT NOT NULL REFERENCES modifier_group(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL,
+  menu_item_id INT REFERENCES menu_item(id) ON DELETE SET NULL
+);
+
+CREATE TABLE menu_item_modifier_group (
+  menu_item_id INT NOT NULL REFERENCES menu_item(id) ON DELETE CASCADE,
+  group_id     INT NOT NULL REFERENCES modifier_group(id) ON DELETE CASCADE,
+  PRIMARY KEY (menu_item_id, group_id)
 );
 
 CREATE TABLE burger_toppings (
@@ -343,6 +367,29 @@ INSERT INTO burger_toppings (id, burger_id, topping_name, is_default, price) VAL
   (3, 201, 'Tomato', TRUE, 0),
   (4, 201, 'Cheese', TRUE, 0)
 ON CONFLICT (id) DO NOTHING;
+
+-- 8.6 Salad ingredients (example)
+INSERT INTO salad_ingredients (id, salad_id, ingredient_name, price) VALUES
+  (1, 605, 'Feta', 15.00),
+  (2, 605, 'Olives', 12.00)
+ON CONFLICT (id) DO NOTHING;
+
+-- 8.7 Modifier groups and options (example)
+INSERT INTO modifier_group (id, name, required, min_select, max_select) VALUES
+  (1, 'Choose your drink', TRUE, 1, 1),
+  (2, 'Extra toppings', FALSE, 0, 5)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO modifier_option (id, group_id, name, menu_item_id) VALUES
+  (1, 1, 'Coke 300ml', 101),
+  (2, 1, 'Coke Zero 300ml', 103),
+  (3, 2, 'Cheese', 201)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES
+  (301, 1),
+  (302, 1)
+ON CONFLICT (menu_item_id, group_id) DO NOTHING;
 
 -- =========================================================
 -- 9) PIZZA SEED (FROM YOUR BIG SCRIPT)

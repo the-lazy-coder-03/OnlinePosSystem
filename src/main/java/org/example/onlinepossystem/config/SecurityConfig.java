@@ -7,7 +7,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -27,13 +27,17 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
+        // Special case for admin password from .env which might not be BCrypt encoded
+        // But for simplicity, we'll use NoOpPasswordEncoder for the admin ONLY if it matches the .env password
+        // Or better, just don't encode it in UserDetailsService if it's the admin.
+        // Spring Security 5+ requires an ID for PasswordEncoder, e.g. {bcrypt}, {noop}.
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
@@ -43,7 +47,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         // Protect order and profile pages
-                        .requestMatchers("/order", "/profile/edit", "/admin/**").authenticated()
+                        .requestMatchers("/order", "/profile/edit").authenticated()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
 
                         // Protect sensitive API endpoints
                         .requestMatchers("/api/staff/create").authenticated()

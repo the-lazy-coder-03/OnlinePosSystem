@@ -2,6 +2,7 @@ package org.example.onlinepossystem.service;
 
 import org.example.onlinepossystem.dto.MenuDTO;
 import org.example.onlinepossystem.dto.OrderRequestDTO;
+import org.example.onlinepossystem.dto.OrderResponseDTO;
 import org.example.onlinepossystem.entity.*;
 import org.example.onlinepossystem.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -58,11 +58,11 @@ public class OrderService {
     private BranchExtraPriceRepository branchExtraPriceRepository;
 
     public List<MenuDTO> getMenuForBranch(String branchName) {
-        Optional<Branch> branchOpt = branchRepository.findByName(branchName);
-        if (branchOpt.isEmpty()) {
-            return new ArrayList<>();
+        if (branchName == null || branchName.isBlank()) {
+            throw new IllegalArgumentException("Branch name is required.");
         }
-        Branch branch = branchOpt.get();
+        Branch branch = branchRepository.findByName(branchName)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Branch not found: " + branchName));
 
         List<MenuDTO> menu = new ArrayList<>();
 
@@ -143,9 +143,10 @@ public class OrderService {
     }
 
     @Transactional
-    public Order placeOrder(OrderRequestDTO request) {
+    public OrderResponseDTO placeOrder(OrderRequestDTO request) {
+        validateOrderRequest(request);
         Branch branch = branchRepository.findByName(request.getBranchName())
-                .orElseThrow(() -> new RuntimeException("Branch not found"));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Branch not found: " + request.getBranchName()));
 
         Order order = new Order();
         order.setBranch(branch);
@@ -157,14 +158,17 @@ public class OrderService {
 
         for (OrderRequestDTO.OrderItemRequestDTO itemRequest : request.getItems()) {
             if (itemRequest.getPizzaId() != null) {
+                if (itemRequest.getPizzaSizeId() == null) {
+                    throw new IllegalArgumentException("pizzaSizeId is required when pizzaId is provided.");
+                }
                 // Handle Pizza
                 Pizza pizza = pizzaRepository.findById(itemRequest.getPizzaId())
-                        .orElseThrow(() -> new RuntimeException("Pizza not found"));
+                        .orElseThrow(() -> new java.util.NoSuchElementException("Pizza not found with ID: " + itemRequest.getPizzaId()));
                 PizzaSize size = pizzaSizeRepository.findById(itemRequest.getPizzaSizeId())
-                        .orElseThrow(() -> new RuntimeException("Pizza size not found"));
+                        .orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + itemRequest.getPizzaSizeId()));
                 BranchPizzaPrice bpp = branchPizzaPriceRepository
                         .findByBranchIdAndPizzaIdAndPizzaSizeId(branch.getId(), pizza.getId(), size.getId())
-                        .orElseThrow(() -> new RuntimeException("Pizza price not found for branch"));
+                        .orElseThrow(() -> new java.util.NoSuchElementException("Price not found for pizza: " + pizza.getName() + " size: " + size.getCm() + "cm in branch: " + branch.getName()));
 
                 OrderPizzaItem pizzaItem = new OrderPizzaItem();
                 pizzaItem.setPizza(pizza);
@@ -176,11 +180,11 @@ public class OrderService {
                 if (itemRequest.getCustomizations() != null) {
                     for (OrderRequestDTO.CustomizationRequestDTO custReq : itemRequest.getCustomizations()) {
                         Ingredient ing = ingredientRepository.findById(custReq.getId())
-                                .orElseThrow(() -> new RuntimeException("Ingredient not found"));
+                                .orElseThrow(() -> new java.util.NoSuchElementException("Ingredient not found with ID: " + custReq.getId()));
                         
                         BranchExtraPrice bep = branchExtraPriceRepository
                                 .findById(new BranchExtraPrice.BranchExtraPriceId(branch.getId(), ing.getPriceCategory().getId(), size.getId()))
-                                .orElseThrow(() -> new RuntimeException("Extra price not found"));
+                                .orElseThrow(() -> new java.util.NoSuchElementException("Extra price not found for ingredient: " + ing.getName() + " size: " + size.getCm() + "cm in branch: " + branch.getName()));
 
                         OrderPizzaItemExtra extra = new OrderPizzaItemExtra();
                         extra.setIngredient(ing);
@@ -193,12 +197,15 @@ public class OrderService {
 
             } else {
                 // Handle Menu Item
+                if (itemRequest.getMenuItemId() == null) {
+                    throw new IllegalArgumentException("Each item must have either menuItemId or pizzaId.");
+                }
                 MenuItem menuItem = menuItemRepository.findById(itemRequest.getMenuItemId())
-                        .orElseThrow(() -> new RuntimeException("Menu item not found"));
+                        .orElseThrow(() -> new java.util.NoSuchElementException("Menu item not found with ID: " + itemRequest.getMenuItemId()));
 
                 BranchMenuItemPrice branchPrice = branchMenuItemPriceRepository
                         .findByBranchIdAndMenuItemId(branch.getId(), menuItem.getId())
-                        .orElseThrow(() -> new RuntimeException("Price not found for branch"));
+                        .orElseThrow(() -> new java.util.NoSuchElementException("Price not found for menu item: " + menuItem.getName() + " in branch: " + branch.getName()));
 
                 OrderMenuItem orderItem = new OrderMenuItem();
                 orderItem.setMenuItem(menuItem);
@@ -213,16 +220,19 @@ public class OrderService {
                         String extraName = "";
                         Double extraPrice = 0.0;
 
-                        Optional<BurgerTopping> bt = burgerToppingRepository.findById(custReq.getId());
-                        if (bt.isPresent()) {
-                            extraName = bt.get().getToppingName();
-                            extraPrice = bt.get().getPrice();
+                        BurgerTopping topping = burgerToppingRepository.findById(custReq.getId()).orElse(null);
+                        if (topping != null) {
+                            extraName = topping.getToppingName();
+                            extraPrice = topping.getPrice();
                         } else {
-                            Optional<SaladIngredient> si = saladIngredientRepository.findById(custReq.getId());
-                            if (si.isPresent()) {
-                                extraName = si.get().getIngredientName();
-                                extraPrice = si.get().getPrice();
+                            SaladIngredient ingredient = saladIngredientRepository.findById(custReq.getId()).orElse(null);
+                            if (ingredient != null) {
+                                extraName = ingredient.getIngredientName();
+                                extraPrice = ingredient.getPrice();
                             }
+                        }
+                        if (extraName.isEmpty()) {
+                            throw new java.util.NoSuchElementException("Customization not found with ID: " + custReq.getId());
                         }
                         extra.setName(extraName);
                         extra.setQty(custReq.getQuantity());
@@ -234,32 +244,148 @@ public class OrderService {
             }
         }
 
-        return orderRepository.save(order);
+        return toDto(orderRepository.save(order));
     }
 
-    public List<Order> getOrdersByBranch(String branchName) {
-        Optional<Branch> branchOpt = branchRepository.findByName(branchName);
-        if (branchOpt.isEmpty()) return new ArrayList<>();
-        return orderRepository.findByBranchId(branchOpt.get().getId());
-    }
-
-    public List<Order> getPendingOrdersByBranch(String branchName) {
-        Optional<Branch> branchOpt = branchRepository.findByName(branchName);
-        if (branchOpt.isEmpty()) return new ArrayList<>();
-        return orderRepository.findByBranchIdAndStatus(branchOpt.get().getId(), "created");
-    }
-
-    public Order updateOrderStatus(Long orderId, String newStatus) {
-        Optional<Order> orderOpt = orderRepository.findById(orderId);
-        if (orderOpt.isPresent()) {
-            Order order = orderOpt.get();
-            order.setStatus(newStatus);
-            return orderRepository.save(order);
+    @Transactional(readOnly = true)
+    public List<OrderResponseDTO> getOrdersByBranch(String branchName) {
+        if (branchName == null || branchName.isBlank()) {
+            throw new IllegalArgumentException("Branch name is required.");
         }
-        return null;
+        Branch branch = branchRepository.findByName(branchName)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Branch not found: " + branchName));
+        return orderRepository.findByBranchId(branch.getId()).stream()
+                .map(this::toDto)
+                .toList();
     }
 
-    public List<Order> getAllOrders() {
-        return orderRepository.findAll();
+    @Transactional(readOnly = true)
+    public List<OrderResponseDTO> getPendingOrdersByBranch(String branchName) {
+        if (branchName == null || branchName.isBlank()) {
+            throw new IllegalArgumentException("Branch name is required.");
+        }
+        Branch branch = branchRepository.findByName(branchName)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Branch not found: " + branchName));
+        return orderRepository.findByBranchIdAndStatus(branch.getId(), "created").stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    @Transactional
+    public OrderResponseDTO updateOrderStatus(Long orderId, String newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Order not found with ID: " + orderId));
+        order.setStatus(newStatus);
+        return toDto(orderRepository.save(order));
+    }
+
+    @Transactional(readOnly = true)
+    public List<OrderResponseDTO> getAllOrders() {
+        return orderRepository.findAll().stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    private void validateOrderRequest(OrderRequestDTO request) {
+        if (request == null) {
+            throw new IllegalArgumentException("Order request is required.");
+        }
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new IllegalArgumentException("Order must include at least one item.");
+        }
+        for (OrderRequestDTO.OrderItemRequestDTO item : request.getItems()) {
+            if (item == null) {
+                throw new IllegalArgumentException("Order items cannot be null.");
+            }
+            boolean hasMenuItem = item.getMenuItemId() != null;
+            boolean hasPizza = item.getPizzaId() != null;
+            if (hasMenuItem == hasPizza) {
+                throw new IllegalArgumentException("Each item must include exactly one of menuItemId or pizzaId.");
+            }
+        }
+    }
+
+    private OrderResponseDTO toDto(Order order) {
+        OrderResponseDTO dto = new OrderResponseDTO();
+        dto.setId(order.getId());
+        if (order.getBranch() != null) {
+            dto.setBranchId(order.getBranch().getId());
+            dto.setBranchName(order.getBranch().getName());
+        }
+        dto.setStatus(order.getStatus());
+        dto.setOrderType(order.getOrderType());
+        dto.setCreatedAt(order.getCreatedAt());
+        dto.setCustomerName(order.getCustomerName());
+        dto.setPhone(order.getPhone());
+        dto.setNotes(order.getNotes());
+
+        List<OrderResponseDTO.MenuItemDTO> menuItems = new ArrayList<>();
+        if (order.getMenuItems() != null) {
+            for (OrderMenuItem item : order.getMenuItems()) {
+                OrderResponseDTO.MenuItemDTO itemDto = new OrderResponseDTO.MenuItemDTO();
+                itemDto.setId(item.getId());
+                if (item.getMenuItem() != null) {
+                    itemDto.setMenuItemId(item.getMenuItem().getId());
+                    itemDto.setMenuItemName(item.getMenuItem().getName());
+                }
+                itemDto.setQty(item.getQty());
+                itemDto.setUnitPriceAtTime(item.getUnitPriceAtTime());
+                itemDto.setNotes(item.getNotes());
+
+                List<OrderResponseDTO.MenuItemExtraDTO> extraDtos = new ArrayList<>();
+                if (item.getExtras() != null) {
+                    for (OrderMenuItemExtra extra : item.getExtras()) {
+                        OrderResponseDTO.MenuItemExtraDTO extraDto = new OrderResponseDTO.MenuItemExtraDTO();
+                        extraDto.setId(extra.getId());
+                        extraDto.setName(extra.getName());
+                        extraDto.setQty(extra.getQty());
+                        extraDto.setUnitPriceAtTime(extra.getUnitPriceAtTime());
+                        extraDtos.add(extraDto);
+                    }
+                }
+                itemDto.setExtras(extraDtos);
+                menuItems.add(itemDto);
+            }
+        }
+        dto.setMenuItems(menuItems);
+
+        List<OrderResponseDTO.PizzaItemDTO> pizzaItems = new ArrayList<>();
+        if (order.getPizzaItems() != null) {
+            for (OrderPizzaItem item : order.getPizzaItems()) {
+                OrderResponseDTO.PizzaItemDTO itemDto = new OrderResponseDTO.PizzaItemDTO();
+                itemDto.setId(item.getId());
+                if (item.getPizza() != null) {
+                    itemDto.setPizzaId(item.getPizza().getId());
+                    itemDto.setPizzaName(item.getPizza().getName());
+                }
+                if (item.getPizzaSize() != null) {
+                    itemDto.setPizzaSizeId(item.getPizzaSize().getId());
+                    itemDto.setPizzaSizeCm(item.getPizzaSize().getCm());
+                }
+                itemDto.setQty(item.getQty());
+                itemDto.setBasePriceAtTime(item.getBasePriceAtTime());
+                itemDto.setNotes(item.getNotes());
+
+                List<OrderResponseDTO.PizzaItemExtraDTO> extraDtos = new ArrayList<>();
+                if (item.getExtras() != null) {
+                    for (OrderPizzaItemExtra extra : item.getExtras()) {
+                        OrderResponseDTO.PizzaItemExtraDTO extraDto = new OrderResponseDTO.PizzaItemExtraDTO();
+                        extraDto.setId(extra.getId());
+                        if (extra.getIngredient() != null) {
+                            extraDto.setIngredientId(extra.getIngredient().getId());
+                            extraDto.setIngredientName(extra.getIngredient().getName());
+                        }
+                        extraDto.setQty(extra.getQty());
+                        extraDto.setUnitPriceAtTime(extra.getUnitPriceAtTime());
+                        extraDtos.add(extraDto);
+                    }
+                }
+                itemDto.setExtras(extraDtos);
+                pizzaItems.add(itemDto);
+            }
+        }
+        dto.setPizzaItems(pizzaItems);
+
+        return dto;
     }
 }

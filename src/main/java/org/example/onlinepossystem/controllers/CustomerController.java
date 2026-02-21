@@ -41,7 +41,7 @@ public class CustomerController {
 
         String email = authentication.getName();
         Customer customer = customerRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Customer not found"));
+                .orElseThrow(() -> new java.util.NoSuchElementException("Customer not found for email: " + email));
 
         customer.setFirstName(firstName);
         customer.setLastName(lastName);

@@ -26,6 +26,9 @@ public class AdminController {
     private final BranchExtraPriceRepository branchExtraPriceRepository;
     private final IngredientRepository ingredientRepository;
     private final PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository;
+    private final ModifierGroupRepository modifierGroupRepository;
+    private final ModifierOptionRepository modifierOptionRepository;
+    private final MenuItemModifierGroupRepository menuItemModifierGroupRepository;
 
     public AdminController(PizzaRepository pizzaRepository,
                            PizzaCategoryRepository pizzaCategoryRepository,
@@ -39,7 +42,10 @@ public class AdminController {
                            PriceCategoryRepository priceCategoryRepository,
                            BranchExtraPriceRepository branchExtraPriceRepository,
                            IngredientRepository ingredientRepository,
-                           PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository) {
+                           PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository,
+                           ModifierGroupRepository modifierGroupRepository,
+                           ModifierOptionRepository modifierOptionRepository,
+                           MenuItemModifierGroupRepository menuItemModifierGroupRepository) {
         this.pizzaRepository = pizzaRepository;
         this.pizzaCategoryRepository = pizzaCategoryRepository;
         this.pizzaSizeRepository = pizzaSizeRepository;
@@ -53,6 +59,9 @@ public class AdminController {
         this.branchExtraPriceRepository = branchExtraPriceRepository;
         this.ingredientRepository = ingredientRepository;
         this.pizzaDefaultIngredientRepository = pizzaDefaultIngredientRepository;
+        this.modifierGroupRepository = modifierGroupRepository;
+        this.modifierOptionRepository = modifierOptionRepository;
+        this.menuItemModifierGroupRepository = menuItemModifierGroupRepository;
     }
 
     @GetMapping
@@ -69,6 +78,9 @@ public class AdminController {
         model.addAttribute("branchExtraPrices", branchExtraPriceRepository.findAll());
         model.addAttribute("ingredients", ingredientRepository.findAllByActiveTrue());
         model.addAttribute("pizzaDefaultIngredients", pizzaDefaultIngredientRepository.findAll());
+        model.addAttribute("modifierGroups", modifierGroupRepository.findAll());
+        model.addAttribute("modifierOptions", modifierOptionRepository.findAll());
+        model.addAttribute("menuItemModifierGroups", menuItemModifierGroupRepository.findAll());
         return "admin";
     }
 
@@ -117,9 +129,9 @@ public class AdminController {
                                    @RequestParam Integer pizzaId,
                                    @RequestParam Integer pizzaSizeId,
                                    @RequestParam Double price) {
-        Branch branch = branchRepository.findById(branchId).orElseThrow();
-        Pizza pizza = pizzaRepository.findById(pizzaId).orElseThrow();
-        PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow();
+        Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + branchId));
+        Pizza pizza = pizzaRepository.findById(pizzaId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza not found with ID: " + pizzaId));
+        PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + pizzaSizeId));
 
         // 1. Save branch-specific price
         BranchPizzaPrice branchPizzaPrice = branchPizzaPriceRepository.findByBranchIdAndPizzaIdAndPizzaSizeId(branchId, pizzaId, pizzaSizeId)
@@ -161,8 +173,8 @@ public class AdminController {
     public String updateMenuItemPrice(@RequestParam Integer branchId,
                                       @RequestParam Integer menuItemId,
                                       @RequestParam Double price) {
-        Branch branch = branchRepository.findById(branchId).orElseThrow();
-        MenuItem menuItem = menuItemRepository.findById(menuItemId).orElseThrow();
+        Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + branchId));
+        MenuItem menuItem = menuItemRepository.findById(menuItemId).orElseThrow(() -> new java.util.NoSuchElementException("Menu item not found with ID: " + menuItemId));
 
         BranchMenuItemPrice branchMenuItemPrice = branchMenuItemPriceRepository.findByBranchIdAndMenuItemId(branchId, menuItemId)
                 .orElse(new BranchMenuItemPrice(branch, menuItem, price));
@@ -178,9 +190,9 @@ public class AdminController {
                                      @RequestParam Integer priceCategoryId,
                                      @RequestParam Integer pizzaSizeId,
                                      @RequestParam Double price) {
-        Branch branch = branchRepository.findById(branchId).orElseThrow();
-        PriceCategory priceCategory = priceCategoryRepository.findById(priceCategoryId).orElseThrow();
-        PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow();
+        Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + branchId));
+        PriceCategory priceCategory = priceCategoryRepository.findById(priceCategoryId).orElseThrow(() -> new java.util.NoSuchElementException("Price category not found with ID: " + priceCategoryId));
+        PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + pizzaSizeId));
 
         BranchExtraPrice bep = branchExtraPriceRepository.findById(new BranchExtraPrice.BranchExtraPriceId(branchId, priceCategoryId, pizzaSizeId))
                 .orElse(new BranchExtraPrice(branch, priceCategory, pizzaSize, price));
