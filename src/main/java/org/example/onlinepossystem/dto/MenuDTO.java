@@ -3,6 +3,7 @@ package org.example.onlinepossystem.dto;
 import java.util.List;
 
 public class MenuDTO {
+    private Integer categoryId;
     private String categoryName;
     private Integer menuItemId;
     private String menuItemName;
@@ -52,4 +53,7 @@ public class MenuDTO {
     public void setPizzaSizeId(Integer pizzaSizeId) { this.pizzaSizeId = pizzaSizeId; }
     public List<CustomizationDTO> getCustomizations() { return customizations; }
     public void setCustomizations(List<CustomizationDTO> customizations) { this.customizations = customizations; }
+
+    public Integer getCategoryId() { return categoryId; }
+    public void setCategoryId(Integer categoryId) { this.categoryId = categoryId; }
 }

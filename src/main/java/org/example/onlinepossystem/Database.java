@@ -213,7 +213,7 @@ public class Database implements CommandLineRunner {
             }
             System.out.println("✅ Staff sync complete!");
         } catch (Exception e) {
-            System.err.println("❌ Failed to sync staff from file: " + e.getMessage());
+            System.err.println("❌ Failed to sync staff from file : " + e.getMessage());
         }
     }
 }
