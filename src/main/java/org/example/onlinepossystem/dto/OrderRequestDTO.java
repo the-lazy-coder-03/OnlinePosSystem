@@ -12,6 +12,12 @@ public class OrderRequestDTO {
     @NotBlank
     private String customerName;
     private String phone;
+    private String houseNumber;
+    private String street;
+    private String area;
+    private String city;
+    private String postalCode;
+    private String complexName;
     @NotBlank
     private String branchName;
     private String orderType; // "pickup" or "delivery"
@@ -25,6 +31,18 @@ public class OrderRequestDTO {
     public void setCustomerName(String customerName) { this.customerName = customerName; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+    public String getHouseNumber() { return houseNumber; }
+    public void setHouseNumber(String houseNumber) { this.houseNumber = houseNumber; }
+    public String getStreet() { return street; }
+    public void setStreet(String street) { this.street = street; }
+    public String getArea() { return area; }
+    public void setArea(String area) { this.area = area; }
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+    public String getPostalCode() { return postalCode; }
+    public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
+    public String getComplexName() { return complexName; }
+    public void setComplexName(String complexName) { this.complexName = complexName; }
     public String getBranchName() { return branchName; }
     public void setBranchName(String branchName) { this.branchName = branchName; }
     public String getOrderType() { return orderType; }
@@ -36,6 +54,7 @@ public class OrderRequestDTO {
         private Integer menuItemId;
         private Integer pizzaId;
         private Integer pizzaSizeId;
+        private Integer sizeCm;
         @NotNull
         @Positive
         private Integer quantity;
@@ -50,6 +69,8 @@ public class OrderRequestDTO {
         public void setPizzaId(Integer pizzaId) { this.pizzaId = pizzaId; }
         public Integer getPizzaSizeId() { return pizzaSizeId; }
         public void setPizzaSizeId(Integer pizzaSizeId) { this.pizzaSizeId = pizzaSizeId; }
+        public Integer getSizeCm() { return sizeCm; }
+        public void setSizeCm(Integer sizeCm) { this.sizeCm = sizeCm; }
         public Integer getQuantity() { return quantity; }
         public void setQuantity(Integer quantity) { this.quantity = quantity; }
         public List<CustomizationRequestDTO> getCustomizations() { return customizations; }

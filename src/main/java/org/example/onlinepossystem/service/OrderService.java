@@ -57,6 +57,9 @@ public class OrderService {
     @Autowired
     private BranchExtraPriceRepository branchExtraPriceRepository;
 
+    @Autowired
+    private ModifierOptionRepository modifierOptionRepository;
+
     public List<MenuDTO> getMenuForBranch(String branchName) {
         if (branchName == null || branchName.isBlank()) {
             throw new IllegalArgumentException("Branch name is required.");
@@ -152,20 +155,33 @@ public class OrderService {
         order.setBranch(branch);
         order.setCustomerName(request.getCustomerName());
         order.setPhone(request.getPhone());
+        order.setHouseNumber(request.getHouseNumber());
+        order.setStreet(request.getStreet());
+        order.setArea(request.getArea());
+        order.setCity(request.getCity());
+        order.setPostalCode(request.getPostalCode());
+        order.setComplexName(request.getComplexName());
         order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "pickup");
         order.setCreatedAt(LocalDateTime.now());
-        order.setStatus("created");
+        order.setStatus("Pending");
 
         for (OrderRequestDTO.OrderItemRequestDTO itemRequest : request.getItems()) {
             if (itemRequest.getPizzaId() != null) {
-                if (itemRequest.getPizzaSizeId() == null) {
-                    throw new IllegalArgumentException("pizzaSizeId is required when pizzaId is provided.");
+                Integer sizeId = itemRequest.getPizzaSizeId();
+                if (sizeId == null && itemRequest.getSizeCm() != null) {
+                    sizeId = pizzaSizeRepository.findByCm(itemRequest.getSizeCm())
+                            .map(PizzaSize::getId)
+                            .orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found for cm: " + itemRequest.getSizeCm()));
+                }
+                if (sizeId == null) {
+                    throw new IllegalArgumentException("pizzaSizeId or sizeCm is required when pizzaId is provided.");
                 }
                 // Handle Pizza
                 Pizza pizza = pizzaRepository.findById(itemRequest.getPizzaId())
                         .orElseThrow(() -> new java.util.NoSuchElementException("Pizza not found with ID: " + itemRequest.getPizzaId()));
-                PizzaSize size = pizzaSizeRepository.findById(itemRequest.getPizzaSizeId())
-                        .orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + itemRequest.getPizzaSizeId()));
+                final Integer finalSizeId = sizeId;
+                PizzaSize size = pizzaSizeRepository.findById(finalSizeId)
+                        .orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + finalSizeId));
                 BranchPizzaPrice bpp = branchPizzaPriceRepository
                         .findByBranchIdAndPizzaIdAndPizzaSizeId(branch.getId(), pizza.getId(), size.getId())
                         .orElseThrow(() -> new java.util.NoSuchElementException("Price not found for pizza: " + pizza.getName() + " size: " + size.getCm() + "cm in branch: " + branch.getName()));
@@ -220,15 +236,26 @@ public class OrderService {
                         String extraName = "";
                         Double extraPrice = 0.0;
 
-                        BurgerTopping topping = burgerToppingRepository.findById(custReq.getId()).orElse(null);
-                        if (topping != null) {
-                            extraName = topping.getToppingName();
-                            extraPrice = topping.getPrice();
+                        ModifierOption modifierOption = modifierOptionRepository.findById(custReq.getId()).orElse(null);
+                        if (modifierOption != null) {
+                            extraName = modifierOption.name;
+                            if (modifierOption.menuItemId != null) {
+                                BranchMenuItemPrice extraPriceEntry = branchMenuItemPriceRepository
+                                        .findByBranchIdAndMenuItemId(branch.getId(), modifierOption.menuItemId)
+                                        .orElseThrow(() -> new java.util.NoSuchElementException("Price not found for modifier option menu item ID: " + modifierOption.menuItemId));
+                                extraPrice = extraPriceEntry.getPrice();
+                            }
                         } else {
-                            SaladIngredient ingredient = saladIngredientRepository.findById(custReq.getId()).orElse(null);
-                            if (ingredient != null) {
-                                extraName = ingredient.getIngredientName();
-                                extraPrice = ingredient.getPrice();
+                            BurgerTopping topping = burgerToppingRepository.findById(custReq.getId()).orElse(null);
+                            if (topping != null) {
+                                extraName = topping.getToppingName();
+                                extraPrice = topping.getPrice();
+                            } else {
+                                SaladIngredient ingredient = saladIngredientRepository.findById(custReq.getId()).orElse(null);
+                                if (ingredient != null) {
+                                    extraName = ingredient.getIngredientName();
+                                    extraPrice = ingredient.getPrice();
+                                }
                             }
                         }
                         if (extraName.isEmpty()) {
@@ -266,7 +293,7 @@ public class OrderService {
         }
         Branch branch = branchRepository.findByName(branchName)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Branch not found: " + branchName));
-        return orderRepository.findByBranchIdAndStatus(branch.getId(), "created").stream()
+        return orderRepository.findByBranchIdAndStatus(branch.getId(), "Pending").stream()
                 .map(this::toDto)
                 .toList();
     }
@@ -317,6 +344,12 @@ public class OrderService {
         dto.setCreatedAt(order.getCreatedAt());
         dto.setCustomerName(order.getCustomerName());
         dto.setPhone(order.getPhone());
+        dto.setHouseNumber(order.getHouseNumber());
+        dto.setStreet(order.getStreet());
+        dto.setArea(order.getArea());
+        dto.setCity(order.getCity());
+        dto.setPostalCode(order.getPostalCode());
+        dto.setComplexName(order.getComplexName());
         dto.setNotes(order.getNotes());
 
         List<OrderResponseDTO.MenuItemDTO> menuItems = new ArrayList<>();

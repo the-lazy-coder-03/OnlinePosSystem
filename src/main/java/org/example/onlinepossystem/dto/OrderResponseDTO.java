@@ -13,6 +13,12 @@ public class OrderResponseDTO {
     private LocalDateTime createdAt;
     private String customerName;
     private String phone;
+    private String houseNumber;
+    private String street;
+    private String area;
+    private String city;
+    private String postalCode;
+    private String complexName;
     private String notes;
     private List<MenuItemDTO> menuItems = new ArrayList<>();
     private List<PizzaItemDTO> pizzaItems = new ArrayList<>();
@@ -33,6 +39,18 @@ public class OrderResponseDTO {
     public void setCustomerName(String customerName) { this.customerName = customerName; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+    public String getHouseNumber() { return houseNumber; }
+    public void setHouseNumber(String houseNumber) { this.houseNumber = houseNumber; }
+    public String getStreet() { return street; }
+    public void setStreet(String street) { this.street = street; }
+    public String getArea() { return area; }
+    public void setArea(String area) { this.area = area; }
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+    public String getPostalCode() { return postalCode; }
+    public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
+    public String getComplexName() { return complexName; }
+    public void setComplexName(String complexName) { this.complexName = complexName; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public List<MenuItemDTO> getMenuItems() { return menuItems; }

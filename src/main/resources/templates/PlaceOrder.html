@@ -769,6 +769,16 @@
 </head>
 
 <body>
+<div id="customerDefaults"
+     th:data-name="${customerName}"
+     th:data-phone="${user != null ? user.phone1 : ''}"
+     th:data-house-number="${user != null ? user.houseNumber : ''}"
+     th:data-street="${user != null ? user.street : ''}"
+     th:data-area="${user != null ? user.area : ''}"
+     th:data-city="${user != null ? user.city : ''}"
+     th:data-postal-code="${user != null ? user.postalCode : ''}"
+     th:data-complex-name="${user != null ? user.complexName : ''}"
+     style="display:none;"></div>
 <!-- ===== Top Bar ===== -->
 <header class="topbar">
     <div class="topbar-inner">
@@ -784,6 +794,9 @@
                 <span>•</span>
                 <span id="cartPill"><strong>0</strong> item(s)</span>
             </div>
+            <button class="btn btn-ghost" id="btnHomeTop" type="button" title="Back to home">
+                Home
+            </button>
             <button class="btn btn-ghost" id="btnChangeBranch" type="button" title="Change branch">
                 Change Branch
             </button>
@@ -1019,11 +1032,22 @@
         branch: { id: null, name: "" },
         orderType: null, // "pickup" or "delivery"
         selection: { branchId: null, branchName: "" },
+        customer: {
+            name: "",
+            phone: "",
+            houseNumber: "",
+            street: "",
+            area: "",
+            city: "",
+            postalCode: "",
+            complexName: ""
+        },
 
         ui: {
             view: "list",                  // "list" | "customize" | "summary"
             activeCategory: "all",
-            search: ""
+            search: "",
+            orderNotice: null
         },
 
         data: {
@@ -1060,6 +1084,19 @@
      * Utilities
      ************************************************************/
     const $ = (id) => document.getElementById(id);
+
+    function initCustomerDefaults(){
+        const el = document.getElementById("customerDefaults");
+        if (!el) return;
+        state.customer.name = (el.dataset.name || "").trim();
+        state.customer.phone = (el.dataset.phone || "").trim();
+        state.customer.houseNumber = (el.dataset.houseNumber || "").trim();
+        state.customer.street = (el.dataset.street || "").trim();
+        state.customer.area = (el.dataset.area || "").trim();
+        state.customer.city = (el.dataset.city || "").trim();
+        state.customer.postalCode = (el.dataset.postalCode || "").trim();
+        state.customer.complexName = (el.dataset.complexName || "").trim();
+    }
 
     function money(v){
         const n = Number(v || 0);
@@ -1495,6 +1532,14 @@
      ************************************************************/
     const actions = {
         async init(){
+            initCustomerDefaults();
+            const goHome = () => {
+                if (state.cart.items.length){
+                    const ok = confirm("You have items in your cart. Leave and discard?");
+                    if (!ok) return;
+                }
+                window.location.href = "/";
+            };
             // Top / Sidebar buttons
             $("btnViewCart").addEventListener("click", () => {
                 if (!state.branch.id) {
@@ -1521,19 +1566,15 @@
                 ui.showBranchOverlay(true);
             });
 
+            $("btnHomeTop").addEventListener("click", goHome);
+
             // BRANCH + ORDER TYPE OVERLAY
             $("branchKenridge").addEventListener("click", () => actions.selectBranch(1, "Kenridge"));
             $("branchUitzicht").addEventListener("click", () => actions.selectBranch(2, "Uitzicht"));
             $("typeCollection").addEventListener("click", () => actions.selectOrderType("pickup"));
             $("typeDelivery").addEventListener("click", () => actions.selectOrderType("delivery"));
 
-            $("btnGoHome").addEventListener("click", () => {
-                if (state.cart.items.length){
-                    const ok = confirm("You have items in your cart. Leave and discard?");
-                    if (!ok) return;
-                }
-                window.location.href = "/";
-            });
+            $("btnGoHome").addEventListener("click", goHome);
 
             $("searchInput").addEventListener("input", (e) => {
                 state.ui.search = safeText(e.target.value).trim();
@@ -1786,10 +1827,12 @@
 
             const qty = Number(state.customize.qty) || 1;
             const selectedIds = Array.from(state.customize.selectedToppingIds);
+            const extraIds = selectedIds.filter(id => !state.customize.defaultToppingIds.has(id));
 
             const all = normalizeAllToppings(d);
             const nameById = new Map(all.map(t => [Number(t.toppingId), t.name]));
             const selectedNames = selectedIds.map(id => nameById.get(Number(id))).filter(Boolean);
+            const extraNames = extraIds.map(id => nameById.get(Number(id))).filter(Boolean);
 
             const subtotal = Number(state.customize.lastQuote.total || 0);
             const lineTotal = subtotal * qty;
@@ -1803,6 +1846,8 @@
                 quantity: qty,
                 selectedToppingIds: selectedIds,
                 selectedToppingNames: selectedNames,
+                selectedExtraToppingIds: extraIds,
+                selectedExtraToppingNames: extraNames,
                 pricing: {
                     base: Number(state.customize.lastQuote.basePrice || 0),
                     toppings: Number(state.customize.lastQuote.toppingsTotal || 0),
@@ -2324,27 +2369,83 @@
 
     function buildOrderPayload(){
         return {
-            branchId: state.branch.id,
+            customerName: state.customer.name || "Guest",
+            phone: state.customer.phone || "",
+            houseNumber: state.customer.houseNumber || "",
+            street: state.customer.street || "",
+            area: state.customer.area || "",
+            city: state.customer.city || "",
+            postalCode: state.customer.postalCode || "",
+            complexName: state.customer.complexName || "",
+            branchName: state.branch.name,
             orderType: state.orderType,
             items: state.cart.items.map(it => {
                 if (it.type === "menu"){
                     return {
-                        type: it.type,
                         menuItemId: it.menuItemId,
                         quantity: it.quantity,
-                        selectedModifierOptionIds: it.selectedModifierOptionIds || []
+                        customizations: (it.selectedModifierOptionIds || []).map(id => ({
+                            id: Number(id),
+                            quantity: 1
+                        }))
                     };
                 }
 
                 return {
-                    type: it.type,
                     pizzaId: it.pizzaId,
                     sizeCm: it.sizeCm,
                     quantity: it.quantity,
-                    selectedToppingIds: it.selectedToppingIds || []
+                    customizations: (it.selectedExtraToppingIds || []).map(id => ({
+                        id: Number(id),
+                        quantity: 1
+                    }))
                 };
             })
         };
+    }
+
+    async function submitOrder(){
+        state.ui.orderNotice = null;
+
+        if (!state.branch.name || !state.orderType){
+            state.ui.orderNotice = { type: "error", message: "Please select a branch and order type before confirming." };
+            renderSummary();
+            return;
+        }
+        if (!state.cart.items.length){
+            state.ui.orderNotice = { type: "error", message: "Your cart is empty." };
+            renderSummary();
+            return;
+        }
+
+        const payload = buildOrderPayload();
+        try{
+            const res = await fetch("/api/orders", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok){
+                let message = `Failed to place order (${res.status}).`;
+                try{
+                    const errJson = await res.json();
+                    message = errJson.message || errJson.error || message;
+                } catch (_){
+                    const errText = await res.text().catch(() => "");
+                    if (errText) message = errText;
+                }
+                state.ui.orderNotice = { type: "error", message };
+                renderSummary();
+                return;
+            }
+            const data = await res.json();
+            state.ui.orderNotice = { type: "success", message: `Order #${data.id} placed. Status: ${data.status}.` };
+            store.clearCart(false);
+            renderSummary();
+        } catch (e){
+            state.ui.orderNotice = { type: "error", message: e.message || "Failed to place order." };
+            renderSummary();
+        }
     }
 
     function renderSummary(){
@@ -2353,6 +2454,13 @@
 
         if (!state.cart.items.length){
             body.innerHTML = `<div class="empty">Your cart is empty.</div>`;
+            if (state.ui.orderNotice && state.ui.orderNotice.message){
+                const notice = document.createElement("div");
+                notice.className = "sum-card";
+                notice.style.color = state.ui.orderNotice.type === "error" ? "#b30000" : "#0b5";
+                notice.textContent = state.ui.orderNotice.message;
+                body.appendChild(notice);
+            }
             render.updateCartBadges();
             return;
         }
@@ -2404,10 +2512,70 @@
 
         body.appendChild(card);
 
-        const payload = document.createElement("pre");
-        payload.className = "payload";
-        payload.textContent = JSON.stringify(buildOrderPayload(), null, 2);
-        body.appendChild(payload);
+        const customerCard = document.createElement("div");
+        customerCard.className = "sum-card";
+        customerCard.innerHTML = `
+            <div style="font-weight:900;color:var(--blue-800);margin-bottom:8px;">Customer Details</div>
+            <div class="formrow" style="margin-top:0;">
+                <input type="text" id="custNameInput" placeholder="Customer name" />
+                <input type="tel" id="custPhoneInput" placeholder="Phone (optional)" />
+            </div>
+            <div style="margin-top:8px;font-weight:850;color:var(--muted);">Address</div>
+            <div class="formrow">
+                <input type="text" id="custHouseInput" placeholder="House / Unit #" />
+                <input type="text" id="custStreetInput" placeholder="Street" />
+            </div>
+            <div class="formrow">
+                <input type="text" id="custAreaInput" placeholder="Area / Suburb" />
+                <input type="text" id="custCityInput" placeholder="City" />
+            </div>
+            <div class="formrow">
+                <input type="text" id="custPostalInput" placeholder="Postal code" />
+                <input type="text" id="custComplexInput" placeholder="Complex / Building (optional)" />
+            </div>
+        `;
+        body.appendChild(customerCard);
+
+        const nameInput = customerCard.querySelector("#custNameInput");
+        const phoneInput = customerCard.querySelector("#custPhoneInput");
+        const houseInput = customerCard.querySelector("#custHouseInput");
+        const streetInput = customerCard.querySelector("#custStreetInput");
+        const areaInput = customerCard.querySelector("#custAreaInput");
+        const cityInput = customerCard.querySelector("#custCityInput");
+        const postalInput = customerCard.querySelector("#custPostalInput");
+        const complexInput = customerCard.querySelector("#custComplexInput");
+        nameInput.value = state.customer.name || "";
+        phoneInput.value = state.customer.phone || "";
+        houseInput.value = state.customer.houseNumber || "";
+        streetInput.value = state.customer.street || "";
+        areaInput.value = state.customer.area || "";
+        cityInput.value = state.customer.city || "";
+        postalInput.value = state.customer.postalCode || "";
+        complexInput.value = state.customer.complexName || "";
+        nameInput.addEventListener("input", (e) => {
+            state.customer.name = safeText(e.target.value).trim();
+        });
+        phoneInput.addEventListener("input", (e) => {
+            state.customer.phone = safeText(e.target.value).trim();
+        });
+        houseInput.addEventListener("input", (e) => {
+            state.customer.houseNumber = safeText(e.target.value).trim();
+        });
+        streetInput.addEventListener("input", (e) => {
+            state.customer.street = safeText(e.target.value).trim();
+        });
+        areaInput.addEventListener("input", (e) => {
+            state.customer.area = safeText(e.target.value).trim();
+        });
+        cityInput.addEventListener("input", (e) => {
+            state.customer.city = safeText(e.target.value).trim();
+        });
+        postalInput.addEventListener("input", (e) => {
+            state.customer.postalCode = safeText(e.target.value).trim();
+        });
+        complexInput.addEventListener("input", (e) => {
+            state.customer.complexName = safeText(e.target.value).trim();
+        });
 
         const actionsRow = document.createElement("div");
         actionsRow.className = "sum-card";
@@ -2416,11 +2584,16 @@
               <button class="btn btn-primary" id="btnConfirmOrder" type="button">Confirm Order</button>
               <button class="btn btn-ghost" id="btnClearCart2" type="button">Clear Cart</button>
             </div>
-            <div style="margin-top:10px;color:var(--muted);font-weight:750;">
-              <strong>Note:</strong> Hook <code>buildOrderPayload()</code> into your backend order endpoint when available.
-            </div>
         `;
         body.appendChild(actionsRow);
+
+        if (state.ui.orderNotice && state.ui.orderNotice.message){
+            const notice = document.createElement("div");
+            notice.className = "sum-card";
+            notice.style.color = state.ui.orderNotice.type === "error" ? "#b30000" : "#0b5";
+            notice.textContent = state.ui.orderNotice.message;
+            body.appendChild(notice);
+        }
 
         body.querySelectorAll("button[data-action]").forEach(btn => {
             btn.addEventListener("click", () => {
@@ -2430,11 +2603,7 @@
             });
         });
 
-        $("btnConfirmOrder").addEventListener("click", () => {
-            const payloadObj = buildOrderPayload();
-            console.log("Order payload:", payloadObj);
-            alert("Order payload ready (see console). Integrate with your backend order endpoint.");
-        });
+        $("btnConfirmOrder").addEventListener("click", () => submitOrder());
 
         $("btnClearCart2").addEventListener("click", () => store.clearCart(true));
 

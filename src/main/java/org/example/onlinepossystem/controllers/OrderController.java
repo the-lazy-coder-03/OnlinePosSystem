@@ -66,9 +66,12 @@ public class OrderController {
 
         String newStatus = request.get("status");
 
-        if (newStatus == null || (!newStatus.equals("Accepted") && !newStatus.equals("Rejected"))) {
+        if (newStatus == null || (!newStatus.equals("Pending")
+                && !newStatus.equals("Preparing")
+                && !newStatus.equals("Completed")
+                && !newStatus.equals("Rejected"))) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", "Invalid status. Must be 'Accepted' or 'Rejected'"));
+                    .body(Map.of("success", false, "message", "Invalid status. Must be Pending, Preparing, Completed, or Rejected."));
         }
 
         OrderResponseDTO updatedOrder = orderService.updateOrderStatus(id, newStatus);
