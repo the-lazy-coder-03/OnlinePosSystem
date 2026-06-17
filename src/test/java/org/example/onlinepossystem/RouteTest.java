@@ -32,6 +32,20 @@ public class RouteTest {
     }
 
     @Test
+    public void testForgotPasswordPage() throws Exception {
+        mockMvc.perform(get("/forgot-password"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("forgot-password"));
+    }
+
+    @Test
+    public void testResetPasswordPage() throws Exception {
+        mockMvc.perform(get("/reset-password").param("token", "test-token"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("reset-password"));
+    }
+
+    @Test
     public void testOrderPageUnauthenticatedRedirectsToLogin() throws Exception {
         mockMvc.perform(get("/order"))
                 .andExpect(status().is3xxRedirection());

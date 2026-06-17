@@ -1,8 +1,9 @@
 package org.example.onlinepossystem.controllers;
 
+import jakarta.validation.Valid;
 import org.example.onlinepossystem.dto.MenuDTO;
 import org.example.onlinepossystem.dto.OrderRequestDTO;
-import org.example.onlinepossystem.entity.Order;
+import org.example.onlinepossystem.dto.OrderResponseDTO;
 import org.example.onlinepossystem.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +36,7 @@ public class OrderController {
      * Place a new order.
      */
     @PostMapping
-    public ResponseEntity<Order> placeOrder(@RequestBody OrderRequestDTO request) {
+    public ResponseEntity<OrderResponseDTO> placeOrder(@Valid @RequestBody OrderRequestDTO request) {
         return ResponseEntity.ok(orderService.placeOrder(request));
     }
 
@@ -43,10 +44,7 @@ public class OrderController {
      * GET /api/orders?branch=Kenridge
      */
     @GetMapping
-    public ResponseEntity<List<Order>> getOrdersByBranch(@RequestParam String branch) {
-        if (branch == null || branch.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<List<OrderResponseDTO>> getOrdersByBranch(@RequestParam String branch) {
         return ResponseEntity.ok(orderService.getOrdersByBranch(branch));
     }
 
@@ -54,10 +52,7 @@ public class OrderController {
      * GET /api/orders/pending?branch=Kenridge
      */
     @GetMapping("/pending")
-    public ResponseEntity<List<Order>> getPendingOrdersByBranch(@RequestParam String branch) {
-        if (branch == null || branch.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<List<OrderResponseDTO>> getPendingOrdersByBranch(@RequestParam String branch) {
         return ResponseEntity.ok(orderService.getPendingOrdersByBranch(branch));
     }
 
@@ -71,18 +66,15 @@ public class OrderController {
 
         String newStatus = request.get("status");
 
-        if (newStatus == null || (!newStatus.equals("Accepted") && !newStatus.equals("Rejected"))) {
+        if (newStatus == null || (!newStatus.equals("Pending")
+                && !newStatus.equals("Preparing")
+                && !newStatus.equals("Completed")
+                && !newStatus.equals("Rejected"))) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", "Invalid status. Must be 'Accepted' or 'Rejected'"));
+                    .body(Map.of("success", false, "message", "Invalid status. Must be Pending, Preparing, Completed, or Rejected."));
         }
 
-        Order updatedOrder = orderService.updateOrderStatus(id, newStatus);
-
-        if (updatedOrder != null) {
-            return ResponseEntity.ok(updatedOrder);
-        } else {
-            return ResponseEntity.status(404)
-                    .body(Map.of("success", false, "message", "Order not found"));
-        }
+        OrderResponseDTO updatedOrder = orderService.updateOrderStatus(id, newStatus);
+        return ResponseEntity.ok(updatedOrder);
     }
 }

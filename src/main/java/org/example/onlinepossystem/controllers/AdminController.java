@@ -1,0 +1,236 @@
+package org.example.onlinepossystem.controllers;
+
+import org.example.onlinepossystem.entity.*;
+import org.example.onlinepossystem.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Optional;
+
+@Controller
+@RequestMapping("/admin")
+public class AdminController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
+
+    private final PizzaRepository pizzaRepository;
+    private final PizzaCategoryRepository pizzaCategoryRepository;
+    private final PizzaSizeRepository pizzaSizeRepository;
+    private final BranchRepository branchRepository;
+    private final BranchPizzaPriceRepository branchPizzaPriceRepository;
+    private final MenuItemRepository menuItemRepository;
+    private final MenuCategoryRepository menuCategoryRepository;
+    private final BranchMenuItemPriceRepository branchMenuItemPriceRepository;
+    private final PizzaAllowedSizeRepository pizzaAllowedSizeRepository;
+    private final PriceCategoryRepository priceCategoryRepository;
+    private final BranchExtraPriceRepository branchExtraPriceRepository;
+    private final IngredientRepository ingredientRepository;
+    private final PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository;
+    private final ModifierGroupRepository modifierGroupRepository;
+    private final ModifierOptionRepository modifierOptionRepository;
+    private final MenuItemModifierGroupRepository menuItemModifierGroupRepository;
+
+    public AdminController(PizzaRepository pizzaRepository,
+                           PizzaCategoryRepository pizzaCategoryRepository,
+                           PizzaSizeRepository pizzaSizeRepository,
+                           BranchRepository branchRepository,
+                           BranchPizzaPriceRepository branchPizzaPriceRepository,
+                           MenuItemRepository menuItemRepository,
+                           MenuCategoryRepository menuCategoryRepository,
+                           BranchMenuItemPriceRepository branchMenuItemPriceRepository,
+                           PizzaAllowedSizeRepository pizzaAllowedSizeRepository,
+                           PriceCategoryRepository priceCategoryRepository,
+                           BranchExtraPriceRepository branchExtraPriceRepository,
+                           IngredientRepository ingredientRepository,
+                           PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository,
+                           ModifierGroupRepository modifierGroupRepository,
+                           ModifierOptionRepository modifierOptionRepository,
+                           MenuItemModifierGroupRepository menuItemModifierGroupRepository) {
+        this.pizzaRepository = pizzaRepository;
+        this.pizzaCategoryRepository = pizzaCategoryRepository;
+        this.pizzaSizeRepository = pizzaSizeRepository;
+        this.branchRepository = branchRepository;
+        this.branchPizzaPriceRepository = branchPizzaPriceRepository;
+        this.menuItemRepository = menuItemRepository;
+        this.menuCategoryRepository = menuCategoryRepository;
+        this.branchMenuItemPriceRepository = branchMenuItemPriceRepository;
+        this.pizzaAllowedSizeRepository = pizzaAllowedSizeRepository;
+        this.priceCategoryRepository = priceCategoryRepository;
+        this.branchExtraPriceRepository = branchExtraPriceRepository;
+        this.ingredientRepository = ingredientRepository;
+        this.pizzaDefaultIngredientRepository = pizzaDefaultIngredientRepository;
+        this.modifierGroupRepository = modifierGroupRepository;
+        this.modifierOptionRepository = modifierOptionRepository;
+        this.menuItemModifierGroupRepository = menuItemModifierGroupRepository;
+    }
+
+    @GetMapping
+    public String adminDashboard(Model model) {
+        model.addAttribute("pizzas", pizzaRepository.findAll());
+        model.addAttribute("menuItems", menuItemRepository.findAll());
+        model.addAttribute("branches", branchRepository.findAll());
+        model.addAttribute("pizzaCategories", pizzaCategoryRepository.findAll());
+        model.addAttribute("menuCategories", menuCategoryRepository.findAll());
+        model.addAttribute("pizzaSizes", pizzaSizeRepository.findAll());
+        model.addAttribute("branchPizzaPrices", branchPizzaPriceRepository.findAll());
+        model.addAttribute("branchMenuItemPrices", branchMenuItemPriceRepository.findAll());
+        model.addAttribute("priceCategories", priceCategoryRepository.findAll());
+        model.addAttribute("branchExtraPrices", branchExtraPriceRepository.findAll());
+        model.addAttribute("ingredients", ingredientRepository.findAllByActiveTrue());
+        model.addAttribute("pizzaDefaultIngredients", pizzaDefaultIngredientRepository.findAll());
+        model.addAttribute("modifierGroups", modifierGroupRepository.findAll());
+        model.addAttribute("modifierOptions", modifierOptionRepository.findAll());
+        model.addAttribute("menuItemModifierGroups", menuItemModifierGroupRepository.findAll());
+        return "admin";
+    }
+
+    @GetMapping("/orders")
+    public String adminOrdersPage(Model model) {
+        model.addAttribute("adminMode", true);
+        return "InputOrders";
+    }
+
+    // ====== Pizza CRUD ======
+
+    @PostMapping("/pizzas/save")
+    public String savePizza(@ModelAttribute Pizza pizza, 
+                            @RequestParam Integer categoryId,
+                            @RequestParam(required = false) List<Integer> ingredientIds,
+                            Authentication authentication) {
+        pizzaCategoryRepository.findById(categoryId).ifPresent(pizza::setCategory);
+        if (pizza.getId() == null) {
+            // Find max id and increment
+            int maxId = pizzaRepository.findAll().stream()
+                    .mapToInt(Pizza::getId)
+                    .max()
+                    .orElse(0);
+            pizza.setId(maxId + 1);
+        }
+        Pizza savedPizza = pizzaRepository.save(pizza);
+
+        // Update default ingredients
+        List<PizzaDefaultIngredient> existing = pizzaDefaultIngredientRepository.findByPizzaId(savedPizza.getId());
+        pizzaDefaultIngredientRepository.deleteAll(existing);
+
+        if (ingredientIds != null) {
+            for (int i = 0; i < ingredientIds.size(); i++) {
+                Integer ingredientId = ingredientIds.get(i);
+                final int order = i;
+                ingredientRepository.findById(ingredientId).ifPresent(ing -> {
+                    pizzaDefaultIngredientRepository.save(new PizzaDefaultIngredient(savedPizza, ing, true, 1, order));
+                });
+            }
+        }
+
+        logger.info("Admin action={} pizzaId={} admin={}", "savePizza", savedPizza.getId(), adminName(authentication));
+        
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/pizzas/delete/{id}")
+    public String deletePizza(@PathVariable Integer id, Authentication authentication) {
+        pizzaRepository.deleteById(id);
+        logger.info("Admin action={} pizzaId={} admin={}", "deletePizza", id, adminName(authentication));
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/pizzas/price")
+    public String updatePizzaPrice(@RequestParam Integer branchId,
+                                   @RequestParam Integer pizzaId,
+                                   @RequestParam Integer pizzaSizeId,
+                                   @RequestParam Double price,
+                                   Authentication authentication) {
+        Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + branchId));
+        Pizza pizza = pizzaRepository.findById(pizzaId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza not found with ID: " + pizzaId));
+        PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + pizzaSizeId));
+
+        // 1. Save branch-specific price
+        BranchPizzaPrice branchPizzaPrice = branchPizzaPriceRepository.findByBranchIdAndPizzaIdAndPizzaSizeId(branchId, pizzaId, pizzaSizeId)
+                .orElse(new BranchPizzaPrice(branch, pizza, pizzaSize, price));
+        branchPizzaPrice.setPrice(price);
+        branchPizzaPriceRepository.save(branchPizzaPrice);
+
+        // 2. Ensure pizza is marked as allowed for this size (global)
+        if (!pizzaAllowedSizeRepository.existsById(new PizzaAllowedSize.PizzaAllowedSizeId(pizzaId, pizzaSizeId))) {
+            pizzaAllowedSizeRepository.save(new PizzaAllowedSize(pizza, pizzaSize));
+        }
+
+        logger.info("Admin action={} branchId={} pizzaId={} sizeId={} admin={}",
+                "updatePizzaPrice", branchId, pizzaId, pizzaSizeId, adminName(authentication));
+
+        return "redirect:/admin";
+    }
+
+    // ====== MenuItem CRUD ======
+
+    @PostMapping("/menu-items/save")
+    public String saveMenuItem(@ModelAttribute MenuItem menuItem,
+                               @RequestParam Integer categoryId,
+                               Authentication authentication) {
+        menuCategoryRepository.findById(categoryId).ifPresent(menuItem::setCategory);
+        if (menuItem.getId() == null) {
+            int maxId = menuItemRepository.findAll().stream()
+                    .mapToInt(MenuItem::getId)
+                    .max()
+                    .orElse(0);
+            menuItem.setId(maxId + 1);
+        }
+        menuItemRepository.save(menuItem);
+        logger.info("Admin action={} menuItemId={} admin={}", "saveMenuItem", menuItem.getId(), adminName(authentication));
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/menu-items/delete/{id}")
+    public String deleteMenuItem(@PathVariable Integer id, Authentication authentication) {
+        menuItemRepository.deleteById(id);
+        logger.info("Admin action={} menuItemId={} admin={}", "deleteMenuItem", id, adminName(authentication));
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/menu-items/price")
+    public String updateMenuItemPrice(@RequestParam Integer branchId,
+                                      @RequestParam Integer menuItemId,
+                                      @RequestParam Double price,
+                                      Authentication authentication) {
+        Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + branchId));
+        MenuItem menuItem = menuItemRepository.findById(menuItemId).orElseThrow(() -> new java.util.NoSuchElementException("Menu item not found with ID: " + menuItemId));
+
+        BranchMenuItemPrice branchMenuItemPrice = branchMenuItemPriceRepository.findByBranchIdAndMenuItemId(branchId, menuItemId)
+                .orElse(new BranchMenuItemPrice(branch, menuItem, price));
+        branchMenuItemPrice.setPrice(price);
+        branchMenuItemPriceRepository.save(branchMenuItemPrice);
+        logger.info("Admin action={} branchId={} menuItemId={} admin={}",
+                "updateMenuItemPrice", branchId, menuItemId, adminName(authentication));
+        return "redirect:/admin";
+    }
+
+    // ====== Extra Topping Pricing ======
+
+    @PostMapping("/toppings/price")
+    public String updateToppingPrice(@RequestParam Integer branchId,
+                                     @RequestParam Integer priceCategoryId,
+                                     @RequestParam Integer pizzaSizeId,
+                                     @RequestParam Double price,
+                                     Authentication authentication) {
+        Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + branchId));
+        PriceCategory priceCategory = priceCategoryRepository.findById(priceCategoryId).orElseThrow(() -> new java.util.NoSuchElementException("Price category not found with ID: " + priceCategoryId));
+        PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + pizzaSizeId));
+
+        BranchExtraPrice bep = branchExtraPriceRepository.findById(new BranchExtraPrice.BranchExtraPriceId(branchId, priceCategoryId, pizzaSizeId))
+                .orElse(new BranchExtraPrice(branch, priceCategory, pizzaSize, price));
+        bep.setPrice(price);
+        branchExtraPriceRepository.save(bep);
+        logger.info("Admin action={} branchId={} priceCategoryId={} sizeId={} admin={}",
+                "updateToppingPrice", branchId, priceCategoryId, pizzaSizeId, adminName(authentication));
+        return "redirect:/admin";
+    }
+
+    private String adminName(Authentication authentication) {
+        return authentication == null ? "unknown" : authentication.getName();
+    }
+}

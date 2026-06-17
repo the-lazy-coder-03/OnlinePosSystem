@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <title>POS — Kenridge Orders</title>
@@ -51,9 +51,22 @@
             margin: 10px 0;
             border-radius: 12px;
             display: flex;
+            flex-direction: column;
+            gap: 10px;
+            font-size: 1.1rem;
+        }
+
+        .orderMain {
+            display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 1.1rem;
+            gap: 10px;
+        }
+
+        .orderActions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .orderItem span.status {
@@ -65,7 +78,8 @@
         }
 
         .status.Pending { background-color: #0073e6; }   /* blue */
-        .status.Accepted { background-color: #00b300; }  /* green */
+        .status.Preparing { background-color: #ff9f1a; } /* orange */
+        .status.Completed { background-color: #00b300; } /* green */
         .status.Rejected { background-color: #ff4d4d; }  /* red */
 
         .orderItem button {
@@ -82,6 +96,13 @@
 
         .orderItem button:hover {
             background-color: #0052cc;
+        }
+
+        .liveStatus {
+            color: #003366;
+            font-size: 0.9rem;
+            margin-top: -10px;
+            margin-bottom: 12px;
         }
 
         /* ========================
@@ -158,7 +179,7 @@
 
 <div class="container">
     <!-- LOGIN -->
-    <div id="loginSection">
+    <div id="loginSection" th:style="${adminMode == true} ? 'display:none;' : 'display:block;'">
         <h2>Staff Login</h2>
         <input type="password" id="codeInput" placeholder="Enter 16-character Code" maxlength="16" style="padding:10px;font-size:1.2rem;border-radius:10px;border:2px solid #0073e6; width: 60%;"><br><br>
         <button onclick="login()" style="padding:10px 25px;font-size:1rem;background:#0073e6;color:white;border:none;border-radius:10px;">Login</button>
@@ -166,9 +187,10 @@
     </div>
 
     <!-- ORDER QUEUE / DASHBOARD -->
-    <div id="queueSection">
+    <div id="queueSection" th:style="${adminMode == true} ? 'display:block;' : 'display:none;'">
         <div class="branchLabel" id="branchLabelQueue"></div>
         <h2>Online Orders Queue</h2>
+        <div id="liveStatus" class="liveStatus"></div>
         <ul id="orderListQueue" class="orderList"></ul>
         <button onclick="processNextOrder()" style="padding:15px 30px;font-size:1.2rem;background:#0073e6;color:white;border:none;border-radius:12px;margin-top:20px;">Process Next Order</button>
     </div>
@@ -185,14 +207,59 @@
     </div>
 </div>
 
-<script>
+<script th:inline="javascript">
+    const ADMIN_MODE = /*[[${adminMode ?: false}]]*/ false;
     let currentBranch = '';
     let branchOrders = [];
     let orderIndex = 0;
     let processedOrders = [];
+    let statusRefreshIntervalId = null;
+    let liveEventSource = null;
+    let liveReconnectTimerId = null;
+    let liveReconnectDelayMs = 1000;
 
     // API BASE URL
     const API_BASE_URL = '/api';
+    const ADMIN_ORDERS_URL = `${API_BASE_URL}/admin/orders`;
+    const ADMIN_STREAM_URL = `${ADMIN_ORDERS_URL}/stream`;
+
+    async function refreshStatus() {
+        try {
+            const res = await fetch("/api/status.php", { cache: "no-store" });
+            const data = await res.json();
+
+            // update DOM
+            const ordersCountEl = document.getElementById("ordersCount");
+            if (ordersCountEl) {
+                ordersCountEl.textContent = data.ordersCount;
+            }
+        } catch (e) {
+            console.error("refresh failed", e);
+        }
+    }
+
+    function startStatusRefresh() {
+        if (statusRefreshIntervalId) {
+            clearInterval(statusRefreshIntervalId);
+        }
+        refreshStatus();
+        statusRefreshIntervalId = setInterval(refreshStatus, 3000);
+    }
+
+    function setLiveStatus(message) {
+        const el = document.getElementById('liveStatus');
+        if (el) el.innerText = ADMIN_MODE ? message : '';
+    }
+
+    function startAdminOrdersPage() {
+        currentBranch = 'All Branches';
+        document.getElementById('branchLabelQueue').innerText = 'Admin: All Branches';
+        fetchBranchOrders().then(() => {
+            processedOrders = [];
+            showQueue();
+            connectOrderStream();
+        });
+    }
 
     // LOGIN - Now connects to backend
     async function login() {
@@ -226,6 +293,7 @@
                 await fetchBranchOrders();
                 processedOrders = [];
                 showQueue();
+                startStatusRefresh();
             } else {
                 // Login failed
                 document.getElementById('codeError').style.display = 'block';
@@ -241,11 +309,126 @@
     // FETCH ORDERS FROM BACKEND
     async function fetchBranchOrders() {
         try {
-            const response = await fetch(`${API_BASE_URL}/orders?branch=${currentBranch}`);
+            const url = ADMIN_MODE
+                ? ADMIN_ORDERS_URL
+                : `${API_BASE_URL}/orders?branch=${encodeURIComponent(currentBranch)}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Orders request failed with status ${response.status}`);
+            }
             branchOrders = await response.json();
         } catch (error) {
             console.error('Error fetching orders:', error);
             branchOrders = [];
+            setLiveStatus('Could not load orders. Retrying with the live connection.');
+        }
+    }
+
+    function upsertOrder(order) {
+        if (!order || !order.id) return;
+
+        const existingIndex = branchOrders.findIndex(o => o.id === order.id);
+        if (existingIndex === -1) {
+            branchOrders.unshift(order);
+        } else {
+            branchOrders[existingIndex] = order;
+        }
+
+        if (document.getElementById('queueSection').style.display !== 'none') {
+            showQueue();
+        }
+
+        const currentOrder = branchOrders[orderIndex];
+        if (currentOrder && currentOrder.id === order.id && document.getElementById('singleOrderSection').style.display !== 'none') {
+            showSingleOrder();
+        }
+    }
+
+    function connectOrderStream() {
+        if (!ADMIN_MODE) return;
+
+        if (liveEventSource) {
+            liveEventSource.close();
+        }
+        if (liveReconnectTimerId) {
+            clearTimeout(liveReconnectTimerId);
+            liveReconnectTimerId = null;
+        }
+
+        setLiveStatus('Connecting to live order updates...');
+        liveEventSource = new EventSource(ADMIN_STREAM_URL);
+
+        liveEventSource.addEventListener('connected', () => {
+            liveReconnectDelayMs = 1000;
+            setLiveStatus('Live order updates connected.');
+        });
+
+        liveEventSource.addEventListener('order-created', event => {
+            try {
+                const order = JSON.parse(event.data);
+                upsertOrder(order);
+                setLiveStatus(`New order received: #${order.id}`);
+            } catch (error) {
+                console.error('Could not read live order event:', error);
+            }
+        });
+
+        liveEventSource.onerror = () => {
+            setLiveStatus('Live updates disconnected. Reconnecting...');
+            liveEventSource.close();
+            liveReconnectTimerId = setTimeout(connectOrderStream, liveReconnectDelayMs);
+            liveReconnectDelayMs = Math.min(liveReconnectDelayMs * 2, 15000);
+        };
+    }
+
+    function formatItemsSummary(order) {
+        const items = [];
+        (order.menuItems || []).forEach(mi => {
+            items.push(`${mi.qty}x ${mi.menuItemName}`);
+        });
+        (order.pizzaItems || []).forEach(pi => {
+            const size = pi.pizzaSizeCm ? ` (${pi.pizzaSizeCm}cm)` : '';
+            items.push(`${pi.qty}x ${pi.pizzaName}${size}`);
+        });
+        return items.length ? items.join(', ') : 'No items';
+    }
+
+    function formatAddress(order) {
+        const parts = [];
+        const line1 = [order.houseNumber, order.street].filter(Boolean).join(" ");
+        if (line1) parts.push(line1);
+        if (order.complexName) parts.push(order.complexName);
+        const line2 = [order.area, order.city].filter(Boolean).join(", ");
+        if (line2) parts.push(line2);
+        if (order.postalCode) parts.push(order.postalCode);
+        return parts.length ? parts.join(", ") : "N/A";
+    }
+
+    async function updateOrderStatus(orderId, status) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+
+            if (!response.ok) {
+                alert('Failed to update order status');
+                return;
+            }
+            const updatedOrder = await response.json();
+            upsertOrder(updatedOrder);
+            if (!ADMIN_MODE) {
+                await fetchBranchOrders();
+            }
+            showQueue();
+            const idx = branchOrders.findIndex(o => o.id === orderId);
+            if (idx !== -1) {
+                orderIndex = idx;
+            }
+        } catch (error) {
+            console.error('Error updating order:', error);
+            alert('Error connecting to server');
         }
     }
 
@@ -262,19 +445,44 @@
         branchOrders.forEach(order => {
             const li = document.createElement('li');
             li.className = 'orderItem';
-            
-            const customerName = order.customerName || 'Guest';
-            const itemsDisplay = order.orderItems ? order.orderItems.map(oi => oi.menuItem.name).join(', ') : 'No items';
 
-            li.innerHTML = `<span>Order #${order.id} - ${customerName} (${order.orderType || 'N/A'})</span>
-                        <span class="status ${order.status}">${order.status}</span>`;
+            const customerName = order.customerName || 'Guest';
+            const branchDisplay = ADMIN_MODE && order.branchName ? ` - ${order.branchName}` : '';
+            const itemsDisplay = formatItemsSummary(order);
+            const addressDisplay = formatAddress(order);
+            const statusRaw = order.status || 'Pending';
+            const status = statusRaw === 'created' ? 'Pending' : statusRaw;
+
+            li.innerHTML = `
+                <div class="orderMain">
+                    <span>Order #${order.id}${branchDisplay} - ${customerName} (${order.orderType || 'N/A'})</span>
+                    <span class="status ${status}">${status}</span>
+                </div>
+                <div style="font-size:0.95rem;color:#003366;">${itemsDisplay}</div>
+                <div style="font-size:0.9rem;color:#003366;">Address: ${addressDisplay}</div>
+                <div class="orderActions"></div>
+            `;
+
+            const actions = li.querySelector('.orderActions');
+            if (status === 'Pending') {
+                const btn = document.createElement('button');
+                btn.textContent = 'Prepare';
+                btn.onclick = () => updateOrderStatus(order.id, 'Preparing');
+                actions.appendChild(btn);
+            } else if (status === 'Preparing') {
+                const btn = document.createElement('button');
+                btn.textContent = 'Complete';
+                btn.onclick = () => updateOrderStatus(order.id, 'Completed');
+                actions.appendChild(btn);
+            }
+
             list.appendChild(li);
         });
     }
 
     // GO TO SINGLE ORDER SCREEN
     function processNextOrder() {
-        const nextIndex = branchOrders.findIndex(o => o.status === 'Pending');
+        const nextIndex = branchOrders.findIndex(o => (o.status === 'Pending' || o.status === 'created'));
         if(nextIndex === -1) return; // no pending orders
         orderIndex = nextIndex;
         document.getElementById('queueSection').style.display = 'none';
@@ -288,115 +496,62 @@
         const orderDiv = document.getElementById('currentOrderSingle');
         orderDiv.innerHTML = '';
 
-        if(branchOrders.length === 0 || branchOrders.filter(o => o.status === 'Pending').length === 0) {
-            orderDiv.innerHTML = '<p>No pending orders to process.</p>';
+        if(branchOrders.length === 0) {
+            orderDiv.innerHTML = '<p>No orders to process.</p>';
             return;
         }
 
         const order = branchOrders[orderIndex];
 
         const customerName = order.customerName || 'Guest';
+        const addressDisplay = formatAddress(order);
         let itemsList = '';
-        if (order.orderItems) {
-            itemsList = order.orderItems.map(oi => {
-                let toppingsStr = '';
-                if (oi.toppings && oi.toppings.length > 0) {
-                    toppingsStr = ` (${oi.toppings.map(t => t.ingredient.name).join(', ')})`;
-                }
-                return `<li>${oi.qty}x ${oi.menuItem.name} (${oi.pizzaSize.cm}cm)${toppingsStr}</li>`;
-            }).join('');
-        } else {
-            itemsList = '<li>No items</li>';
-        }
+        const menuItems = order.menuItems || [];
+        const pizzaItems = order.pizzaItems || [];
+
+        const menuLines = menuItems.map(mi => {
+            const extras = (mi.extras || []).map(e => e.name).filter(Boolean);
+            const extraStr = extras.length ? ` (Extras: ${extras.join(', ')})` : '';
+            return `<li>${mi.qty}x ${mi.menuItemName}${extraStr}</li>`;
+        });
+        const pizzaLines = pizzaItems.map(pi => {
+            const extras = (pi.extras || []).map(e => e.ingredientName).filter(Boolean);
+            const size = pi.pizzaSizeCm ? ` (${pi.pizzaSizeCm}cm)` : '';
+            const extraStr = extras.length ? ` (Extras: ${extras.join(', ')})` : '';
+            return `<li>${pi.qty}x ${pi.pizzaName}${size}${extraStr}</li>`;
+        });
+
+        itemsList = [...menuLines, ...pizzaLines].join('') || '<li>No items</li>';
+
+        const statusRaw = order.status || 'Pending';
+        const status = statusRaw === 'created' ? 'Pending' : statusRaw;
 
         orderDiv.innerHTML = `
         <div class="orderCard">
             <p><strong>Order #${order.id}</strong></p>
             <p><strong>Customer:</strong> ${customerName}</p>
             <p><strong>Type:</strong> ${order.orderType || 'N/A'}</p>
+            <p><strong>Address:</strong> ${addressDisplay}</p>
             <p><strong>Items:</strong></p>
             <ul>${itemsList}</ul>
             <div style="text-align:center; margin-top:15px;">
-                <button class="acceptBtn" onclick="acceptOrder()">Accept</button>
-                <button class="rejectBtn" onclick="rejectOrder()">Reject</button>
+                ${status === 'Pending' ? '<button class="acceptBtn" onclick="prepareOrder()">Prepare</button>' : ''}
+                ${status === 'Preparing' ? '<button class="acceptBtn" onclick="completeOrder()">Complete</button>' : ''}
             </div>
         </div>
     `;
     }
 
-    // ACCEPT ORDER - Now updates backend
-    async function acceptOrder() {
+    async function prepareOrder() {
         const order = branchOrders[orderIndex];
-        try {
-            // Update status in backend
-            const response = await fetch(`${API_BASE_URL}/orders/${order.id}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Accepted' })
-            });
-
-            if (response.ok) {
-                // Update local state
-                branchOrders[orderIndex].status = 'Accepted';
-                processedOrders.push(branchOrders[orderIndex]); // track processed
-
-                // Refresh orders from backend to stay in sync
-                await fetchBranchOrders();
-                showQueue(); // update dashboard
-
-                // Automatically go to next pending order
-                const nextPendingIndex = branchOrders.findIndex(o => o.status === 'Pending');
-                if(nextPendingIndex !== -1) {
-                    orderIndex = nextPendingIndex;
-                    showSingleOrder();
-                } else {
-                    // No more pending orders
-                    document.getElementById('singleOrderSection').innerHTML = '<p>All orders have been processed.</p><button onclick="goHome()" class="homeBtn">Go to Dashboard</button>';
-                }
-            } else {
-                alert('Failed to update order status');
-            }
-        } catch (error) {
-            console.error('Error accepting order:', error);
-            alert('Error connecting to server');
-        }
+        await updateOrderStatus(order.id, 'Preparing');
+        showSingleOrder();
     }
 
-    // REJECT ORDER - Now updates backend
-    async function rejectOrder() {
+    async function completeOrder() {
         const order = branchOrders[orderIndex];
-        try {
-            // Update status in backend
-            const response = await fetch(`${API_BASE_URL}/orders/${order.id}/status`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Rejected' })
-            });
-
-            if (response.ok) {
-                // Update local state
-                branchOrders[orderIndex].status = 'Rejected';
-                processedOrders.push(branchOrders[orderIndex]); // track processed
-
-                // Refresh orders from backend to stay in sync
-                await fetchBranchOrders();
-                showQueue(); // update dashboard
-
-                // Optionally move to next pending order automatically as well
-                const nextPendingIndex = branchOrders.findIndex(o => o.status === 'Pending');
-                if(nextPendingIndex !== -1) {
-                    orderIndex = nextPendingIndex;
-                    showSingleOrder();
-                } else {
-                    document.getElementById('singleOrderSection').innerHTML = '<p>All orders have been processed.</p><button onclick="goHome()" class="homeBtn">Go to Dashboard</button>';
-                }
-            } else {
-                alert('Failed to update order status');
-            }
-        } catch (error) {
-            console.error('Error rejecting order:', error);
-            alert('Error connecting to server');
-        }
+        await updateOrderStatus(order.id, 'Completed');
+        showSingleOrder();
     }
 
 
@@ -417,6 +572,12 @@
         document.getElementById('queueSection').style.display = 'block';
         showQueue();
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        if (ADMIN_MODE) {
+            startAdminOrdersPage();
+        }
+    });
 </script>
 
 </body>

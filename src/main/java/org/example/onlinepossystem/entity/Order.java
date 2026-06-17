@@ -35,7 +35,7 @@ public class Order {
     private String orderType = "pickup";
 
     @Column(nullable = false)
-    private String status = "created";
+    private String status = "Pending";
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -45,6 +45,24 @@ public class Order {
 
     @Column
     private String phone;
+
+    @Column(name = "house_number")
+    private String houseNumber;
+
+    @Column(name = "street")
+    private String street;
+
+    @Column(name = "area")
+    private String area;
+
+    @Column(name = "city")
+    private String city;
+
+    @Column(name = "postal_code")
+    private String postalCode;
+
+    @Column(name = "complex_name")
+    private String complexName;
 
     @Column(columnDefinition = "TEXT")
     private String notes;
@@ -73,6 +91,18 @@ public class Order {
     public void setCustomerName(String customerName) { this.customerName = customerName; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+    public String getHouseNumber() { return houseNumber; }
+    public void setHouseNumber(String houseNumber) { this.houseNumber = houseNumber; }
+    public String getStreet() { return street; }
+    public void setStreet(String street) { this.street = street; }
+    public String getArea() { return area; }
+    public void setArea(String area) { this.area = area; }
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+    public String getPostalCode() { return postalCode; }
+    public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
+    public String getComplexName() { return complexName; }
+    public void setComplexName(String complexName) { this.complexName = complexName; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public List<OrderMenuItem> getMenuItems() { return menuItems; }

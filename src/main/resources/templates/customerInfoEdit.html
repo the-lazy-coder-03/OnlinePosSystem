@@ -227,13 +227,15 @@
         <div class="tab-content active" id="profile">
             <h2>1. Edit Profile</h2>
             <div th:if="${param.success}" class="message">Profile updated successfully!</div>
+            <div th:if="${param.error != null and param.error[0] == 'password'}" class="message">Password must be at least 8 characters and include uppercase, lowercase, number, and special character.</div>
             <form id="profileForm" th:action="@{/profile/update}" method="post" th:object="${customer}">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                 <div style="display: flex; gap: 10px;">
                     <input type="text" id="firstName" th:field="*{firstName}" placeholder="First Name" required style="flex: 1;">
                     <input type="text" id="lastName" th:field="*{lastName}" placeholder="Surname" required style="flex: 1;">
                 </div>
                 <input type="email" id="email" th:field="*{email}" placeholder="Email Address" required readonly>
-                <input type="password" id="password" name="password" placeholder="New Password (leave blank to keep current)">
+                <input type="password" id="password" name="password" minlength="8" placeholder="New Password (leave blank to keep current)">
 
                 <input type="text" id="houseNumber" th:field="*{houseNumber}" placeholder="House / Apartment Number">
                 <input type="text" id="complexName" th:field="*{complexName}" placeholder="Complex Name">
