@@ -27,7 +27,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<ApiError> handleNotFound(NoSuchElementException ex, HttpServletRequest request) {
-        return build(HttpStatus.NOT_FOUND, ex.getMessage(), request, null);
+        return build(HttpStatus.NOT_FOUND, "The requested resource was not found.", request, null);
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class, ConstraintViolationException.class})
@@ -48,13 +48,13 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request, null);
+        return build(HttpStatus.BAD_REQUEST, "Please check your input and try again.", request, null);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
-        String message = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
-        return build(HttpStatus.CONFLICT, message, request, null);
+        logger.error("Data integrity violation in API", ex);
+        return build(HttpStatus.CONFLICT, "That request conflicts with existing data.", request, null);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -65,7 +65,8 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiError> handleResponseStatus(ResponseStatusException ex, HttpServletRequest request) {
         HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
-        return build(status, ex.getReason(), request, null);
+        String message = status.is4xxClientError() ? ex.getReason() : "Unexpected error";
+        return build(status, message, request, null);
     }
 
     @ExceptionHandler(Exception.class)

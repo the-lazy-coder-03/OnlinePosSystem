@@ -2,6 +2,9 @@ package org.example.onlinepossystem.controllers;
 
 import org.example.onlinepossystem.entity.*;
 import org.example.onlinepossystem.repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -12,6 +15,8 @@ import java.util.Optional;
 @Controller
 @RequestMapping("/admin")
 public class AdminController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
 
     private final PizzaRepository pizzaRepository;
     private final PizzaCategoryRepository pizzaCategoryRepository;
@@ -84,12 +89,19 @@ public class AdminController {
         return "admin";
     }
 
+    @GetMapping("/orders")
+    public String adminOrdersPage(Model model) {
+        model.addAttribute("adminMode", true);
+        return "InputOrders";
+    }
+
     // ====== Pizza CRUD ======
 
     @PostMapping("/pizzas/save")
     public String savePizza(@ModelAttribute Pizza pizza, 
                             @RequestParam Integer categoryId,
-                            @RequestParam(required = false) List<Integer> ingredientIds) {
+                            @RequestParam(required = false) List<Integer> ingredientIds,
+                            Authentication authentication) {
         pizzaCategoryRepository.findById(categoryId).ifPresent(pizza::setCategory);
         if (pizza.getId() == null) {
             // Find max id and increment
@@ -114,13 +126,16 @@ public class AdminController {
                 });
             }
         }
+
+        logger.info("Admin action={} pizzaId={} admin={}", "savePizza", savedPizza.getId(), adminName(authentication));
         
         return "redirect:/admin";
     }
 
     @PostMapping("/pizzas/delete/{id}")
-    public String deletePizza(@PathVariable Integer id) {
+    public String deletePizza(@PathVariable Integer id, Authentication authentication) {
         pizzaRepository.deleteById(id);
+        logger.info("Admin action={} pizzaId={} admin={}", "deletePizza", id, adminName(authentication));
         return "redirect:/admin";
     }
 
@@ -128,7 +143,8 @@ public class AdminController {
     public String updatePizzaPrice(@RequestParam Integer branchId,
                                    @RequestParam Integer pizzaId,
                                    @RequestParam Integer pizzaSizeId,
-                                   @RequestParam Double price) {
+                                   @RequestParam Double price,
+                                   Authentication authentication) {
         Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + branchId));
         Pizza pizza = pizzaRepository.findById(pizzaId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza not found with ID: " + pizzaId));
         PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + pizzaSizeId));
@@ -144,13 +160,18 @@ public class AdminController {
             pizzaAllowedSizeRepository.save(new PizzaAllowedSize(pizza, pizzaSize));
         }
 
+        logger.info("Admin action={} branchId={} pizzaId={} sizeId={} admin={}",
+                "updatePizzaPrice", branchId, pizzaId, pizzaSizeId, adminName(authentication));
+
         return "redirect:/admin";
     }
 
     // ====== MenuItem CRUD ======
 
     @PostMapping("/menu-items/save")
-    public String saveMenuItem(@ModelAttribute MenuItem menuItem, @RequestParam Integer categoryId) {
+    public String saveMenuItem(@ModelAttribute MenuItem menuItem,
+                               @RequestParam Integer categoryId,
+                               Authentication authentication) {
         menuCategoryRepository.findById(categoryId).ifPresent(menuItem::setCategory);
         if (menuItem.getId() == null) {
             int maxId = menuItemRepository.findAll().stream()
@@ -160,19 +181,22 @@ public class AdminController {
             menuItem.setId(maxId + 1);
         }
         menuItemRepository.save(menuItem);
+        logger.info("Admin action={} menuItemId={} admin={}", "saveMenuItem", menuItem.getId(), adminName(authentication));
         return "redirect:/admin";
     }
 
     @PostMapping("/menu-items/delete/{id}")
-    public String deleteMenuItem(@PathVariable Integer id) {
+    public String deleteMenuItem(@PathVariable Integer id, Authentication authentication) {
         menuItemRepository.deleteById(id);
+        logger.info("Admin action={} menuItemId={} admin={}", "deleteMenuItem", id, adminName(authentication));
         return "redirect:/admin";
     }
 
     @PostMapping("/menu-items/price")
     public String updateMenuItemPrice(@RequestParam Integer branchId,
                                       @RequestParam Integer menuItemId,
-                                      @RequestParam Double price) {
+                                      @RequestParam Double price,
+                                      Authentication authentication) {
         Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + branchId));
         MenuItem menuItem = menuItemRepository.findById(menuItemId).orElseThrow(() -> new java.util.NoSuchElementException("Menu item not found with ID: " + menuItemId));
 
@@ -180,6 +204,8 @@ public class AdminController {
                 .orElse(new BranchMenuItemPrice(branch, menuItem, price));
         branchMenuItemPrice.setPrice(price);
         branchMenuItemPriceRepository.save(branchMenuItemPrice);
+        logger.info("Admin action={} branchId={} menuItemId={} admin={}",
+                "updateMenuItemPrice", branchId, menuItemId, adminName(authentication));
         return "redirect:/admin";
     }
 
@@ -189,7 +215,8 @@ public class AdminController {
     public String updateToppingPrice(@RequestParam Integer branchId,
                                      @RequestParam Integer priceCategoryId,
                                      @RequestParam Integer pizzaSizeId,
-                                     @RequestParam Double price) {
+                                     @RequestParam Double price,
+                                     Authentication authentication) {
         Branch branch = branchRepository.findById(branchId).orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + branchId));
         PriceCategory priceCategory = priceCategoryRepository.findById(priceCategoryId).orElseThrow(() -> new java.util.NoSuchElementException("Price category not found with ID: " + priceCategoryId));
         PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + pizzaSizeId));
@@ -198,6 +225,12 @@ public class AdminController {
                 .orElse(new BranchExtraPrice(branch, priceCategory, pizzaSize, price));
         bep.setPrice(price);
         branchExtraPriceRepository.save(bep);
+        logger.info("Admin action={} branchId={} priceCategoryId={} sizeId={} admin={}",
+                "updateToppingPrice", branchId, priceCategoryId, pizzaSizeId, adminName(authentication));
         return "redirect:/admin";
+    }
+
+    private String adminName(Authentication authentication) {
+        return authentication == null ? "unknown" : authentication.getName();
     }
 }

@@ -172,6 +172,7 @@
         <h2>Login</h2>
 
         <form th:action="@{/login}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <div class="form-group">
                 <label for="username">Email or Phone Number</label>
                 <input type="text" id="username" name="username" placeholder="Enter email or phone" required autocomplete="username">
@@ -186,6 +187,7 @@
 
             <div th:if="${param.error}" class="error">Invalid username or password</div>
             <div th:if="${param.logout}" class="logout">You have been logged out</div>
+            <div th:if="${param.reset}" class="logout">Your password has been reset. Please log in.</div>
         </form>
 
         <!-- =========================
@@ -193,6 +195,7 @@
         ========================= -->
         <div class="extra-links">
             <p>Don’t have an account? <a th:href="@{/register}">Sign up</a></p>
+            <p><a th:href="@{/forgot-password}">Forgot password?</a></p>
         </div>
     </div>
 

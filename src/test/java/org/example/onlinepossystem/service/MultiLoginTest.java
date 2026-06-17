@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -41,7 +42,7 @@ public class MultiLoginTest {
         String email = "test@example.com";
         String phone1 = "1234567890";
         String phone2 = "0987654321";
-        String password = "password123";
+        String password = "Password1!";
 
         customerService.registerCustomer(
                 "John", "Doe", email, password, phone1, phone2,
@@ -74,13 +75,14 @@ public class MultiLoginTest {
     @Test
     public void testSuccessfulLogin() throws Exception {
         String email = "login@example.com";
-        String password = "password123";
+        String password = "Password1!";
         customerService.registerCustomer(
                 "John", "Doe", email, password, "1112223333", "4445556666",
                 "123", "Main St", "Area", "Complex", "Store", "1234"
         );
 
         mockMvc.perform(MockMvcRequestBuilders.post("/login")
+                        .with(csrf())
                         .param("username", email)
                         .param("password", password))
                 .andExpect(status().isFound())
@@ -89,6 +91,7 @@ public class MultiLoginTest {
     @Test
     public void testFailedLogin() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.post("/login")
+                        .with(csrf())
                         .param("username", "nonexistent@example.com")
                         .param("password", "wrongpassword"))
                 .andExpect(status().isFound())
@@ -98,13 +101,14 @@ public class MultiLoginTest {
     public void testSuccessfulLoginWithPhone() throws Exception {
         String email = "phone_user@example.com";
         String phone = "9998887777";
-        String password = "password123";
+        String password = "Password1!";
         customerService.registerCustomer(
                 "Phone", "User", email, password, phone, null,
                 "123", "Main St", "Area", "Complex", "Store", "1234"
         );
 
         mockMvc.perform(MockMvcRequestBuilders.post("/login")
+                        .with(csrf())
                         .param("username", phone)
                         .param("password", password))
                 .andExpect(status().isFound())

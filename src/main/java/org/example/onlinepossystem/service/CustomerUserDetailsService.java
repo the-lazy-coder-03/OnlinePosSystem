@@ -14,10 +14,10 @@ public class CustomerUserDetailsService implements UserDetailsService {
 
     private final CustomerRepository customerRepository;
 
-    @Value("${ADMIN_USERNAME:admin}")
+    @Value("${ADMIN_USERNAME}")
     private String adminUsername;
 
-    @Value("${ADMIN_PASSWORD:admin}")
+    @Value("${ADMIN_PASSWORD}")
     private String adminPassword;
 
     public CustomerUserDetailsService(CustomerRepository customerRepository) {
@@ -50,11 +50,25 @@ public class CustomerUserDetailsService implements UserDetailsService {
 
         return User.builder()
                 .username(customer.getEmail())
-                .password("{bcrypt}" + customer.getPassword()) // assuming it's already BCrypt encoded in DB
-                .roles("USER")
+                .password(formatPasswordForSpringSecurity(customer.getPassword()))
+                .roles(safeRole(customer.getRole()))
                 .accountLocked(false)
                 .disabled(false)
                 .build();
         //
+    }
+
+    private String formatPasswordForSpringSecurity(String storedPassword) {
+        if (storedPassword != null && storedPassword.startsWith("{")) {
+            return storedPassword;
+        }
+        return "{bcrypt}" + storedPassword;
+    }
+
+    private String safeRole(String role) {
+        if (role == null || role.isBlank()) {
+            return "USER";
+        }
+        return role.replace("ROLE_", "").trim().toUpperCase();
     }
 }

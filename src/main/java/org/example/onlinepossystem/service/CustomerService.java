@@ -2,6 +2,7 @@ package org.example.onlinepossystem.service;
 
 import org.example.onlinepossystem.entity.Customer;
 import org.example.onlinepossystem.repository.CustomerRepository;
+import org.example.onlinepossystem.security.PasswordPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +34,10 @@ public class CustomerService {
                                      String preferredStore,
                                      String postalCode) {
 
+        if (!PasswordPolicy.isValid(password)) {
+            throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
+        }
+
         Customer customer = new Customer();
         customer.setFirstName(firstName);
         customer.setLastName(lastName);
@@ -47,6 +52,7 @@ public class CustomerService {
         customer.setPreferredStore(preferredStore);
         customer.setPostalCode(postalCode);
         customer.setLastOrderedAt(LocalDateTime.now());
+        customer.setRole("USER");
 
         return customerRepository.save(customer); // insert into DB
     }

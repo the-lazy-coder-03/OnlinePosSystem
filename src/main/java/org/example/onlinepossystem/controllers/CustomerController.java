@@ -1,15 +1,25 @@
 package org.example.onlinepossystem.controllers;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import org.example.onlinepossystem.entity.Customer;
 import org.example.onlinepossystem.repository.CustomerRepository;
+import org.example.onlinepossystem.security.PasswordPolicy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.security.core.Authentication;
 
 @Controller
+@Validated
 public class CustomerController {
+
+    private static final Logger logger = LoggerFactory.getLogger(CustomerController.class);
 
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
@@ -22,13 +32,13 @@ public class CustomerController {
 
     @PostMapping("/profile/update")
     public String updateProfile(
-            @RequestParam String firstName,
-            @RequestParam String lastName,
+            @RequestParam @NotBlank String firstName,
+            @RequestParam @NotBlank String lastName,
             @RequestParam(required = false) String houseNumber,
             @RequestParam(required = false) String street,
             @RequestParam(required = false) String area,
             @RequestParam(required = false) String postalCode,
-            @RequestParam(required = false) String phone1,
+            @RequestParam(required = false) @Pattern(regexp = "^[0-9+()\\-\\s]{7,20}$") String phone1,
             @RequestParam(required = false) String phone2,
             @RequestParam(required = false) String preferredStore,
             @RequestParam(required = false) String complexName,
@@ -55,6 +65,9 @@ public class CustomerController {
         customer.setComplexName(complexName);
 
         if (newPassword != null && !newPassword.isEmpty()) {
+            if (!PasswordPolicy.isValid(newPassword)) {
+                return "redirect:/profile/edit?error=password";
+            }
             customer.setPassword(passwordEncoder.encode(newPassword));
         }
 
@@ -65,18 +78,22 @@ public class CustomerController {
 
     @PostMapping("/register")
     public String handleRegister(
-            @RequestParam String firstName,
-            @RequestParam String lastName,
-            @RequestParam String email,
-            @RequestParam String password,
+            @RequestParam @NotBlank String firstName,
+            @RequestParam @NotBlank String lastName,
+            @RequestParam @NotBlank @Email String email,
+            @RequestParam @NotBlank String password,
             @RequestParam(required = false, name = "house_number") String houseNumber,
-            @RequestParam String street,
-            @RequestParam String area,
-            @RequestParam String postalCode,
-            @RequestParam String phone,
+            @RequestParam @NotBlank String street,
+            @RequestParam @NotBlank String area,
+            @RequestParam @NotBlank String postalCode,
+            @RequestParam @NotBlank @Pattern(regexp = "^[0-9+()\\-\\s]{7,20}$") String phone,
             @RequestParam(required = false) String phone2,
             @RequestParam(required = false, name = "preferred_store") String preferredStore
     ) {
+        if (!PasswordPolicy.isValid(password)) {
+            return "redirect:/register?error=password";
+        }
+
         // Check if email already exists
         if (customerRepository.findByEmail(email).isPresent()) {
             return "redirect:/register?error=email";
@@ -100,8 +117,10 @@ public class CustomerController {
         customer.setPhone1(phone);
         customer.setPhone2(phone2);
         customer.setPreferredStore(preferredStore);
+        customer.setRole("USER");
 
         customerRepository.save(customer);
+        logger.info("New customer account registered");
 
         // Redirect to login page after registration
         return "redirect:/login?registered";

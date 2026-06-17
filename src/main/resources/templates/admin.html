@@ -2,6 +2,8 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_parameter" th:content="${_csrf.parameterName}">
     <title>Admin Dashboard - Pete's Pizza</title>
     <style>
         body { font-family: sans-serif; margin: 20px; background: #f4f4f4; }
@@ -31,6 +33,7 @@
 <div class="container">
     <h1>Admin Dashboard</h1>
     <a href="/" style="display: inline-block; margin-bottom: 20px;">&larr; Back to Home</a>
+    <a href="/admin/orders" style="display: inline-block; margin-bottom: 20px; margin-left: 15px;">Live Orders</a>
 
     <div class="tabs">
         <div class="tab active" onclick="showSection('pizzas')">Pizzas</div>
@@ -86,6 +89,7 @@
                                 th:data-ingredient-ids="${#strings.listJoin(pizzaDefaultIngredients.?[pizza.id == __${p.id}__].![ingredient.id], ',')}"
                                 style="background: #17a2b8;">Edit</button>
                         <form th:action="@{/admin/pizzas/delete/{id}(id=${p.id})}" method="post" style="display:inline;">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                             <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
                         </form>
                     </td>
@@ -124,6 +128,7 @@
                         </div>
                         <button class="btn btn-success" th:onclick="'openPriceModal(' + ${m.id} + ', \'menuItem\')'">Set Prices</button>
                         <form th:action="@{/admin/menu-items/delete/{id}(id=${m.id})}" method="post" style="display:inline;">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                             <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
                         </form>
                     </td>
@@ -166,6 +171,7 @@
     <div class="modal-content">
         <h2>Add/Edit Pizza</h2>
         <form th:action="@{/admin/pizzas/save}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <input type="hidden" name="id" id="pizzaId">
             <div class="form-group">
                 <label>Name</label>
@@ -210,6 +216,7 @@
     <div class="modal-content">
         <h2>Add/Edit Menu Item</h2>
         <form th:action="@{/admin/menu-items/save}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <input type="hidden" name="id" id="menuItemId">
             <div class="form-group">
                 <label>Name</label>
@@ -243,6 +250,7 @@
     <div class="modal-content">
         <h2 id="priceModalTitle">Set Price</h2>
         <form id="priceForm" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <input type="hidden" name="pizzaId" id="pricePizzaId">
             <input type="hidden" name="menuItemId" id="priceMenuItemId">
             

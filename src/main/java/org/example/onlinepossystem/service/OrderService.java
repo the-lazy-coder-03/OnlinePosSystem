@@ -4,8 +4,10 @@ import org.example.onlinepossystem.dto.MenuDTO;
 import org.example.onlinepossystem.dto.OrderRequestDTO;
 import org.example.onlinepossystem.dto.OrderResponseDTO;
 import org.example.onlinepossystem.entity.*;
+import org.example.onlinepossystem.event.OrderCreatedEvent;
 import org.example.onlinepossystem.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +61,9 @@ public class OrderService {
 
     @Autowired
     private ModifierOptionRepository modifierOptionRepository;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     public List<MenuDTO> getMenuForBranch(String branchName) {
         if (branchName == null || branchName.isBlank()) {
@@ -271,7 +276,10 @@ public class OrderService {
             }
         }
 
-        return toDto(orderRepository.save(order));
+        Order savedOrder = orderRepository.save(order);
+        OrderResponseDTO response = toDto(savedOrder);
+        eventPublisher.publishEvent(new OrderCreatedEvent(response));
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -281,7 +289,7 @@ public class OrderService {
         }
         Branch branch = branchRepository.findByName(branchName)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Branch not found: " + branchName));
-        return orderRepository.findByBranchId(branch.getId()).stream()
+        return orderRepository.findByBranchIdOrderByCreatedAtDesc(branch.getId()).stream()
                 .map(this::toDto)
                 .toList();
     }
@@ -293,7 +301,7 @@ public class OrderService {
         }
         Branch branch = branchRepository.findByName(branchName)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Branch not found: " + branchName));
-        return orderRepository.findByBranchIdAndStatus(branch.getId(), "Pending").stream()
+        return orderRepository.findByBranchIdAndStatusOrderByCreatedAtDesc(branch.getId(), "Pending").stream()
                 .map(this::toDto)
                 .toList();
     }
@@ -308,9 +316,16 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<OrderResponseDTO> getAllOrders() {
-        return orderRepository.findAll().stream()
+        return orderRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(this::toDto)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public OrderResponseDTO getOrderById(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Order not found with ID: " + orderId));
+        return toDto(order);
     }
 
     private void validateOrderRequest(OrderRequestDTO request) {

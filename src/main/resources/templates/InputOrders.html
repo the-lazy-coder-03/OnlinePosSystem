@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <title>POS — Kenridge Orders</title>
@@ -98,6 +98,13 @@
             background-color: #0052cc;
         }
 
+        .liveStatus {
+            color: #003366;
+            font-size: 0.9rem;
+            margin-top: -10px;
+            margin-bottom: 12px;
+        }
+
         /* ========================
            SINGLE ORDER SCREEN
         ======================== */
@@ -172,7 +179,7 @@
 
 <div class="container">
     <!-- LOGIN -->
-    <div id="loginSection">
+    <div id="loginSection" th:style="${adminMode == true} ? 'display:none;' : 'display:block;'">
         <h2>Staff Login</h2>
         <input type="password" id="codeInput" placeholder="Enter 16-character Code" maxlength="16" style="padding:10px;font-size:1.2rem;border-radius:10px;border:2px solid #0073e6; width: 60%;"><br><br>
         <button onclick="login()" style="padding:10px 25px;font-size:1rem;background:#0073e6;color:white;border:none;border-radius:10px;">Login</button>
@@ -180,9 +187,10 @@
     </div>
 
     <!-- ORDER QUEUE / DASHBOARD -->
-    <div id="queueSection">
+    <div id="queueSection" th:style="${adminMode == true} ? 'display:block;' : 'display:none;'">
         <div class="branchLabel" id="branchLabelQueue"></div>
         <h2>Online Orders Queue</h2>
+        <div id="liveStatus" class="liveStatus"></div>
         <ul id="orderListQueue" class="orderList"></ul>
         <button onclick="processNextOrder()" style="padding:15px 30px;font-size:1.2rem;background:#0073e6;color:white;border:none;border-radius:12px;margin-top:20px;">Process Next Order</button>
     </div>
@@ -199,15 +207,21 @@
     </div>
 </div>
 
-<script>
+<script th:inline="javascript">
+    const ADMIN_MODE = /*[[${adminMode ?: false}]]*/ false;
     let currentBranch = '';
     let branchOrders = [];
     let orderIndex = 0;
     let processedOrders = [];
     let statusRefreshIntervalId = null;
+    let liveEventSource = null;
+    let liveReconnectTimerId = null;
+    let liveReconnectDelayMs = 1000;
 
     // API BASE URL
     const API_BASE_URL = '/api';
+    const ADMIN_ORDERS_URL = `${API_BASE_URL}/admin/orders`;
+    const ADMIN_STREAM_URL = `${ADMIN_ORDERS_URL}/stream`;
 
     async function refreshStatus() {
         try {
@@ -230,6 +244,21 @@
         }
         refreshStatus();
         statusRefreshIntervalId = setInterval(refreshStatus, 3000);
+    }
+
+    function setLiveStatus(message) {
+        const el = document.getElementById('liveStatus');
+        if (el) el.innerText = ADMIN_MODE ? message : '';
+    }
+
+    function startAdminOrdersPage() {
+        currentBranch = 'All Branches';
+        document.getElementById('branchLabelQueue').innerText = 'Admin: All Branches';
+        fetchBranchOrders().then(() => {
+            processedOrders = [];
+            showQueue();
+            connectOrderStream();
+        });
     }
 
     // LOGIN - Now connects to backend
@@ -280,12 +309,76 @@
     // FETCH ORDERS FROM BACKEND
     async function fetchBranchOrders() {
         try {
-            const response = await fetch(`${API_BASE_URL}/orders?branch=${currentBranch}`);
+            const url = ADMIN_MODE
+                ? ADMIN_ORDERS_URL
+                : `${API_BASE_URL}/orders?branch=${encodeURIComponent(currentBranch)}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Orders request failed with status ${response.status}`);
+            }
             branchOrders = await response.json();
         } catch (error) {
             console.error('Error fetching orders:', error);
             branchOrders = [];
+            setLiveStatus('Could not load orders. Retrying with the live connection.');
         }
+    }
+
+    function upsertOrder(order) {
+        if (!order || !order.id) return;
+
+        const existingIndex = branchOrders.findIndex(o => o.id === order.id);
+        if (existingIndex === -1) {
+            branchOrders.unshift(order);
+        } else {
+            branchOrders[existingIndex] = order;
+        }
+
+        if (document.getElementById('queueSection').style.display !== 'none') {
+            showQueue();
+        }
+
+        const currentOrder = branchOrders[orderIndex];
+        if (currentOrder && currentOrder.id === order.id && document.getElementById('singleOrderSection').style.display !== 'none') {
+            showSingleOrder();
+        }
+    }
+
+    function connectOrderStream() {
+        if (!ADMIN_MODE) return;
+
+        if (liveEventSource) {
+            liveEventSource.close();
+        }
+        if (liveReconnectTimerId) {
+            clearTimeout(liveReconnectTimerId);
+            liveReconnectTimerId = null;
+        }
+
+        setLiveStatus('Connecting to live order updates...');
+        liveEventSource = new EventSource(ADMIN_STREAM_URL);
+
+        liveEventSource.addEventListener('connected', () => {
+            liveReconnectDelayMs = 1000;
+            setLiveStatus('Live order updates connected.');
+        });
+
+        liveEventSource.addEventListener('order-created', event => {
+            try {
+                const order = JSON.parse(event.data);
+                upsertOrder(order);
+                setLiveStatus(`New order received: #${order.id}`);
+            } catch (error) {
+                console.error('Could not read live order event:', error);
+            }
+        });
+
+        liveEventSource.onerror = () => {
+            setLiveStatus('Live updates disconnected. Reconnecting...');
+            liveEventSource.close();
+            liveReconnectTimerId = setTimeout(connectOrderStream, liveReconnectDelayMs);
+            liveReconnectDelayMs = Math.min(liveReconnectDelayMs * 2, 15000);
+        };
     }
 
     function formatItemsSummary(order) {
@@ -323,7 +416,11 @@
                 alert('Failed to update order status');
                 return;
             }
-            await fetchBranchOrders();
+            const updatedOrder = await response.json();
+            upsertOrder(updatedOrder);
+            if (!ADMIN_MODE) {
+                await fetchBranchOrders();
+            }
             showQueue();
             const idx = branchOrders.findIndex(o => o.id === orderId);
             if (idx !== -1) {
@@ -350,6 +447,7 @@
             li.className = 'orderItem';
 
             const customerName = order.customerName || 'Guest';
+            const branchDisplay = ADMIN_MODE && order.branchName ? ` - ${order.branchName}` : '';
             const itemsDisplay = formatItemsSummary(order);
             const addressDisplay = formatAddress(order);
             const statusRaw = order.status || 'Pending';
@@ -357,7 +455,7 @@
 
             li.innerHTML = `
                 <div class="orderMain">
-                    <span>Order #${order.id} - ${customerName} (${order.orderType || 'N/A'})</span>
+                    <span>Order #${order.id}${branchDisplay} - ${customerName} (${order.orderType || 'N/A'})</span>
                     <span class="status ${status}">${status}</span>
                 </div>
                 <div style="font-size:0.95rem;color:#003366;">${itemsDisplay}</div>
@@ -474,6 +572,12 @@
         document.getElementById('queueSection').style.display = 'block';
         showQueue();
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        if (ADMIN_MODE) {
+            startAdminOrdersPage();
+        }
+    });
 </script>
 
 </body>

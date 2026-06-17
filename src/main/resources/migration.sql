@@ -445,7 +445,7 @@ INSERT INTO ingredient (ingredient_id, name, price_category_id, seasonal) VALUES
   (25, 'anchovies',       4, FALSE),
   (26, 'avo',             4, TRUE),
   (27, 'origanum',        1, FALSE),
-  (28, 'tomato base',     2, FALSE),
+  (28, 'tomato base',     1, FALSE),
   (29, 'rib',             4, FALSE),
   (30, 'rib sauce',       2, FALSE),
   (31, 'bbq sauce',       2, FALSE),

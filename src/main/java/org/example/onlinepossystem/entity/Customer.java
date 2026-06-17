@@ -58,6 +58,9 @@ public class Customer {
     @Column(name = "last_name")
     private String lastName;
 
+    @Column(name = "role")
+    private String role = "USER";
+
     // Default constructor
     public Customer() {}
 
@@ -108,4 +111,7 @@ public class Customer {
 
     public String getCity() { return city; }
     public void setCity(String city) { this.city = city; }
+
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
 }

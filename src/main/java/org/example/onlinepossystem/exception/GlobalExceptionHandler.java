@@ -27,7 +27,7 @@ public class GlobalExceptionHandler {
     public String handleNoSuchElementException(NoSuchElementException ex, Model model) {
         logger.error("Resource not found: {}", ex.getMessage());
         model.addAttribute("status", 404);
-        model.addAttribute("message", "The requested resource was not found: " + ex.getMessage());
+        model.addAttribute("message", "The requested resource was not found.");
         return "error";
     }
 
@@ -36,7 +36,7 @@ public class GlobalExceptionHandler {
     public String handleValidationExceptions(Exception ex, Model model) {
         logger.error("Validation error: {}", ex.getMessage());
         model.addAttribute("status", 400);
-        model.addAttribute("message", "Invalid request: " + ex.getMessage());
+        model.addAttribute("message", "Please check your input and try again.");
         return "error";
     }
 
@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
     public String handleIllegalArgument(IllegalArgumentException ex, Model model) {
         logger.error("Bad request: {}", ex.getMessage());
         model.addAttribute("status", 400);
-        model.addAttribute("message", ex.getMessage());
+        model.addAttribute("message", "Please check your input and try again.");
         return "error";
     }
 
@@ -54,7 +54,7 @@ public class GlobalExceptionHandler {
     public String handleDataIntegrityViolation(DataIntegrityViolationException ex, Model model) {
         logger.error("Data integrity violation", ex);
         model.addAttribute("status", 409);
-        model.addAttribute("message", "Conflict: " + ex.getMostSpecificCause().getMessage());
+        model.addAttribute("message", "That request could not be completed because it conflicts with existing data.");
         return "error";
     }
 
@@ -63,7 +63,9 @@ public class GlobalExceptionHandler {
         logger.error("Response status exception: {} - {}", ex.getStatusCode(), ex.getReason());
         response.setStatus(ex.getStatusCode().value());
         model.addAttribute("status", ex.getStatusCode().value());
-        model.addAttribute("message", ex.getReason());
+        model.addAttribute("message", ex.getStatusCode().is4xxClientError()
+                ? "Please check your input and try again."
+                : "An unexpected error occurred.");
         return "error";
     }
 
@@ -72,7 +74,7 @@ public class GlobalExceptionHandler {
     public String handleGeneralException(Exception ex, Model model) {
         logger.error("Unhandled exception occurred", ex);
         model.addAttribute("status", 500);
-        model.addAttribute("message", "An unexpected error occurred: " + ex.getMessage());
+        model.addAttribute("message", "An unexpected error occurred. Please try again later.");
         return "error";
     }
 }
