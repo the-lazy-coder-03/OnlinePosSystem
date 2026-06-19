@@ -10,11 +10,15 @@ public record MenuItemDetail(
         Integer categoryId,
         String categoryName,
         BigDecimal price,
-        List<ModifierGroupItem> modifierGroups
+        List<ModifierGroupItem> modifierGroups,
+        List<BurgerToppingItem> burgerToppings
 ) {
     public MenuItemDetail {
         if (modifierGroups == null) {
             modifierGroups = List.of();
+        }
+        if (burgerToppings == null) {
+            burgerToppings = List.of();
         }
     }
 }

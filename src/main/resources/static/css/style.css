@@ -147,7 +147,8 @@ nav a:hover {
 .map-container .view-menu-btn {
     width: 150px;
     height: 45px;
-    display: inline-flex;
+    display: flex;
+    align-self: center;
     align-items: center;
     justify-content: center;
 

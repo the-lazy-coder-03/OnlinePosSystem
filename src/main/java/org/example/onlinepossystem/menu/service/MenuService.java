@@ -1,5 +1,7 @@
 package org.example.onlinepossystem.menu.service;
 
+import org.example.onlinepossystem.entity.BurgerTopping;
+import org.example.onlinepossystem.menu.dto.BurgerToppingItem;
 import org.example.onlinepossystem.menu.dto.MenuItemDetail;
 import org.example.onlinepossystem.menu.dto.MenuItemRow;
 import org.example.onlinepossystem.menu.dto.ModifierGroupItem;
@@ -7,6 +9,7 @@ import org.example.onlinepossystem.menu.dto.ModifierGroupRow;
 import org.example.onlinepossystem.menu.dto.ModifierOptionItem;
 import org.example.onlinepossystem.menu.dto.ModifierOptionRow;
 import org.example.onlinepossystem.menu.repository.MenuReadRepository;
+import org.example.onlinepossystem.repository.BurgerToppingRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,9 +23,11 @@ import java.util.stream.Collectors;
 @Service
 public class MenuService {
     private final MenuReadRepository menuReadRepository;
+    private final BurgerToppingRepository burgerToppingRepository;
 
-    public MenuService(MenuReadRepository menuReadRepository) {
+    public MenuService(MenuReadRepository menuReadRepository, BurgerToppingRepository burgerToppingRepository) {
         this.menuReadRepository = menuReadRepository;
+        this.burgerToppingRepository = burgerToppingRepository;
     }
 
     public List<MenuItemDetail> getMenuForBranch(Integer branchId) {
@@ -75,9 +80,27 @@ public class MenuService {
             }
         }
 
+        List<BurgerTopping> burgerToppings = burgerToppingRepository.findByBurgerIds(menuItemIds);
+        Map<Integer, List<BurgerToppingItem>> toppingsByMenuItem = burgerToppings.stream()
+                .filter(topping -> topping.getBurger() != null && topping.getBurger().getId() != null)
+                .collect(Collectors.groupingBy(
+                        topping -> topping.getBurger().getId(),
+                        LinkedHashMap::new,
+                        Collectors.mapping(
+                                topping -> new BurgerToppingItem(
+                                        topping.getId(),
+                                        topping.getToppingName(),
+                                        topping.isDefault(),
+                                        toBigDecimal(topping.getPrice())
+                                ),
+                                Collectors.toList()
+                        )
+                ));
+
         List<MenuItemDetail> results = new ArrayList<>();
         for (MenuItemRow row : menuRows) {
             List<ModifierGroupItem> groups = groupsByMenuItem.getOrDefault(row.menuItemId(), List.of());
+            List<BurgerToppingItem> burgerToppingItems = toppingsByMenuItem.getOrDefault(row.menuItemId(), List.of());
             results.add(new MenuItemDetail(
                     row.menuItemId(),
                     row.name(),
@@ -85,7 +108,8 @@ public class MenuService {
                     row.categoryId(),
                     row.categoryName(),
                     toBigDecimal(row.price()),
-                    groups
+                    groups,
+                    burgerToppingItems
             ));
         }
         return results;

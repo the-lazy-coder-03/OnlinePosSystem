@@ -237,29 +237,48 @@ public class OrderService {
                 if (itemRequest.getCustomizations() != null) {
                     for (OrderRequestDTO.CustomizationRequestDTO custReq : itemRequest.getCustomizations()) {
                         OrderMenuItemExtra extra = new OrderMenuItemExtra();
-                        // For non-pizza items, we'll use the name from BurgerTopping or SaladIngredient
                         String extraName = "";
                         Double extraPrice = 0.0;
+                        String customizationType = custReq.getType() == null ? "" : custReq.getType().trim();
 
-                        ModifierOption modifierOption = modifierOptionRepository.findById(custReq.getId()).orElse(null);
-                        if (modifierOption != null) {
-                            extraName = modifierOption.name;
-                            if (modifierOption.menuItemId != null) {
-                                BranchMenuItemPrice extraPriceEntry = branchMenuItemPriceRepository
-                                        .findByBranchIdAndMenuItemId(branch.getId(), modifierOption.menuItemId)
-                                        .orElseThrow(() -> new java.util.NoSuchElementException("Price not found for modifier option menu item ID: " + modifierOption.menuItemId));
-                                extraPrice = extraPriceEntry.getPrice();
+                        if ("burgerTopping".equalsIgnoreCase(customizationType)) {
+                            BurgerTopping topping = burgerToppingRepository.findById(custReq.getId()).orElse(null);
+                            if (isToppingForMenuItem(topping, menuItem)) {
+                                extraName = topping.getToppingName();
+                                extraPrice = topping.getPrice();
+                            }
+                        } else if ("modifierOption".equalsIgnoreCase(customizationType)) {
+                            ModifierOption modifierOption = modifierOptionRepository.findById(custReq.getId()).orElse(null);
+                            if (modifierOption != null) {
+                                extraName = modifierOption.name;
+                                if (modifierOption.menuItemId != null) {
+                                    BranchMenuItemPrice extraPriceEntry = branchMenuItemPriceRepository
+                                            .findByBranchIdAndMenuItemId(branch.getId(), modifierOption.menuItemId)
+                                            .orElseThrow(() -> new java.util.NoSuchElementException("Price not found for modifier option menu item ID: " + modifierOption.menuItemId));
+                                    extraPrice = extraPriceEntry.getPrice();
+                                }
                             }
                         } else {
                             BurgerTopping topping = burgerToppingRepository.findById(custReq.getId()).orElse(null);
-                            if (topping != null) {
+                            if (isToppingForMenuItem(topping, menuItem)) {
                                 extraName = topping.getToppingName();
                                 extraPrice = topping.getPrice();
                             } else {
-                                SaladIngredient ingredient = saladIngredientRepository.findById(custReq.getId()).orElse(null);
-                                if (ingredient != null) {
-                                    extraName = ingredient.getIngredientName();
-                                    extraPrice = ingredient.getPrice();
+                                ModifierOption modifierOption = modifierOptionRepository.findById(custReq.getId()).orElse(null);
+                                if (modifierOption != null) {
+                                    extraName = modifierOption.name;
+                                    if (modifierOption.menuItemId != null) {
+                                        BranchMenuItemPrice extraPriceEntry = branchMenuItemPriceRepository
+                                                .findByBranchIdAndMenuItemId(branch.getId(), modifierOption.menuItemId)
+                                                .orElseThrow(() -> new java.util.NoSuchElementException("Price not found for modifier option menu item ID: " + modifierOption.menuItemId));
+                                        extraPrice = extraPriceEntry.getPrice();
+                                    }
+                                } else {
+                                    SaladIngredient ingredient = saladIngredientRepository.findById(custReq.getId()).orElse(null);
+                                    if (ingredient != null) {
+                                        extraName = ingredient.getIngredientName();
+                                        extraPrice = ingredient.getPrice();
+                                    }
                                 }
                             }
                         }
@@ -326,6 +345,32 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Order not found with ID: " + orderId));
         return toDto(order);
+    }
+
+    private boolean isToppingForMenuItem(BurgerTopping topping, MenuItem menuItem) {
+        if (topping == null || topping.getBurger() == null || menuItem == null) {
+            return false;
+        }
+        Integer toppingBurgerId = topping.getBurger().getId();
+        if (toppingBurgerId != null && toppingBurgerId.equals(menuItem.getId())) {
+            return true;
+        }
+        String toppingFamily = burgerFamilyKey(topping.getBurger());
+        return !toppingFamily.isBlank() && toppingFamily.equals(burgerFamilyKey(menuItem));
+    }
+
+    private String burgerFamilyKey(MenuItem menuItem) {
+        if (menuItem == null || menuItem.getName() == null) {
+            return "";
+        }
+        String name = menuItem.getName().trim().toLowerCase().replaceAll("\\s+combo\\s*$", "");
+        String category = menuItem.getCategory() == null || menuItem.getCategory().getName() == null
+                ? ""
+                : menuItem.getCategory().getName().toLowerCase();
+        if (!name.contains("burger") && !category.contains("burger")) {
+            return "";
+        }
+        return name.replaceAll("\\s+", " ");
     }
 
     private void validateOrderRequest(OrderRequestDTO request) {

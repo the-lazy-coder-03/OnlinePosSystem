@@ -85,11 +85,14 @@ public class OrderRequestDTO {
         @NotNull
         @Positive
         private Integer quantity;
+        private String type;
 
         // Getters and Setters
         public Integer getId() { return id; }
         public void setId(Integer id) { this.id = id; }
         public Integer getQuantity() { return quantity; }
         public void setQuantity(Integer quantity) { this.quantity = quantity; }
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
     }
 }
