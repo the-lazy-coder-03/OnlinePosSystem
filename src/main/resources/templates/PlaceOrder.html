@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Place Order — Pete’s Pizza</title>
+    <title th:text="${menuOnly == true ? 'Menu - Pete''s Pizza' : 'Place Order - Pete''s Pizza'}">Place Order - Pete's Pizza</title>
 
     <style>
         :root{
@@ -746,6 +746,12 @@
             color: #fff !important;
             border: 1px solid var(--blue-650) !important;
         }
+        .menu-only .ordering-only{
+            display: none !important;
+        }
+        .menu-only .top-actions .pill{
+            padding-right: 14px;
+        }
 
         /* ===== Responsive ===== */
         @media (max-width: 980px){
@@ -768,7 +774,7 @@
     </style>
 </head>
 
-<body>
+<body th:classappend="${menuOnly == true ? 'menu-only' : ''}">
 <div id="customerDefaults"
      th:data-name="${customerName}"
      th:data-phone="${user != null ? user.phone1 : ''}"
@@ -788,11 +794,11 @@
         </div>
 
         <div class="top-actions">
-            <div class="pill" title="Current branch + cart count">
+            <div class="pill" title="Current branch">
                 <span class="dot"></span>
                 <span id="branchPill">Branch: —</span>
-                <span>•</span>
-                <span id="cartPill"><strong>0</strong> item(s)</span>
+                <span class="ordering-only">•</span>
+                <span id="cartPill" class="ordering-only"><strong>0</strong> item(s)</span>
             </div>
             <button class="btn btn-ghost" id="btnHomeTop" type="button" title="Back to home">
                 Home
@@ -800,7 +806,7 @@
             <button class="btn btn-ghost" id="btnChangeBranch" type="button" title="Change branch">
                 Change Branch
             </button>
-            <button class="btn btn-primary" id="btnViewCart" type="button" title="View cart">
+            <button class="btn btn-primary ordering-only" id="btnViewCart" type="button" title="View cart">
                 View Cart
             </button>
         </div>
@@ -810,8 +816,8 @@
 <!-- ===== Branch + Order Type Overlay ===== -->
 <div class="overlay" id="branchOverlay" aria-hidden="true">
     <div class="overlay-card">
-        <h2>Start Your Order</h2>
-        <p>Choose a branch first, then select collection or delivery.</p>
+        <h2 id="branchOverlayTitle">Start Your Order</h2>
+        <p id="branchOverlayDesc">Choose a branch first, then select collection or delivery.</p>
 
         <div id="branchStep">
             <h3 style="margin:12px 0 6px;color:var(--blue-800);">Choose a Branch</h3>
@@ -825,7 +831,7 @@
             </div>
         </div>
 
-        <div id="orderTypeStep" class="hidden">
+        <div id="orderTypeStep" class="hidden ordering-only">
             <h3 style="margin:16px 0 6px;color:var(--blue-800);">Collection or Delivery?</h3>
             <div class="choice-grid">
                 <button class="btn btn-ghost choice-btn" id="typeCollection" type="button">
@@ -841,7 +847,7 @@
             <button class="btn btn-ghost" id="btnGoHome" type="button">← Back to Home</button>
         </div>
 
-        <p style="margin-top:12px;font-size:.88rem;">
+        <p id="branchOverlayNote" style="margin-top:12px;font-size:.88rem;">
             Branch and order type selection are required to continue.
         </p>
     </div>
@@ -855,7 +861,7 @@
 
         <div id="menuItemGroups"></div>
 
-        <div class="qty" style="margin-top:12px;">
+        <div class="qty ordering-only" style="margin-top:12px;">
             <div class="qty-controls">
                 <button class="qty-btn" id="menuQtyMinus" type="button" aria-label="Decrease quantity">−</button>
                 <div class="qty-val" id="menuQtyValue">1</div>
@@ -871,7 +877,7 @@
 
         <div class="formrow">
             <button class="btn btn-ghost" id="menuItemCancel" type="button">Cancel</button>
-            <button class="btn btn-primary" id="menuItemAdd" type="button">Add to Cart</button>
+            <button class="btn btn-primary ordering-only" id="menuItemAdd" type="button">Add to Cart</button>
         </div>
     </div>
 </div>
@@ -891,10 +897,10 @@
 
         <div class="sidebar-footer">
             <div class="mini"><span>Active:</span> <strong id="activeCategoryLabel">Everything</strong></div>
-            <div class="mini"><span>Cart total:</span> <strong id="cartTotalMini">R0.00</strong></div>
+            <div class="mini ordering-only"><span>Cart total:</span> <strong id="cartTotalMini">R0.00</strong></div>
 
-            <button class="btn btn-cart" id="btnSidebarCart" type="button">View Cart &amp; Total</button>
-            <button class="btn btn-clear" id="btnSidebarClear" type="button">Clear Cart</button>
+            <button class="btn btn-cart ordering-only" id="btnSidebarCart" type="button">View Cart &amp; Total</button>
+            <button class="btn btn-clear ordering-only" id="btnSidebarClear" type="button">Clear Cart</button>
         </div>
     </aside>
 
@@ -930,7 +936,7 @@
                     <button class="backlink" id="btnCustomizeBack" type="button" aria-label="Back to menu">
                         ← Back
                     </button>
-                    <div class="pill" style="background: rgba(11,42,91,.06); border-color: var(--line); color: var(--blue-800);">
+                    <div class="pill ordering-only" style="background: rgba(11,42,91,.06); border-color: var(--line); color: var(--blue-800);">
                         <span class="dot" style="background: var(--blue-650); box-shadow:0 0 0 3px rgba(30,99,214,.12);"></span>
                         <span id="customizeCartPill">0 item(s)</span>
                     </div>
@@ -963,7 +969,7 @@
                 </div>
 
                 <!-- Quantity -->
-                <div class="card">
+                <div class="card ordering-only">
                     <h3>Quantity</h3>
                     <div class="qty">
                         <div class="qty-controls">
@@ -991,10 +997,10 @@
             </div>
 
             <!-- Sticky bottom bar: Add to Cart w/ live total -->
-            <div class="stickybar" aria-label="Add to cart sticky bar">
+            <div class="stickybar ordering-only" aria-label="Add to cart sticky bar">
                 <div class="stickybar-inner">
                     <div class="sticky-left" id="stickyQty">1 item</div>
-                    <button class="sticky-action" id="btnAddToCart" type="button" aria-label="Add to cart">
+                    <button class="sticky-action ordering-only" id="btnAddToCart" type="button" aria-label="Add to cart">
                         Add to cart
                     </button>
                     <div class="sticky-right" id="stickyTotal">R0.00</div>
@@ -1022,7 +1028,11 @@
     </main>
 </div>
 
-<script>
+<script th:inline="javascript">
+    const MENU_ONLY = /*[[${menuOnly == true}]]*/ false;
+    const INITIAL_BRANCH_ID = /*[[${branchId}]]*/ null;
+    const INITIAL_BRANCH_NAME = /*[[${branchName ?: ''}]]*/ "";
+
     /************************************************************
      * Single, structured state object (required)
      ************************************************************/
@@ -1119,6 +1129,13 @@
         return (s ?? "").toString();
     }
 
+    function branchNameFromId(branchId){
+        const id = Number(branchId);
+        if (id === 1) return "Kenridge";
+        if (id === 2) return "Uitzicht";
+        return `Branch ${id}`;
+    }
+
     /************************************************************
      * API functions (separated, required)
      ************************************************************/
@@ -1194,8 +1211,10 @@
     const render = {
         updateTopBar(){
             const orderLabel = state.orderType === "delivery" ? "Delivery" : (state.orderType === "pickup" ? "Collection" : null);
-            const baseLabel = state.branch.id ? `${state.branch.name}` : "Place Order";
-            const label = orderLabel && state.branch.id ? `${baseLabel} • ${orderLabel}` : baseLabel;
+            const baseLabel = state.branch.id ? `${state.branch.name}` : (MENU_ONLY ? "Menu" : "Place Order");
+            const label = MENU_ONLY && state.branch.id
+                ? `${baseLabel} Menu`
+                : (orderLabel && state.branch.id ? `${baseLabel} • ${orderLabel}` : baseLabel);
             const b = state.branch.id ? `${state.branch.name} (ID: ${state.branch.id})` : "Branch: —";
             $("branchLabel").textContent = label;
             $("branchPill").textContent = b;
@@ -1292,8 +1311,8 @@
                           <div class="row-title">${escapeHtml(p.name)}</div>
                           <div class="row-price">${p.basePrice != null ? ("From " + money(p.basePrice)) : ""}</div>
                         </div>
-                        <div class="row-sub">${escapeHtml(p.shortDescription || p.description || p.toppingsPreview || "Tap to customize size and toppings.")}</div>
-                        <div class="row-cta">Click to customize &amp; add</div>
+                        <div class="row-sub">${escapeHtml(p.shortDescription || p.description || p.toppingsPreview || (MENU_ONLY ? "Tap to view sizes and toppings." : "Tap to customize size and toppings."))}</div>
+                        <div class="row-cta">${MENU_ONLY ? "View details" : "Click to customize &amp; add"}</div>
                     `;
                     row.addEventListener("click", () => actions.openCustomize(p.pizzaId).catch(err => alert(err.message)));
                     body.appendChild(row);
@@ -1316,8 +1335,8 @@
                           <div class="row-title">${escapeHtml(m.name)}</div>
                           <div class="row-price">${money(m.basePrice || 0)}</div>
                         </div>
-                        <div class="row-sub">${escapeHtml(m.shortDescription || m.description || "Tap to add to your order.")}</div>
-                        <div class="row-cta">${hasModifiers ? "Click to choose options" : "Click to add"}</div>
+                        <div class="row-sub">${escapeHtml(m.shortDescription || m.description || (MENU_ONLY ? "View item details." : "Tap to add to your order."))}</div>
+                        <div class="row-cta">${MENU_ONLY ? (hasModifiers ? "View options" : "View details") : (hasModifiers ? "Click to choose options" : "Click to add")}</div>
                     `;
                     row.addEventListener("click", () => actions.openMenuItem(m.menuItemId));
                     body.appendChild(row);
@@ -1345,7 +1364,9 @@
             }
 
             $("customizePizzaName").textContent = d.name || "Customize Pizza";
-            $("customizePizzaMeta").textContent = state.branch.id ? `${state.branch.name} • Customize your pizza` : "Customize your pizza";
+            $("customizePizzaMeta").textContent = state.branch.id
+                ? `${state.branch.name} • ${MENU_ONLY ? "Menu details" : "Customize your pizza"}`
+                : (MENU_ONLY ? "Menu details" : "Customize your pizza");
 
             // Sizes (radio buttons required)
             $("sizeOptions").innerHTML = "";
@@ -1467,6 +1488,7 @@
 
         menuCustomize(){
             const item = state.menuCustomize.menuItem;
+            $("menuItemCancel").textContent = MENU_ONLY ? "Close" : "Cancel";
             if (!item){
                 $("menuItemTitle").textContent = "Menu Item";
                 $("menuItemDesc").textContent = "Choose options if required.";
@@ -1533,8 +1555,9 @@
     const actions = {
         async init(){
             initCustomerDefaults();
+            ui.applyMode();
             const goHome = () => {
-                if (state.cart.items.length){
+                if (!MENU_ONLY && state.cart.items.length){
                     const ok = confirm("You have items in your cart. Leave and discard?");
                     if (!ok) return;
                 }
@@ -1594,12 +1617,16 @@
             $("menuItemCancel").addEventListener("click", () => actions.closeMenuItemOverlay());
             $("menuItemAdd").addEventListener("click", () => actions.addMenuItemToCartFromOverlay());
 
-            // Always start with branch selection overlay
-            ui.showBranchOverlay(true);
-
             render.updateTopBar();
             render.sidebar();
             render.list();
+
+            if (MENU_ONLY && Number.isFinite(Number(INITIAL_BRANCH_ID))){
+                const branchId = Number(INITIAL_BRANCH_ID);
+                await actions.loadBranch(branchId, INITIAL_BRANCH_NAME || branchNameFromId(branchId), null);
+            } else {
+                ui.showBranchOverlay(true);
+            }
         },
 
         selectBranch(branchId, branchName){
@@ -1607,6 +1634,10 @@
             state.selection.branchName = branchName;
             state.orderType = null;
             ui.setBranchChoiceUI(branchId);
+            if (MENU_ONLY){
+                actions.loadBranch(branchId, branchName, null).catch(e => alert(e.message));
+                return;
+            }
             ui.showOrderTypeStep(true);
             ui.resetOrderTypeUI();
         },
@@ -1625,19 +1656,19 @@
         },
 
         async loadBranch(branchId, branchName, orderType){
-            if (!orderType) {
+            if (!MENU_ONLY && !orderType) {
                 throw new Error("Please select collection or delivery.");
             }
 
             // If switching branch, clear cart to avoid mixed pricing
-            if (state.branch.id && state.branch.id !== branchId && state.cart.items.length){
+            if (!MENU_ONLY && state.branch.id && state.branch.id !== branchId && state.cart.items.length){
                 const ok = confirm("Switching branch will clear your current cart. Continue?");
                 if (!ok) return;
                 store.clearCart(false);
             }
 
             store.setBranch(branchId, branchName);
-            state.orderType = orderType;
+            state.orderType = MENU_ONLY ? null : orderType;
             state.selection.branchId = branchId;
             state.selection.branchName = branchName;
             ui.showBranchOverlay(false);
@@ -1675,7 +1706,7 @@
             }
 
             $("listTitle").textContent = `${state.branch.name} Menu`;
-            $("listSub").textContent = "Tap an item to customize or add to your order.";
+            $("listSub").textContent = MENU_ONLY ? "Browse menu items and prices." : "Tap an item to customize or add to your order.";
             $("searchInput").value = "";
             state.ui.search = "";
             state.ui.activeCategory = "all";
@@ -1815,6 +1846,7 @@
         },
 
         addCustomizedPizzaToCart(){
+            if (MENU_ONLY) return;
             const d = state.customize.detail;
             if (!state.branch.id) return alert("Please select a branch.");
             if (!d || !state.customize.pizzaId) return alert("Pizza not loaded yet.");
@@ -1871,7 +1903,7 @@
             if (!item) return;
 
             const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
-            if (!groups.length){
+            if (!MENU_ONLY && !groups.length){
                 actions.addMenuItemDirect(item);
                 return;
             }
@@ -1940,6 +1972,7 @@
         },
 
         addMenuItemToCartFromOverlay(){
+            if (MENU_ONLY) return;
             const item = state.menuCustomize.menuItem;
             if (!item) return;
 
@@ -1972,6 +2005,7 @@
         },
 
         addMenuItemDirect(item){
+            if (MENU_ONLY) return;
             const base = Number(item.basePrice || 0);
             store.addToCart({
                 type: "menu",
@@ -2000,6 +2034,9 @@
      ************************************************************/
     const view = {
         show(name){
+            if (MENU_ONLY && name === "summary"){
+                name = "list";
+            }
             if (name !== "list" && !state.branch.id) {
                 ui.showBranchOverlay(true);
                 return;
@@ -2025,6 +2062,15 @@
      * UI helpers
      ************************************************************/
     const ui = {
+        applyMode(){
+            if (!MENU_ONLY) return;
+            document.title = "Menu - Pete's Pizza";
+            $("branchOverlayTitle").textContent = "View Menu";
+            $("branchOverlayDesc").textContent = "Choose a branch to view its menu.";
+            $("branchOverlayNote").textContent = "Choose a branch to continue.";
+            $("listSub").textContent = "Browse menu items and prices.";
+            $("menuItemCancel").textContent = "Close";
+        },
         showBranchOverlay(show){
             $("branchOverlay").classList.toggle("show", !!show);
             $("branchOverlay").setAttribute("aria-hidden", show ? "false" : "true");
@@ -2033,8 +2079,8 @@
                     state.selection.branchId = state.branch.id;
                     state.selection.branchName = state.branch.name;
                     ui.setBranchChoiceUI(state.branch.id);
-                    ui.showOrderTypeStep(true);
-                    ui.setOrderTypeChoiceUI(state.orderType);
+                    ui.showOrderTypeStep(!MENU_ONLY);
+                    if (!MENU_ONLY) ui.setOrderTypeChoiceUI(state.orderType);
                 } else {
                     state.selection.branchId = null;
                     state.selection.branchName = "";
@@ -2643,7 +2689,7 @@
      * Warn on leaving with cart
      ************************************************************/
     window.addEventListener("beforeunload", (e) => {
-        if (state.cart.items.length > 0){
+        if (!MENU_ONLY && state.cart.items.length > 0){
             e.preventDefault();
             e.returnValue = "";
         }

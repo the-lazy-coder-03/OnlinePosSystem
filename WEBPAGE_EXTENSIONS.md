@@ -8,9 +8,9 @@ This file lists the main webpage names and browser paths used by the application
 | --- | --- | --- | --- |
 | Home | `/` | `index.html` | Main home page |
 | Home | `/home` | `index.html` | Home page alias |
-| Menu | `/menu` | `index.html` | Menu section on the home page |
-| Kenridge Menu | `/menu/kenridge` | `index.html` | Kenridge branch menu |
-| Uitzicht Menu | `/menu/uitzicht` | `index.html` | Uitzicht branch menu |
+| Menu | `/menu` | `PlaceOrder.html` | Read-only menu page |
+| Kenridge Menu | `/menu/kenridge` | `PlaceOrder.html` | Read-only Kenridge branch menu |
+| Uitzicht Menu | `/menu/uitzicht` | `PlaceOrder.html` | Read-only Uitzicht branch menu |
 | Place Order | `/order` | `PlaceOrder.html` | Customer order page |
 | Login | `/login` | `login.html` | User login page |
 | Register | `/register` | `register.html` | User registration page |
@@ -32,6 +32,7 @@ This file lists the main webpage names and browser paths used by the application
 | Staff Orders | `/orders` | `InputOrders.html` | Staff order queue alias |
 | Staff Orders | `/InputOrders` | `InputOrders.html` | Staff order queue alias |
 | Staff Orders | `/InputOrders.html` | `InputOrders.html` | Staff order queue alias |
+| Admin Login | `/admin/login` | `admin-login.html` | Admin login page |
 | Admin Dashboard | `/admin` | `admin.html` | Admin menu and pricing dashboard |
 | Admin Live Orders | `/admin/orders` | `InputOrders.html` | Admin live orders page |
 

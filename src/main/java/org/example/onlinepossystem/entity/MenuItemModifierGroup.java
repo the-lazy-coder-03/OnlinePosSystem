@@ -18,6 +18,16 @@ public class MenuItemModifierGroup {
     @Column(name = "group_id")
     public Integer groupId;
 
-    protected MenuItemModifierGroup() {
+    public MenuItemModifierGroup() {
     }
+
+    public MenuItemModifierGroup(Integer menuItemId, Integer groupId) {
+        this.menuItemId = menuItemId;
+        this.groupId = groupId;
+    }
+
+    public Integer getMenuItemId() { return menuItemId; }
+    public void setMenuItemId(Integer menuItemId) { this.menuItemId = menuItemId; }
+    public Integer getGroupId() { return groupId; }
+    public void setGroupId(Integer groupId) { this.groupId = groupId; }
 }

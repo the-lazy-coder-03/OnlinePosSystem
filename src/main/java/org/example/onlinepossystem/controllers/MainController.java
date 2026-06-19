@@ -33,18 +33,25 @@ public class MainController {
     }
 
     @GetMapping("/menu")
-    public String menuPage() {
-        return "index";
+    public String menuPage(Model model) {
+        model.addAttribute("menuOnly", true);
+        return "PlaceOrder";
     }
 
     @GetMapping("/menu/kenridge")
-    public String kenridgeMenu() {
-        return "index";
+    public String kenridgeMenu(Model model) {
+        model.addAttribute("menuOnly", true);
+        model.addAttribute("branchId", 1);
+        model.addAttribute("branchName", "Kenridge");
+        return "PlaceOrder";
     }
 
     @GetMapping("/menu/uitzicht")
-    public String uitzichtMenu() {
-        return "index";
+    public String uitzichtMenu(Model model) {
+        model.addAttribute("menuOnly", true);
+        model.addAttribute("branchId", 2);
+        model.addAttribute("branchName", "Uitzicht");
+        return "PlaceOrder";
     }
 
     @GetMapping("/order")
@@ -70,6 +77,11 @@ public class MainController {
     @GetMapping("/login")
     public String loginPage() {
         return "login";
+    }
+
+    @GetMapping("/admin/login")
+    public String adminLoginPage() {
+        return "admin-login";
     }
 
     @GetMapping("/register")

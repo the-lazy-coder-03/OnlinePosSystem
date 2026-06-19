@@ -7,12 +7,14 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.Map;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -32,7 +34,7 @@ public class AdminAccessTest {
     public void testAdminPanelRedirectsToLoginWhenNotAuthenticated() throws Exception {
         mockMvc.perform(get("/admin"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(header().string("Location", "http://localhost/login"));
+                .andExpect(header().string("Location", "http://localhost/admin/login"));
     }
 
     @Test
@@ -73,6 +75,35 @@ public class AdminAccessTest {
                 .param("password", "admin"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"));
+    }
+
+    @Test
+    public void testAdminSavedRequestLoginReturnsToAdminPanel() throws Exception {
+        MvcResult redirectToLogin = mockMvc.perform(get("/admin"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", "http://localhost/admin/login"))
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) redirectToLogin.getRequest().getSession(false);
+
+        mockMvc.perform(post("/login")
+                .session(session)
+                .with(csrf())
+                .param("username", "admin")
+                .param("password", "admin"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string(HttpHeaders.LOCATION, containsString("/admin")));
+    }
+
+    @Test
+    public void testAdminLoginFailureReturnsToAdminLoginPage() throws Exception {
+        mockMvc.perform(post("/login")
+                .with(csrf())
+                .param("adminLogin", "true")
+                .param("username", "admin")
+                .param("password", "wrong-password"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/login?error"));
     }
 
     @Test

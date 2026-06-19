@@ -7,6 +7,7 @@ import org.example.onlinepossystem.dto.OrderResponseDTO;
 import org.example.onlinepossystem.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,6 +37,7 @@ public class OrderController {
      * Place a new order.
      */
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<OrderResponseDTO> placeOrder(@Valid @RequestBody OrderRequestDTO request) {
         return ResponseEntity.ok(orderService.placeOrder(request));
     }

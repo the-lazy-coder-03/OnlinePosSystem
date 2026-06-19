@@ -27,6 +27,12 @@ public class LoggingAuthenticationFailureHandler extends SimpleUrlAuthentication
             AuthenticationException exception
     ) throws IOException, ServletException {
         logger.warn("Failed login attempt from IP {}", clientIp(request));
+
+        if ("true".equals(request.getParameter("adminLogin"))) {
+            getRedirectStrategy().sendRedirect(request, response, "/admin/login?error");
+            return;
+        }
+
         super.onAuthenticationFailure(request, response, exception);
     }
 
