@@ -671,58 +671,10 @@ SET price = EXCLUDED.price;
 COMMIT;
 
 -- =========================================================
--- 10) NORMALIZE MENU CATEGORY IDS (FAVOURITE / SUPREME)
+-- 10) NORMALIZE PIZZA CATEGORY IDS (FAVOURITE / SUPREME)
 -- =========================================================
 
 BEGIN;
-
--- Normalize names to exact labels
-UPDATE menu_category
-SET name = 'Favourite',
-    sort_order = 1
-WHERE LOWER(name) IN ('favourite', 'favourites');
-
-UPDATE menu_category
-SET name = 'Supreme',
-    sort_order = 2
-WHERE LOWER(name) IN ('supreme', 'supremes');
-
--- Ensure required IDs exist
-INSERT INTO menu_category (id, name, sort_order)
-VALUES (1, 'Favourite', 1)
-ON CONFLICT (id) DO UPDATE
-SET name = EXCLUDED.name,
-    sort_order = EXCLUDED.sort_order;
-
-INSERT INTO menu_category (id, name, sort_order)
-VALUES (2, 'Supreme', 2)
-ON CONFLICT (id) DO UPDATE
-SET name = EXCLUDED.name,
-    sort_order = EXCLUDED.sort_order;
-
--- Remap menu items based on category name
-UPDATE menu_item
-SET category_id = 1
-WHERE category_id IN (
-    SELECT id FROM menu_category
-    WHERE LOWER(name) IN ('favourite', 'favourites')
-);
-
-UPDATE menu_item
-SET category_id = 2
-WHERE category_id IN (
-    SELECT id FROM menu_category
-    WHERE LOWER(name) IN ('supreme', 'supremes')
-);
-
--- Remove duplicates after remap
-DELETE FROM menu_category
-WHERE id <> 1
-  AND LOWER(name) IN ('favourite', 'favourites');
-
-DELETE FROM menu_category
-WHERE id <> 2
-  AND LOWER(name) IN ('supreme', 'supremes');
 
 -- Normalize pizza categories to Favourite/Supreme with fixed IDs
 UPDATE pizza_category
