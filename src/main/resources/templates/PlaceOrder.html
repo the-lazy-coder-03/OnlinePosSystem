@@ -1069,6 +1069,7 @@
 
         // Customize view selection
         customize: {
+            kind: null,                    // "pizza" | "burger"
             pizzaId: null,
             detail: null,                  // loaded from /pizzas/{pizzaId}
             sizeCm: null,                  // selected size
@@ -1085,6 +1086,7 @@
             qty: 1,
             selectedByGroup: new Map(),    // groupId -> Set<optionId>
             selectedBurgerToppingIds: new Set(),
+            selectedBurgerExtraToppingIds: new Set(),
             selectedBurgerVariantId: null
         },
 
@@ -1331,6 +1333,7 @@
                 for (const m of items){
                     const row = document.createElement("div");
                     row.className = "row";
+                    const isBurger = isBurgerMenuItem(m);
                     const hasModifiers = Array.isArray(m.modifierGroups) && m.modifierGroups.length > 0;
                     const hasBurgerToppings = Array.isArray(m.burgerToppings) && m.burgerToppings.length > 0;
                     const burgerVariants = getBurgerVariantFamily(m);
@@ -1343,8 +1346,8 @@
                           <div class="row-title">${escapeHtml(m.name)}</div>
                           <div class="row-price">${hasBurgerVariants ? ("From " + money(variantBasePrice)) : money(m.basePrice || 0)}</div>
                         </div>
-                        <div class="row-sub">${escapeHtml(m.shortDescription || m.description || (hasBurgerVariants ? "Choose burger only or combo." : (hasBurgerToppings ? "Tap to edit burger toppings." : (MENU_ONLY ? "View item details." : "Tap to add to your order."))))}</div>
-                        <div class="row-cta">${MENU_ONLY ? ((hasModifiers || hasBurgerToppings || hasBurgerVariants) ? "View options" : "View details") : (hasBurgerVariants ? "Click to choose burger option" : (hasBurgerToppings ? "Click to edit toppings" : (hasModifiers ? "Click to choose options" : "Click to add")))}</div>
+                        <div class="row-sub">${escapeHtml(m.shortDescription || m.description || (isBurger ? "Tap to customize burger options." : (MENU_ONLY ? "View item details." : "Tap to add to your order.")))}</div>
+                        <div class="row-cta">${MENU_ONLY ? ((hasModifiers || isBurger || hasBurgerToppings || hasBurgerVariants) ? "View options" : "View details") : (isBurger ? "Click to customize" : (hasModifiers ? "Click to choose options" : "Click to add"))}</div>
                     `;
                     row.addEventListener("click", () => actions.openMenuItem(m.menuItemId));
                     body.appendChild(row);
@@ -1361,6 +1364,21 @@
         },
 
         customize(){
+            if (state.customize.kind === "burger"){
+                render.burgerCustomize();
+                return;
+            }
+
+            setCustomizeCardHeader("cardSizes", "Size", "Choose one size (radio buttons).");
+            setCustomizeCardHeader("cardDefaults", "Default Toppings", "These are included by default (checked).");
+            setCustomizeCardHeader("cardExtras", "Extra Toppings", "Optional extras (grouped by category).");
+            setCustomizeCardHeader("cardQuote", "Live Price", "Calculated via /quote (auto-updates).");
+            $("cardSizes").style.display = "";
+            $("cardDefaults").style.display = "";
+            $("cardExtras").style.display = "";
+            $("cardQuote").style.display = "";
+            $("btnAddToCart").textContent = "Add to cart";
+
             const d = state.customize.detail;
             if (!d){
                 $("customizePizzaName").textContent = "Loading…";
@@ -1465,6 +1483,199 @@
             render.quote();
         },
 
+        burgerCustomize(){
+            const item = state.menuCustomize.menuItem;
+            $("btnAddToCart").textContent = "Add to cart";
+            $("cardSizes").style.display = "";
+            $("cardDefaults").style.display = "";
+            $("cardExtras").style.display = "";
+            $("cardQuote").style.display = "";
+
+            if (!item){
+                $("customizePizzaName").textContent = "Burger";
+                $("customizePizzaMeta").textContent = "Choose burger options.";
+                $("sizeOptions").innerHTML = "";
+                $("defaultToppings").innerHTML = "";
+                $("extraToppingsGroups").innerHTML = "";
+                $("qtyValue").textContent = "1";
+                $("stickyQty").textContent = "1 item";
+                $("qBase").textContent = money(0);
+                $("qToppings").textContent = money(0);
+                $("qSubtotal").textContent = money(0);
+                $("qTotal").textContent = money(0);
+                $("stickyTotal").textContent = money(0);
+                return;
+            }
+
+            $("customizePizzaName").textContent = item.name || "Burger";
+            $("customizePizzaMeta").textContent = state.branch.id
+                ? `${state.branch.name} • ${MENU_ONLY ? "Menu details" : "Customize your burger"}`
+                : (MENU_ONLY ? "Menu details" : "Customize your burger");
+
+            const burgerVariants = getBurgerVariantFamily(item);
+            const burgerToppings = getBurgerToppingsForMenuItem(item);
+            const proteins = burgerToppings.filter(isBurgerProtein);
+            const defaults = burgerToppings.filter(t => !isBurgerProtein(t) && t.defaultSelected);
+            const extras = burgerToppings.filter(t => !isBurgerProtein(t) && !t.defaultSelected);
+            const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
+            const proteinQty = burgerProteinQtyRequired(item);
+
+            setCustomizeCardHeader("cardSizes", "Burger Option", "Choose burger only or combo.");
+            $("sizeOptions").innerHTML = "";
+            if (burgerVariants.length > 1){
+                for (const variant of burgerVariants){
+                    const variantId = Number(variant.menuItemId);
+                    const id = `burger_page_variant_${variantId}`;
+                    const wrap = document.createElement("div");
+                    wrap.className = "opt";
+                    wrap.innerHTML = `
+                        <div class="opt-left">
+                          <input type="radio" name="burger_page_variant" id="${id}" ${variantId === Number(item.menuItemId) ? "checked" : ""} />
+                          <label for="${id}">${escapeHtml(getBurgerVariantLabel(variant))}</label>
+                        </div>
+                        <div class="opt-price">${money(variant.basePrice || 0)}</div>
+                    `;
+                    wrap.querySelector("input").addEventListener("change", () => {
+                        actions.setBurgerVariant(variantId);
+                    });
+                    $("sizeOptions").appendChild(wrap);
+                }
+            } else {
+                $("cardSizes").style.display = "none";
+            }
+
+            setCustomizeCardHeader(
+                "cardDefaults",
+                proteinQty > 1 ? `Protein Choice (${proteinQty} portions)` : "Protein Choice",
+                "Choose one protein."
+            );
+            $("defaultToppings").innerHTML = "";
+            if (proteins.length){
+                for (const protein of proteins){
+                    const toppingId = Number(protein.toppingId ?? protein.id);
+                    const id = `burger_page_protein_${toppingId}`;
+                    const wrap = document.createElement("div");
+                    wrap.className = "opt";
+                    wrap.innerHTML = `
+                        <div class="opt-left">
+                          <input type="radio" name="burger_page_protein" id="${id}" ${state.menuCustomize.selectedBurgerToppingIds.has(toppingId) ? "checked" : ""} />
+                          <label for="${id}">${escapeHtml(protein.name)}</label>
+                        </div>
+                        <div class="opt-price">${burgerComponentPriceLabel(protein)}</div>
+                    `;
+                    wrap.querySelector("input").addEventListener("change", () => {
+                        actions.selectBurgerProtein(protein);
+                    });
+                    $("defaultToppings").appendChild(wrap);
+                }
+            } else {
+                $("defaultToppings").innerHTML = `<div class="empty">No protein options available.</div>`;
+            }
+
+            setCustomizeCardHeader("cardExtras", "Burger Toppings", "Included toppings and optional extras.");
+            const groupsEl = $("extraToppingsGroups");
+            groupsEl.innerHTML = "";
+
+            const appendTitle = (text) => {
+                const title = document.createElement("div");
+                title.className = "group-title";
+                title.textContent = text;
+                groupsEl.appendChild(title);
+            };
+
+            if (defaults.length){
+                appendTitle("Included Toppings");
+                for (const topping of defaults){
+                    const toppingId = Number(topping.toppingId ?? topping.id);
+                    const id = `burger_page_top_${toppingId}`;
+                    const removable = topping.removable !== false;
+                    const wrap = document.createElement("div");
+                    wrap.className = "opt";
+                    wrap.innerHTML = `
+                        <div class="opt-left">
+                          <input type="checkbox" id="${id}" ${state.menuCustomize.selectedBurgerToppingIds.has(toppingId) ? "checked" : ""} ${removable ? "" : "disabled"} />
+                          <label for="${id}">${escapeHtml(topping.name)}</label>
+                        </div>
+                        <div class="opt-price">Included</div>
+                    `;
+                    wrap.querySelector("input").addEventListener("change", (e) => {
+                        actions.toggleBurgerTopping(topping, e.target.checked);
+                    });
+                    groupsEl.appendChild(wrap);
+                }
+            }
+
+            if (extras.length){
+                appendTitle("Extra Toppings");
+                for (const topping of extras){
+                    const toppingId = Number(topping.toppingId ?? topping.id);
+                    const id = `burger_page_extra_${toppingId}`;
+                    const wrap = document.createElement("div");
+                    wrap.className = "opt";
+                    wrap.innerHTML = `
+                        <div class="opt-left">
+                          <input type="checkbox" id="${id}" ${state.menuCustomize.selectedBurgerExtraToppingIds.has(toppingId) ? "checked" : ""} />
+                          <label for="${id}">${escapeHtml(topping.name)}</label>
+                        </div>
+                        <div class="opt-price">${burgerComponentPriceLabel(topping)}</div>
+                    `;
+                    wrap.querySelector("input").addEventListener("change", (e) => {
+                        actions.toggleBurgerTopping(topping, e.target.checked);
+                    });
+                    groupsEl.appendChild(wrap);
+                }
+            }
+
+            if (groups.length){
+                for (const g of groups){
+                    const groupId = Number(g.groupId);
+                    const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
+                    const max = Number(g.maxSelect || 0);
+                    const hint = min > 0 ? `Required • Choose ${min}${max ? "–" + max : ""}` : (max ? `Choose up to ${max}` : "");
+                    const groupName = safeText(g.name || "Options");
+
+                    appendTitle(hint ? `${groupName} • ${hint}` : groupName);
+
+                    const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
+                    const opts = Array.isArray(g.options) ? g.options : [];
+                    for (const opt of opts){
+                        const optionId = Number(opt.optionId ?? opt.id);
+                        const id = `burger_page_mod_${groupId}_${optionId}`;
+                        const isRadio = max === 1 && min >= 1;
+                        const wrap = document.createElement("div");
+                        wrap.className = "opt";
+                        wrap.innerHTML = `
+                            <div class="opt-left">
+                              <input type="${isRadio ? "radio" : "checkbox"}" name="burger_page_group_${groupId}" id="${id}" ${selected.has(optionId) ? "checked" : ""} />
+                              <label for="${id}">${escapeHtml(opt.name)}</label>
+                            </div>
+                            <div class="opt-price">${Number(opt.price || 0) > 0 ? ("+" + money(opt.price)) : money(0)}</div>
+                        `;
+                        wrap.querySelector("input").addEventListener("change", (e) => {
+                            actions.toggleMenuOption(g, opt, e.target);
+                        });
+                        groupsEl.appendChild(wrap);
+                    }
+                }
+            }
+
+            if (!defaults.length && !extras.length && !groups.length){
+                groupsEl.innerHTML = `<div class="empty">No topping options available.</div>`;
+            }
+
+            $("qtyValue").textContent = String(state.menuCustomize.qty);
+            $("stickyQty").textContent = `${state.menuCustomize.qty} item${state.menuCustomize.qty === 1 ? "" : "s"}`;
+
+            setCustomizeCardHeader("cardQuote", "Live Price", "Calculated from your burger options.");
+            const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
+            $("quoteError").style.display = "none";
+            $("qBase").textContent = money(pricing.base);
+            $("qToppings").textContent = money(pricing.modifiers);
+            $("qSubtotal").textContent = money(pricing.subtotal);
+            $("qTotal").textContent = money(pricing.lineTotal);
+            $("stickyTotal").textContent = money(pricing.lineTotal);
+        },
+
         quote(){
             const q = state.customize.lastQuote;
             const errEl = $("quoteError");
@@ -1545,27 +1756,85 @@
             }
 
             if (burgerToppings.length){
-                const title = document.createElement("div");
-                title.className = "group-title";
-                title.textContent = "Burger toppings";
-                groupsEl.appendChild(title);
+                const proteins = burgerToppings.filter(isBurgerProtein);
+                const defaults = burgerToppings.filter(t => !isBurgerProtein(t) && t.defaultSelected);
+                const extras = burgerToppings.filter(t => !isBurgerProtein(t) && !t.defaultSelected);
+                const proteinQty = burgerProteinQtyRequired(item);
 
-                for (const topping of burgerToppings){
-                    const toppingId = Number(topping.toppingId ?? topping.id);
-                    const id = `burger_top_${toppingId}`;
-                    const wrap = document.createElement("div");
-                    wrap.className = "opt";
-                    wrap.innerHTML = `
-                        <div class="opt-left">
-                          <input type="checkbox" id="${id}" ${state.menuCustomize.selectedBurgerToppingIds.has(toppingId) ? "checked" : ""} />
-                          <label for="${id}">${escapeHtml(topping.name)}</label>
-                        </div>
-                        <div class="opt-price">${Number(topping.price || 0) > 0 ? ("+" + money(topping.price)) : money(0)}</div>
-                    `;
-                    wrap.querySelector("input").addEventListener("change", (e) => {
-                        actions.toggleBurgerTopping(topping, e.target.checked);
-                    });
-                    groupsEl.appendChild(wrap);
+                if (proteins.length){
+                    const title = document.createElement("div");
+                    title.className = "group-title";
+                    title.textContent = proteinQty > 1 ? `Protein choice • ${proteinQty} portions` : "Protein choice";
+                    groupsEl.appendChild(title);
+
+                    for (const protein of proteins){
+                        const toppingId = Number(protein.toppingId ?? protein.id);
+                        const id = `burger_protein_${toppingId}`;
+                        const wrap = document.createElement("div");
+                        wrap.className = "opt";
+                        wrap.innerHTML = `
+                            <div class="opt-left">
+                              <input type="radio" name="burger_protein" id="${id}" ${state.menuCustomize.selectedBurgerToppingIds.has(toppingId) ? "checked" : ""} />
+                              <label for="${id}">${escapeHtml(protein.name)}</label>
+                            </div>
+                            <div class="opt-price">${burgerComponentPriceLabel(protein)}</div>
+                        `;
+                        wrap.querySelector("input").addEventListener("change", () => {
+                            actions.selectBurgerProtein(protein);
+                        });
+                        groupsEl.appendChild(wrap);
+                    }
+                }
+
+                if (defaults.length){
+                    const title = document.createElement("div");
+                    title.className = "group-title";
+                    title.textContent = "Included toppings";
+                    groupsEl.appendChild(title);
+
+                    for (const topping of defaults){
+                        const toppingId = Number(topping.toppingId ?? topping.id);
+                        const id = `burger_top_${toppingId}`;
+                        const removable = topping.removable !== false;
+                        const wrap = document.createElement("div");
+                        wrap.className = "opt";
+                        wrap.innerHTML = `
+                            <div class="opt-left">
+                              <input type="checkbox" id="${id}" ${state.menuCustomize.selectedBurgerToppingIds.has(toppingId) ? "checked" : ""} ${removable ? "" : "disabled"} />
+                              <label for="${id}">${escapeHtml(topping.name)}</label>
+                            </div>
+                            <div class="opt-price">Included</div>
+                        `;
+                        wrap.querySelector("input").addEventListener("change", (e) => {
+                            actions.toggleBurgerTopping(topping, e.target.checked);
+                        });
+                        groupsEl.appendChild(wrap);
+                    }
+                }
+
+                if (extras.length){
+                    const title = document.createElement("div");
+                    title.className = "group-title";
+                    title.textContent = "Extra toppings";
+                    groupsEl.appendChild(title);
+
+                    for (const topping of extras){
+                        const toppingId = Number(topping.toppingId ?? topping.id);
+                        const id = `burger_extra_${toppingId}`;
+                        const wrap = document.createElement("div");
+                        wrap.className = "opt";
+                        wrap.innerHTML = `
+                            <div class="opt-left">
+                              <input type="checkbox" id="${id}" ${state.menuCustomize.selectedBurgerExtraToppingIds.has(toppingId) ? "checked" : ""} />
+                              <label for="${id}">${escapeHtml(topping.name)}</label>
+                            </div>
+                            <div class="opt-price">${burgerComponentPriceLabel(topping)}</div>
+                        `;
+                        wrap.querySelector("input").addEventListener("change", (e) => {
+                            actions.toggleBurgerTopping(topping, e.target.checked);
+                        });
+                        groupsEl.appendChild(wrap);
+                    }
                 }
             }
 
@@ -1667,11 +1936,23 @@
             });
 
             // Quantity controls
-            $("qtyMinus").addEventListener("click", () => actions.setQty(state.customize.qty - 1));
-            $("qtyPlus").addEventListener("click", () => actions.setQty(state.customize.qty + 1));
+            $("qtyMinus").addEventListener("click", () => {
+                if (state.customize.kind === "burger"){
+                    actions.setMenuQty(state.menuCustomize.qty - 1);
+                    return;
+                }
+                actions.setQty(state.customize.qty - 1);
+            });
+            $("qtyPlus").addEventListener("click", () => {
+                if (state.customize.kind === "burger"){
+                    actions.setMenuQty(state.menuCustomize.qty + 1);
+                    return;
+                }
+                actions.setQty(state.customize.qty + 1);
+            });
 
             // Add to cart
-            $("btnAddToCart").addEventListener("click", () => actions.addCustomizedPizzaToCart());
+            $("btnAddToCart").addEventListener("click", () => actions.addCustomizedItemToCart());
 
             // Menu item overlay controls
             $("menuQtyMinus").addEventListener("click", () => actions.setMenuQty(state.menuCustomize.qty - 1));
@@ -1783,6 +2064,7 @@
             const id = Number(pizzaId);
             if (!Number.isFinite(id)) throw new Error("Invalid pizzaId.");
 
+            state.customize.kind = "pizza";
             state.customize.pizzaId = id;
             state.customize.detail = null;
             state.customize.sizeCm = null;
@@ -1954,6 +2236,43 @@
             view.show("list");
         },
 
+        addCustomizedItemToCart(){
+            if (state.customize.kind === "burger"){
+                actions.addCustomizedBurgerToCart();
+                return;
+            }
+            actions.addCustomizedPizzaToCart();
+        },
+
+        openBurgerCustomize(menuItemId){
+            if (!state.branch.id) {
+                alert("Please select a branch.");
+                return;
+            }
+
+            const id = Number(menuItemId);
+            const item = state.data.menuItems.find(m => Number(m.menuItemId) === id);
+            if (!item) return;
+
+            state.customize.kind = "burger";
+            state.customize.pizzaId = null;
+            state.customize.detail = null;
+            state.customize.sizeCm = null;
+            state.customize.selectedToppingIds = new Set();
+            state.customize.defaultToppingIds = new Set();
+            state.customize.extraToppingIds = new Set();
+            state.customize.qty = 1;
+            state.customize.lastQuote = null;
+            state.customize.isQuoting = false;
+
+            state.menuCustomize.menuItem = item;
+            state.menuCustomize.qty = 1;
+            resetMenuCustomizeSelections(item);
+
+            view.show("customize");
+            render.customize();
+        },
+
         openMenuItem(menuItemId){
             if (!state.branch.id) {
                 alert("Please select a branch.");
@@ -1967,6 +2286,10 @@
             const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
             const burgerToppings = getBurgerToppingsForMenuItem(item);
             const burgerVariants = getBurgerVariantFamily(item);
+            if (isBurgerMenuItem(item)){
+                actions.openBurgerCustomize(item.menuItemId);
+                return;
+            }
             if (!MENU_ONLY && !groups.length && !burgerToppings.length && burgerVariants.length <= 1){
                 actions.addMenuItemDirect(item);
                 return;
@@ -1983,7 +2306,7 @@
         setMenuQty(qty){
             const next = clamp(Number(qty) || 1, 1, 99);
             state.menuCustomize.qty = next;
-            render.menuCustomize();
+            renderActiveMenuCustomizer();
         },
 
         setBurgerVariant(menuItemId){
@@ -1993,7 +2316,7 @@
 
             state.menuCustomize.menuItem = item;
             resetMenuCustomizeSelections(item);
-            render.menuCustomize();
+            renderActiveMenuCustomizer();
         },
 
         toggleMenuOption(group, option, inputEl){
@@ -2008,7 +2331,7 @@
                 const next = new Set();
                 if (inputEl.checked) next.add(optionId);
                 state.menuCustomize.selectedByGroup.set(groupId, next);
-                render.menuCustomize();
+                renderActiveMenuCustomizer();
                 return;
             }
 
@@ -2024,19 +2347,35 @@
             }
 
             state.menuCustomize.selectedByGroup.set(groupId, current);
-            render.menuCustomize();
+            renderActiveMenuCustomizer();
         },
 
         toggleBurgerTopping(topping, checked){
             const toppingId = Number(topping.toppingId ?? topping.id);
             if (!Number.isFinite(toppingId)) return;
 
+            const targetSet = topping.defaultSelected
+                ? state.menuCustomize.selectedBurgerToppingIds
+                : state.menuCustomize.selectedBurgerExtraToppingIds;
             if (checked){
-                state.menuCustomize.selectedBurgerToppingIds.add(toppingId);
+                targetSet.add(toppingId);
             } else {
-                state.menuCustomize.selectedBurgerToppingIds.delete(toppingId);
+                targetSet.delete(toppingId);
             }
-            render.menuCustomize();
+            renderActiveMenuCustomizer();
+        },
+
+        selectBurgerProtein(protein){
+            const proteinId = Number(protein.toppingId ?? protein.id);
+            if (!Number.isFinite(proteinId)) return;
+
+            for (const existing of getBurgerToppingsForMenuItem(state.menuCustomize.menuItem)){
+                if (isBurgerProtein(existing)){
+                    state.menuCustomize.selectedBurgerToppingIds.delete(Number(existing.toppingId ?? existing.id));
+                }
+            }
+            state.menuCustomize.selectedBurgerToppingIds.add(proteinId);
+            renderActiveMenuCustomizer();
         },
 
         closeMenuItemOverlay(){
@@ -2045,6 +2384,7 @@
             state.menuCustomize.qty = 1;
             state.menuCustomize.selectedByGroup = new Map();
             state.menuCustomize.selectedBurgerToppingIds = new Set();
+            state.menuCustomize.selectedBurgerExtraToppingIds = new Set();
             state.menuCustomize.selectedBurgerVariantId = null;
         },
 
@@ -2068,6 +2408,7 @@
                 name: item.name || "Menu Item",
                 quantity: Number(state.menuCustomize.qty) || 1,
                 selectedBurgerToppingIds: pricing.selectedBurgerToppingIds,
+                selectedBurgerExtraToppingIds: pricing.selectedBurgerExtraToppingIds,
                 selectedModifierOptionIds: pricing.selectedModifierOptionIds,
                 selectedModifierNames: pricing.selectedOptionNames,
                 pricing: {
@@ -2082,6 +2423,48 @@
             alert("Added to cart!");
         },
 
+        addCustomizedBurgerToCart(){
+            if (MENU_ONLY) return;
+            const item = state.menuCustomize.menuItem;
+            if (!item) return;
+
+            const validation = validateMenuSelections(item, state.menuCustomize.selectedByGroup);
+            if (!validation.ok){
+                alert(validation.message);
+                return;
+            }
+
+            const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
+
+            store.addToCart({
+                type: "menu",
+                branchId: state.branch.id,
+                menuItemId: Number(item.menuItemId),
+                name: item.name || "Burger",
+                quantity: Number(state.menuCustomize.qty) || 1,
+                selectedBurgerToppingIds: pricing.selectedBurgerToppingIds,
+                selectedBurgerExtraToppingIds: pricing.selectedBurgerExtraToppingIds,
+                selectedModifierOptionIds: pricing.selectedModifierOptionIds,
+                selectedModifierNames: pricing.selectedOptionNames,
+                pricing: {
+                    base: pricing.base,
+                    modifiers: pricing.modifiers,
+                    subtotal: pricing.subtotal,
+                    lineTotal: pricing.lineTotal
+                }
+            });
+
+            state.customize.kind = null;
+            state.menuCustomize.menuItem = null;
+            state.menuCustomize.qty = 1;
+            state.menuCustomize.selectedByGroup = new Map();
+            state.menuCustomize.selectedBurgerToppingIds = new Set();
+            state.menuCustomize.selectedBurgerExtraToppingIds = new Set();
+            state.menuCustomize.selectedBurgerVariantId = null;
+            alert("Added to cart!");
+            view.show("list");
+        },
+
         addMenuItemDirect(item){
             if (MENU_ONLY) return;
             const base = Number(item.basePrice || 0);
@@ -2092,6 +2475,7 @@
                 name: item.name || "Menu Item",
                 quantity: 1,
                 selectedBurgerToppingIds: [],
+                selectedBurgerExtraToppingIds: [],
                 selectedModifierOptionIds: [],
                 selectedModifierNames: [],
                 pricing: {
@@ -2106,9 +2490,27 @@
         }
     };
 
+    function renderActiveMenuCustomizer(){
+        if (state.ui.view === "customize" && state.customize.kind === "burger"){
+            render.customize();
+            return;
+        }
+        render.menuCustomize();
+    }
+
+    function setCustomizeCardHeader(cardId, title, subText){
+        const card = $(cardId);
+        if (!card) return;
+        const heading = card.querySelector("h3");
+        const sub = card.querySelector(".sub");
+        if (heading) heading.textContent = title;
+        if (sub) sub.textContent = subText;
+    }
+
     function resetMenuCustomizeSelections(item){
         state.menuCustomize.selectedByGroup = new Map();
         state.menuCustomize.selectedBurgerToppingIds = new Set();
+        state.menuCustomize.selectedBurgerExtraToppingIds = new Set();
         state.menuCustomize.selectedBurgerVariantId = item ? Number(item.menuItemId) : null;
 
         const groups = Array.isArray(item?.modifierGroups) ? item.modifierGroups : [];
@@ -2123,11 +2525,20 @@
             state.menuCustomize.selectedByGroup.set(groupId, selected);
         }
 
-        for (const topping of getBurgerToppingsForMenuItem(item)){
+        const burgerToppings = getBurgerToppingsForMenuItem(item);
+        for (const topping of burgerToppings){
             const toppingId = Number(topping.toppingId ?? topping.id);
             if (Number.isFinite(toppingId) && topping.defaultSelected){
                 state.menuCustomize.selectedBurgerToppingIds.add(toppingId);
             }
+        }
+
+        const proteins = burgerToppings.filter(isBurgerProtein);
+        const selectedProtein = proteins.some(protein =>
+            state.menuCustomize.selectedBurgerToppingIds.has(Number(protein.toppingId ?? protein.id))
+        );
+        if (!selectedProtein && proteins.length){
+            state.menuCustomize.selectedBurgerToppingIds.add(Number(proteins[0].toppingId ?? proteins[0].id));
         }
     }
 
@@ -2141,6 +2552,13 @@
             .replace(/\s+combo\s*$/i, "")
             .replace(/\s+/g, " ")
             .trim();
+    }
+
+    function isBurgerMenuItem(item){
+        if (!item) return false;
+        if (getBurgerFamilyKey(item)) return true;
+        const burgerToppings = Array.isArray(item.burgerToppings) ? item.burgerToppings : [];
+        return burgerToppings.length > 0;
     }
 
     function isBurgerComboItem(item){
@@ -2179,6 +2597,28 @@
         const family = getBurgerVariantFamily(item);
         const baseBurger = family.find(v => !isBurgerComboItem(v) && Array.isArray(v.burgerToppings) && v.burgerToppings.length);
         return baseBurger ? baseBurger.burgerToppings : [];
+    }
+
+    function burgerComponentType(component){
+        return safeText(component?.componentType ?? component?.type ?? component?.component_type).trim().toLowerCase();
+    }
+
+    function isBurgerProtein(component){
+        return burgerComponentType(component) === "protein";
+    }
+
+    function burgerProteinQtyRequired(item){
+        const protein = getBurgerToppingsForMenuItem(item).find(isBurgerProtein);
+        const qty = Number(protein?.proteinQuantityRequired ?? protein?.protein_quantity_required ?? 1);
+        return Number.isFinite(qty) && qty > 0 ? qty : 1;
+    }
+
+    function burgerComponentPriceLabel(component){
+        if (component?.defaultSelected && !isBurgerProtein(component)){
+            return "Included";
+        }
+        const price = Number(component?.price || 0);
+        return price > 0 ? ("+" + money(price)) : money(0);
     }
 
     const debouncedQuote = debounce(() => actions.quoteNow(), 220);
@@ -2308,7 +2748,10 @@
                 toppingId: Number(t.toppingId ?? t.id),
                 name: safeText(t.name ?? t.toppingName ?? t.topping_name ?? ""),
                 defaultSelected: Boolean(t.defaultSelected ?? t.default ?? t.isDefault),
-                price: Number(t.price || 0)
+                price: Number(t.price || 0),
+                componentType: safeText(t.componentType ?? t.type ?? t.component_type ?? ""),
+                removable: t.removable !== false,
+                proteinQuantityRequired: Number(t.proteinQuantityRequired ?? t.protein_quantity_required ?? 1)
             }))
             .filter(t => Number.isFinite(t.toppingId) && t.name);
         return {
@@ -2446,18 +2889,40 @@
         const selectedOptionIds = [];
         const selectedOptionNames = [];
         const selectedBurgerToppingIds = [];
+        const selectedBurgerExtraToppingIds = [];
         const selectedModifierOptionIds = [];
 
         const burgerToppings = getBurgerToppingsForMenuItem(item);
         const selectedBurgerToppingIdSet = state.menuCustomize.selectedBurgerToppingIds || new Set();
+        const selectedBurgerExtraToppingIdSet = state.menuCustomize.selectedBurgerExtraToppingIds || new Set();
         for (const topping of burgerToppings){
             const toppingId = Number(topping.toppingId ?? topping.id);
             if (!selectedBurgerToppingIdSet.has(toppingId)) continue;
-            modifiers += Number(topping.price || 0);
+            if (!topping.defaultSelected && !isBurgerProtein(topping)) continue;
+            const isIncludedDefault = Boolean(topping.defaultSelected) && !isBurgerProtein(topping);
+            if (!isIncludedDefault){
+                modifiers += Number(topping.price || 0);
+            }
             selectedOptionIds.push(toppingId);
             selectedBurgerToppingIds.push(toppingId);
             const toppingName = safeText(topping.name);
-            if (toppingName) selectedOptionNames.push(toppingName);
+            if (toppingName && (!topping.defaultSelected || isBurgerProtein(topping))) selectedOptionNames.push(toppingName);
+        }
+
+        const extraToppingById = new Map();
+        for (const topping of burgerToppings){
+            if (burgerComponentType(topping) !== "extra_topping" || topping.defaultSelected) continue;
+            const toppingId = Number(topping.toppingId ?? topping.id);
+            if (!Number.isFinite(toppingId) || extraToppingById.has(toppingId)) continue;
+            extraToppingById.set(toppingId, topping);
+        }
+        for (const [toppingId, topping] of extraToppingById.entries()){
+            if (!selectedBurgerExtraToppingIdSet.has(toppingId)) continue;
+            modifiers += Number(topping.price || 0);
+            selectedOptionIds.push(toppingId);
+            selectedBurgerExtraToppingIds.push(toppingId);
+            const toppingName = safeText(topping.name);
+            if (toppingName) selectedOptionNames.push("Extra " + toppingName);
         }
 
         const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
@@ -2485,12 +2950,25 @@
             lineTotal,
             selectedOptionIds,
             selectedBurgerToppingIds,
+            selectedBurgerExtraToppingIds,
             selectedModifierOptionIds,
             selectedOptionNames
         };
     }
 
     function validateMenuSelections(item, selectedByGroup){
+        const burgerToppings = getBurgerToppingsForMenuItem(item);
+        const proteins = burgerToppings.filter(isBurgerProtein);
+        if (proteins.length){
+            const selectedBurgerIds = state.menuCustomize.selectedBurgerToppingIds || new Set();
+            const selectedProteinCount = proteins.filter(protein =>
+                selectedBurgerIds.has(Number(protein.toppingId ?? protein.id))
+            ).length;
+            if (selectedProteinCount !== 1){
+                return { ok: false, message: "Please choose one burger protein." };
+            }
+        }
+
         const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
         for (const g of groups){
             const groupId = Number(g.groupId);
@@ -2626,7 +3104,12 @@
                     const burgerToppings = (it.selectedBurgerToppingIds || []).map(id => ({
                         id: Number(id),
                         quantity: 1,
-                        type: "burgerTopping"
+                        type: "burgerComponent"
+                    }));
+                    const burgerExtraToppings = (it.selectedBurgerExtraToppingIds || []).map(id => ({
+                        id: Number(id),
+                        quantity: 1,
+                        type: "burgerExtraComponent"
                     }));
                     const modifierOptions = (it.selectedModifierOptionIds || []).map(id => ({
                         id: Number(id),
@@ -2636,7 +3119,7 @@
                     return {
                         menuItemId: it.menuItemId,
                         quantity: it.quantity,
-                        customizations: burgerToppings.concat(modifierOptions)
+                        customizations: burgerToppings.concat(burgerExtraToppings, modifierOptions)
                     };
                 }
 

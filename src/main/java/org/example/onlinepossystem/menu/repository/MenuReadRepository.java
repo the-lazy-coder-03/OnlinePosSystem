@@ -25,7 +25,9 @@ public interface MenuReadRepository extends JpaRepository<MenuItem, Integer> {
             join mi.category mc
             left join BranchMenuItemPrice bmp
                 on bmp.menuItem = mi and bmp.branch.id = :branchId
-            order by mc.name, mi.name
+            where mi.active = true
+              and mc.active = true
+            order by mc.sortOrder, mi.sortOrder, mi.name
             """)
     List<MenuItemRow> findMenuItemsForBranch(@Param("branchId") Integer branchId);
 

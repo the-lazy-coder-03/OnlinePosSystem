@@ -20,6 +20,8 @@ public class MenuDTO {
         private String name;
         private Double price;
         private boolean isDefault;
+        private String type;
+        private Integer proteinQuantityRequired;
 
         // Getters and Setters
         public Integer getId() { return id; }
@@ -30,6 +32,10 @@ public class MenuDTO {
         public void setPrice(Double price) { this.price = price; }
         public boolean isDefault() { return isDefault; }
         public void setDefault(boolean aDefault) { isDefault = aDefault; }
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
+        public Integer getProteinQuantityRequired() { return proteinQuantityRequired; }
+        public void setProteinQuantityRequired(Integer proteinQuantityRequired) { this.proteinQuantityRequired = proteinQuantityRequired; }
     }
 
     // Getters and Setters

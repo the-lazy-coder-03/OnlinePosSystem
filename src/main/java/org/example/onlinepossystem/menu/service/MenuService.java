@@ -1,6 +1,6 @@
 package org.example.onlinepossystem.menu.service;
 
-import org.example.onlinepossystem.entity.BurgerTopping;
+import org.example.onlinepossystem.menu.dto.BurgerComponentRow;
 import org.example.onlinepossystem.menu.dto.BurgerToppingItem;
 import org.example.onlinepossystem.menu.dto.MenuItemDetail;
 import org.example.onlinepossystem.menu.dto.MenuItemRow;
@@ -8,8 +8,8 @@ import org.example.onlinepossystem.menu.dto.ModifierGroupItem;
 import org.example.onlinepossystem.menu.dto.ModifierGroupRow;
 import org.example.onlinepossystem.menu.dto.ModifierOptionItem;
 import org.example.onlinepossystem.menu.dto.ModifierOptionRow;
+import org.example.onlinepossystem.menu.repository.BurgerComponentReadRepository;
 import org.example.onlinepossystem.menu.repository.MenuReadRepository;
-import org.example.onlinepossystem.repository.BurgerToppingRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -17,17 +17,16 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
 public class MenuService {
     private final MenuReadRepository menuReadRepository;
-    private final BurgerToppingRepository burgerToppingRepository;
+    private final BurgerComponentReadRepository burgerComponentReadRepository;
 
-    public MenuService(MenuReadRepository menuReadRepository, BurgerToppingRepository burgerToppingRepository) {
+    public MenuService(MenuReadRepository menuReadRepository, BurgerComponentReadRepository burgerComponentReadRepository) {
         this.menuReadRepository = menuReadRepository;
-        this.burgerToppingRepository = burgerToppingRepository;
+        this.burgerComponentReadRepository = burgerComponentReadRepository;
     }
 
     public List<MenuItemDetail> getMenuForBranch(Integer branchId) {
@@ -80,18 +79,20 @@ public class MenuService {
             }
         }
 
-        List<BurgerTopping> burgerToppings = burgerToppingRepository.findByBurgerIds(menuItemIds);
-        Map<Integer, List<BurgerToppingItem>> toppingsByMenuItem = burgerToppings.stream()
-                .filter(topping -> topping.getBurger() != null && topping.getBurger().getId() != null)
+        List<BurgerComponentRow> burgerComponents = burgerComponentReadRepository.findComponentsForMenuItems(branchId, menuItemIds);
+        Map<Integer, List<BurgerToppingItem>> toppingsByMenuItem = burgerComponents.stream()
                 .collect(Collectors.groupingBy(
-                        topping -> topping.getBurger().getId(),
+                        BurgerComponentRow::burgerId,
                         LinkedHashMap::new,
                         Collectors.mapping(
-                                topping -> new BurgerToppingItem(
-                                        topping.getId(),
-                                        topping.getToppingName(),
-                                        topping.isDefault(),
-                                        toBigDecimal(topping.getPrice())
+                                component -> new BurgerToppingItem(
+                                        component.componentId(),
+                                        component.name(),
+                                        Boolean.TRUE.equals(component.defaultSelected()),
+                                        toBigDecimal(component.price()),
+                                        component.componentType(),
+                                        Boolean.TRUE.equals(component.removable()),
+                                        component.proteinQuantityRequired()
                                 ),
                                 Collectors.toList()
                         )

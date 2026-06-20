@@ -1,20 +1,30 @@
 package org.example.onlinepossystem.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.example.onlinepossystem.dto.MenuDTO;
 import org.example.onlinepossystem.dto.OrderRequestDTO;
 import org.example.onlinepossystem.dto.OrderResponseDTO;
 import org.example.onlinepossystem.entity.*;
 import org.example.onlinepossystem.event.OrderCreatedEvent;
+import org.example.onlinepossystem.menu.dto.BurgerComponentRow;
+import org.example.onlinepossystem.menu.repository.BurgerComponentReadRepository;
 import org.example.onlinepossystem.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,7 +43,7 @@ public class OrderService {
     private BranchMenuItemPriceRepository branchMenuItemPriceRepository;
 
     @Autowired
-    private BurgerToppingRepository burgerToppingRepository;
+    private BurgerComponentReadRepository burgerComponentReadRepository;
 
     @Autowired
     private SaladIngredientRepository saladIngredientRepository;
@@ -65,6 +75,9 @@ public class OrderService {
     @Autowired
     private ApplicationEventPublisher eventPublisher;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     public List<MenuDTO> getMenuForBranch(String branchName) {
         if (branchName == null || branchName.isBlank()) {
             throw new IllegalArgumentException("Branch name is required.");
@@ -80,6 +93,16 @@ public class OrderService {
                 .collect(Collectors.toMap(p -> p.getMenuItem().getId(), BranchMenuItemPrice::getPrice, (v1, v2) -> v1));
 
         List<MenuItem> items = menuItemRepository.findAllByActiveTrue();
+        List<Integer> menuItemIds = items.stream().map(MenuItem::getId).toList();
+        Map<Integer, List<BurgerComponentRow>> burgerComponentsByMenuItem = burgerComponentReadRepository
+                .findComponentsForMenuItems(branch.getId(), menuItemIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        BurgerComponentRow::burgerId,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
         for (MenuItem i : items) {
             if (itemPriceMap.containsKey(i.getId())) {
                 MenuDTO dto = new MenuDTO();
@@ -94,13 +117,14 @@ public class OrderService {
                 dto.setPizza(false);
 
                 List<MenuDTO.CustomizationDTO> customizations = new ArrayList<>();
-                List<BurgerTopping> toppings = burgerToppingRepository.findByBurgerId(i.getId());
-                for (BurgerTopping t : toppings) {
+                for (BurgerComponentRow component : burgerComponentsByMenuItem.getOrDefault(i.getId(), List.of())) {
                     MenuDTO.CustomizationDTO c = new MenuDTO.CustomizationDTO();
-                    c.setId(t.getId());
-                    c.setName(t.getToppingName());
-                    c.setPrice(t.getPrice());
-                    c.setDefault(t.isDefault());
+                    c.setId(component.componentId());
+                    c.setName(component.name());
+                    c.setPrice(toDouble(component.price()));
+                    c.setDefault(Boolean.TRUE.equals(component.defaultSelected()));
+                    c.setType(component.componentType());
+                    c.setProteinQuantityRequired(component.proteinQuantityRequired());
                     customizations.add(c);
                 }
                 List<SaladIngredient> ingredients = saladIngredientRepository.findBySaladId(i.getId());
@@ -234,63 +258,7 @@ public class OrderService {
                 orderItem.setUnitPriceAtTime(branchPrice.getPrice());
                 orderItem.setNotes(itemRequest.getNotes());
 
-                if (itemRequest.getCustomizations() != null) {
-                    for (OrderRequestDTO.CustomizationRequestDTO custReq : itemRequest.getCustomizations()) {
-                        OrderMenuItemExtra extra = new OrderMenuItemExtra();
-                        String extraName = "";
-                        Double extraPrice = 0.0;
-                        String customizationType = custReq.getType() == null ? "" : custReq.getType().trim();
-
-                        if ("burgerTopping".equalsIgnoreCase(customizationType)) {
-                            BurgerTopping topping = burgerToppingRepository.findById(custReq.getId()).orElse(null);
-                            if (isToppingForMenuItem(topping, menuItem)) {
-                                extraName = topping.getToppingName();
-                                extraPrice = topping.getPrice();
-                            }
-                        } else if ("modifierOption".equalsIgnoreCase(customizationType)) {
-                            ModifierOption modifierOption = modifierOptionRepository.findById(custReq.getId()).orElse(null);
-                            if (modifierOption != null) {
-                                extraName = modifierOption.name;
-                                if (modifierOption.menuItemId != null) {
-                                    BranchMenuItemPrice extraPriceEntry = branchMenuItemPriceRepository
-                                            .findByBranchIdAndMenuItemId(branch.getId(), modifierOption.menuItemId)
-                                            .orElseThrow(() -> new java.util.NoSuchElementException("Price not found for modifier option menu item ID: " + modifierOption.menuItemId));
-                                    extraPrice = extraPriceEntry.getPrice();
-                                }
-                            }
-                        } else {
-                            BurgerTopping topping = burgerToppingRepository.findById(custReq.getId()).orElse(null);
-                            if (isToppingForMenuItem(topping, menuItem)) {
-                                extraName = topping.getToppingName();
-                                extraPrice = topping.getPrice();
-                            } else {
-                                ModifierOption modifierOption = modifierOptionRepository.findById(custReq.getId()).orElse(null);
-                                if (modifierOption != null) {
-                                    extraName = modifierOption.name;
-                                    if (modifierOption.menuItemId != null) {
-                                        BranchMenuItemPrice extraPriceEntry = branchMenuItemPriceRepository
-                                                .findByBranchIdAndMenuItemId(branch.getId(), modifierOption.menuItemId)
-                                                .orElseThrow(() -> new java.util.NoSuchElementException("Price not found for modifier option menu item ID: " + modifierOption.menuItemId));
-                                        extraPrice = extraPriceEntry.getPrice();
-                                    }
-                                } else {
-                                    SaladIngredient ingredient = saladIngredientRepository.findById(custReq.getId()).orElse(null);
-                                    if (ingredient != null) {
-                                        extraName = ingredient.getIngredientName();
-                                        extraPrice = ingredient.getPrice();
-                                    }
-                                }
-                            }
-                        }
-                        if (extraName.isEmpty()) {
-                            throw new java.util.NoSuchElementException("Customization not found with ID: " + custReq.getId());
-                        }
-                        extra.setName(extraName);
-                        extra.setQty(custReq.getQuantity());
-                        extra.setUnitPriceAtTime(extraPrice);
-                        orderItem.addExtra(extra);
-                    }
-                }
+                applyMenuItemCustomizations(branch, menuItem, orderItem, itemRequest.getCustomizations());
                 order.addMenuItem(orderItem);
             }
         }
@@ -347,30 +315,278 @@ public class OrderService {
         return toDto(order);
     }
 
-    private boolean isToppingForMenuItem(BurgerTopping topping, MenuItem menuItem) {
-        if (topping == null || topping.getBurger() == null || menuItem == null) {
-            return false;
+    private void applyMenuItemCustomizations(
+            Branch branch,
+            MenuItem menuItem,
+            OrderMenuItem orderItem,
+            List<OrderRequestDTO.CustomizationRequestDTO> customizations
+    ) {
+        List<OrderRequestDTO.CustomizationRequestDTO> safeCustomizations =
+                customizations == null ? List.of() : customizations;
+        Optional<BurgerComponentReadRepository.BurgerConfig> burgerConfig =
+                burgerComponentReadRepository.findBurgerConfig(menuItem.getId());
+
+        Set<Integer> burgerComponentIds = Set.of();
+        if (burgerConfig.isPresent()) {
+            burgerComponentIds = applyBurgerComponents(
+                    branch.getId(),
+                    menuItem,
+                    orderItem,
+                    safeCustomizations,
+                    burgerConfig.get()
+            );
         }
-        Integer toppingBurgerId = topping.getBurger().getId();
-        if (toppingBurgerId != null && toppingBurgerId.equals(menuItem.getId())) {
-            return true;
-        }
-        String toppingFamily = burgerFamilyKey(topping.getBurger());
-        return !toppingFamily.isBlank() && toppingFamily.equals(burgerFamilyKey(menuItem));
+
+        applyGenericMenuItemExtras(branch, orderItem, safeCustomizations, burgerComponentIds);
     }
 
-    private String burgerFamilyKey(MenuItem menuItem) {
-        if (menuItem == null || menuItem.getName() == null) {
+    private Set<Integer> applyBurgerComponents(
+            Integer branchId,
+            MenuItem menuItem,
+            OrderMenuItem orderItem,
+            List<OrderRequestDTO.CustomizationRequestDTO> customizations,
+            BurgerComponentReadRepository.BurgerConfig burgerConfig
+    ) {
+        List<BurgerComponentRow> components = burgerComponentReadRepository
+                .findComponentsForMenuItems(branchId, List.of(menuItem.getId()));
+        if (components.isEmpty()) {
+            throw new java.util.NoSuchElementException("Burger components not found for menu item: " + menuItem.getName());
+        }
+
+        Map<Integer, List<BurgerComponentRow>> componentsById = components.stream()
+                .collect(Collectors.groupingBy(
+                        BurgerComponentRow::componentId,
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+
+        Set<Integer> selectedComponentIds = new LinkedHashSet<>();
+        Map<Integer, Integer> selectedQuantities = new HashMap<>();
+        Map<Integer, Integer> selectedExtraQuantities = new LinkedHashMap<>();
+        for (OrderRequestDTO.CustomizationRequestDTO customization : customizations) {
+            if (customization == null) {
+                continue;
+            }
+            if (isBurgerExtraComponentCustomization(customization, componentsById.keySet())) {
+                Integer componentId = customization.getId();
+                selectedExtraQuantities.merge(componentId, safeQuantity(customization.getQuantity()), Integer::sum);
+                continue;
+            }
+            if (isBurgerComponentCustomization(customization, componentsById.keySet())) {
+                Integer componentId = customization.getId();
+                selectedComponentIds.add(componentId);
+                selectedQuantities.merge(componentId, safeQuantity(customization.getQuantity()), Integer::sum);
+            }
+        }
+
+        List<BurgerComponentRow> selectedProteins = selectedComponentIds.stream()
+                .map(componentId -> findBurgerComponent(componentsById, componentId, "protein").orElse(null))
+                .filter(component -> component != null)
+                .toList();
+        if (selectedProteins.size() != 1) {
+            throw new IllegalArgumentException(menuItem.getName() + " requires exactly one protein choice.");
+        }
+
+        BurgerComponentRow protein = selectedProteins.get(0);
+        OrderBurgerProtein burgerProtein = new OrderBurgerProtein();
+        burgerProtein.setComponent(burgerComponentReference(protein.componentId()));
+        burgerProtein.setProteinQtyPerBurger(burgerConfig.proteinQuantityRequired());
+        burgerProtein.setUnitPriceAtTime(toMoney(protein.price()));
+        orderItem.setBurgerProtein(burgerProtein);
+
+        for (BurgerComponentRow component : components) {
+            if (!Boolean.TRUE.equals(component.defaultSelected())) {
+                continue;
+            }
+            if (selectedComponentIds.contains(component.componentId())) {
+                continue;
+            }
+            if (!Boolean.TRUE.equals(component.removable())) {
+                throw new IllegalArgumentException(component.name() + " cannot be removed from " + menuItem.getName() + ".");
+            }
+
+            OrderBurgerRemovedComponent removedComponent = new OrderBurgerRemovedComponent();
+            removedComponent.setComponent(burgerComponentReference(component.componentId()));
+            orderItem.addRemovedBurgerComponent(removedComponent);
+        }
+
+        for (Integer selectedComponentId : selectedComponentIds) {
+            if (!componentsById.containsKey(selectedComponentId)) {
+                throw new java.util.NoSuchElementException("Burger component not found with ID: " + selectedComponentId);
+            }
+            boolean defaultForBurger = componentsById.getOrDefault(selectedComponentId, List.of()).stream()
+                    .anyMatch(component -> Boolean.TRUE.equals(component.defaultSelected()));
+            if (defaultForBurger) {
+                continue;
+            }
+            findBurgerExtraComponent(componentsById, selectedComponentId).ifPresent(component ->
+                    selectedExtraQuantities.merge(
+                            selectedComponentId,
+                            selectedQuantities.getOrDefault(selectedComponentId, 1),
+                            Integer::sum
+                    )
+            );
+        }
+
+        for (Map.Entry<Integer, Integer> selectedExtra : selectedExtraQuantities.entrySet()) {
+            BurgerComponentRow component = findBurgerExtraComponent(componentsById, selectedExtra.getKey())
+                    .orElseThrow(() -> new java.util.NoSuchElementException(
+                            "Burger extra component not found with ID: " + selectedExtra.getKey()
+                    ));
+
+            OrderBurgerExtraComponent extraComponent = new OrderBurgerExtraComponent();
+            extraComponent.setComponent(burgerComponentReference(component.componentId()));
+            extraComponent.setQty(selectedExtra.getValue());
+            extraComponent.setUnitPriceAtTime(toMoney(component.price()));
+            orderItem.addExtraBurgerComponent(extraComponent);
+        }
+
+        return componentsById.keySet();
+    }
+
+    private Optional<BurgerComponentRow> findBurgerComponent(
+            Map<Integer, List<BurgerComponentRow>> componentsById,
+            Integer componentId,
+            String componentType
+    ) {
+        return componentsById.getOrDefault(componentId, List.of()).stream()
+                .filter(component -> componentType.equals(component.componentType()))
+                .findFirst();
+    }
+
+    private Optional<BurgerComponentRow> findBurgerExtraComponent(
+            Map<Integer, List<BurgerComponentRow>> componentsById,
+            Integer componentId
+    ) {
+        return componentsById.getOrDefault(componentId, List.of()).stream()
+                .filter(component -> "extra_topping".equals(component.componentType()))
+                .filter(component -> !Boolean.TRUE.equals(component.defaultSelected()))
+                .findFirst();
+    }
+
+    private void applyGenericMenuItemExtras(
+            Branch branch,
+            OrderMenuItem orderItem,
+            List<OrderRequestDTO.CustomizationRequestDTO> customizations,
+            Set<Integer> burgerComponentIds
+    ) {
+        for (OrderRequestDTO.CustomizationRequestDTO customization : customizations) {
+            if (customization == null) {
+                continue;
+            }
+            if (isBurgerComponentCustomization(customization, burgerComponentIds)) {
+                continue;
+            }
+
+            OrderMenuItemExtra extra = resolveGenericMenuItemExtra(branch, customization);
+            orderItem.addExtra(extra);
+        }
+    }
+
+    private OrderMenuItemExtra resolveGenericMenuItemExtra(
+            Branch branch,
+            OrderRequestDTO.CustomizationRequestDTO customization
+    ) {
+        String customizationType = normalizedType(customization);
+        if (customizationType.isBlank() || "modifieroption".equals(customizationType)) {
+            Optional<ModifierOption> modifierOption = modifierOptionRepository.findById(customization.getId());
+            if (modifierOption.isPresent()) {
+                ModifierOption option = modifierOption.get();
+                double extraPrice = 0.0;
+                if (option.menuItemId != null) {
+                    BranchMenuItemPrice extraPriceEntry = branchMenuItemPriceRepository
+                            .findByBranchIdAndMenuItemId(branch.getId(), option.menuItemId)
+                            .orElseThrow(() -> new java.util.NoSuchElementException(
+                                    "Price not found for modifier option menu item ID: " + option.menuItemId
+                            ));
+                    extraPrice = extraPriceEntry.getPrice();
+                }
+                return genericMenuItemExtra(option.name, safeQuantity(customization.getQuantity()), extraPrice);
+            }
+            if ("modifieroption".equals(customizationType)) {
+                throw new java.util.NoSuchElementException("Modifier option not found with ID: " + customization.getId());
+            }
+        }
+
+        if (customizationType.isBlank() || "saladingredient".equals(customizationType)) {
+            Optional<SaladIngredient> ingredient = saladIngredientRepository.findById(customization.getId());
+            if (ingredient.isPresent()) {
+                SaladIngredient saladIngredient = ingredient.get();
+                return genericMenuItemExtra(
+                        saladIngredient.getIngredientName(),
+                        safeQuantity(customization.getQuantity()),
+                        saladIngredient.getPrice()
+                );
+            }
+            if ("saladingredient".equals(customizationType)) {
+                throw new java.util.NoSuchElementException("Salad ingredient not found with ID: " + customization.getId());
+            }
+        }
+
+        throw new java.util.NoSuchElementException("Customization not found with ID: " + customization.getId());
+    }
+
+    private OrderMenuItemExtra genericMenuItemExtra(String name, Integer quantity, Double price) {
+        OrderMenuItemExtra extra = new OrderMenuItemExtra();
+        extra.setName(name);
+        extra.setQty(quantity);
+        extra.setUnitPriceAtTime(price == null ? 0.0 : price);
+        return extra;
+    }
+
+    private boolean isBurgerComponentCustomization(
+            OrderRequestDTO.CustomizationRequestDTO customization,
+            Set<Integer> knownComponentIds
+    ) {
+        if (isBurgerExtraComponentCustomization(customization, knownComponentIds)) {
+            return true;
+        }
+        String customizationType = normalizedType(customization);
+        return "burgertopping".equals(customizationType)
+                || "burgercomponent".equals(customizationType)
+                || (customizationType.isBlank()
+                && customization != null
+                && knownComponentIds.contains(customization.getId()));
+    }
+
+    private boolean isBurgerExtraComponentCustomization(
+            OrderRequestDTO.CustomizationRequestDTO customization,
+            Set<Integer> knownComponentIds
+    ) {
+        String customizationType = normalizedType(customization);
+        return "burgerextra".equals(customizationType)
+                || "burgerextratopping".equals(customizationType)
+                || "burgerextracomponent".equals(customizationType)
+                || ("burgercomponentextra".equals(customizationType)
+                && customization != null
+                && knownComponentIds.contains(customization.getId()));
+    }
+
+    private String normalizedType(OrderRequestDTO.CustomizationRequestDTO customization) {
+        if (customization == null || customization.getType() == null) {
             return "";
         }
-        String name = menuItem.getName().trim().toLowerCase().replaceAll("\\s+combo\\s*$", "");
-        String category = menuItem.getCategory() == null || menuItem.getCategory().getName() == null
-                ? ""
-                : menuItem.getCategory().getName().toLowerCase();
-        if (!name.contains("burger") && !category.contains("burger")) {
-            return "";
-        }
-        return name.replaceAll("\\s+", " ");
+        return customization.getType().trim().replace("_", "").replace("-", "").toLowerCase();
+    }
+
+    private Integer safeQuantity(Integer quantity) {
+        return quantity == null || quantity < 1 ? 1 : quantity;
+    }
+
+    private Double toDouble(Double value) {
+        return value == null ? 0.0 : value;
+    }
+
+    private Double toDouble(BigDecimal value) {
+        return value == null ? 0.0 : value.doubleValue();
+    }
+
+    private BigDecimal toMoney(Double value) {
+        return value == null ? BigDecimal.ZERO : BigDecimal.valueOf(value);
+    }
+
+    private BurgerComponent burgerComponentReference(Integer componentId) {
+        return entityManager.getReference(BurgerComponent.class, componentId);
     }
 
     private void validateOrderRequest(OrderRequestDTO request) {
@@ -426,6 +642,38 @@ public class OrderService {
                 itemDto.setNotes(item.getNotes());
 
                 List<OrderResponseDTO.MenuItemExtraDTO> extraDtos = new ArrayList<>();
+                if (item.getBurgerProtein() != null && item.getBurgerProtein().getComponent() != null) {
+                    OrderBurgerProtein protein = item.getBurgerProtein();
+                    OrderResponseDTO.MenuItemExtraDTO proteinDto = new OrderResponseDTO.MenuItemExtraDTO();
+                    proteinDto.setName("Protein: " + protein.getComponent().getName());
+                    proteinDto.setQty(protein.getProteinQtyPerBurger());
+                    proteinDto.setUnitPriceAtTime(toDouble(protein.getUnitPriceAtTime()));
+                    extraDtos.add(proteinDto);
+                }
+                if (item.getRemovedBurgerComponents() != null) {
+                    for (OrderBurgerRemovedComponent removedComponent : item.getRemovedBurgerComponents()) {
+                        if (removedComponent.getComponent() == null) {
+                            continue;
+                        }
+                        OrderResponseDTO.MenuItemExtraDTO removedDto = new OrderResponseDTO.MenuItemExtraDTO();
+                        removedDto.setName("No " + removedComponent.getComponent().getName());
+                        removedDto.setQty(1);
+                        removedDto.setUnitPriceAtTime(0.0);
+                        extraDtos.add(removedDto);
+                    }
+                }
+                if (item.getExtraBurgerComponents() != null) {
+                    for (OrderBurgerExtraComponent extraComponent : item.getExtraBurgerComponents()) {
+                        if (extraComponent.getComponent() == null) {
+                            continue;
+                        }
+                        OrderResponseDTO.MenuItemExtraDTO extraDto = new OrderResponseDTO.MenuItemExtraDTO();
+                        extraDto.setName("Extra " + extraComponent.getComponent().getName());
+                        extraDto.setQty(extraComponent.getQty());
+                        extraDto.setUnitPriceAtTime(toDouble(extraComponent.getUnitPriceAtTime()));
+                        extraDtos.add(extraDto);
+                    }
+                }
                 if (item.getExtras() != null) {
                     for (OrderMenuItemExtra extra : item.getExtras()) {
                         OrderResponseDTO.MenuItemExtraDTO extraDto = new OrderResponseDTO.MenuItemExtraDTO();

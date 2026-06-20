@@ -9,14 +9,12 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.annotation.PostConstruct;
 import javax.sql.DataSource;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Component
 public class Database implements CommandLineRunner {
@@ -37,8 +35,6 @@ public class Database implements CommandLineRunner {
     private final IngredientRepository ingredientRepository;
     private final PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository;
     private final BranchExtraPriceRepository branchExtraPriceRepository;
-    private final BurgerToppingRepository burgerToppingRepository;
-    private final SaladIngredientRepository saladIngredientRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public Database(DataSource dataSource, StaffService staffService, StaffRepository staffRepository,
@@ -49,8 +45,7 @@ public class Database implements CommandLineRunner {
                     PizzaRepository pizzaRepository,
                     PizzaAllowedSizeRepository pizzaAllowedSizeRepository,
                     PriceCategoryRepository priceCategoryRepository, IngredientRepository ingredientRepository,
-                    PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository, BranchExtraPriceRepository branchExtraPriceRepository,
-                    BurgerToppingRepository burgerToppingRepository, SaladIngredientRepository saladIngredientRepository) {
+                    PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository, BranchExtraPriceRepository branchExtraPriceRepository) {
         this.dataSource = dataSource;
         this.staffService = staffService;
         this.staffRepository = staffRepository;
@@ -67,8 +62,6 @@ public class Database implements CommandLineRunner {
         this.ingredientRepository = ingredientRepository;
         this.pizzaDefaultIngredientRepository = pizzaDefaultIngredientRepository;
         this.branchExtraPriceRepository = branchExtraPriceRepository;
-        this.burgerToppingRepository = burgerToppingRepository;
-        this.saladIngredientRepository = saladIngredientRepository;
     }
 
     @Override
