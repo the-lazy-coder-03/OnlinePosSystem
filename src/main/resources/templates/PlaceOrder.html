@@ -373,6 +373,30 @@
             color: var(--blue-650);
             white-space: nowrap;
         }
+        .row-actions{
+            display:flex;
+            flex-direction: column;
+            align-items:flex-end;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .row-add-btn{
+            border: none;
+            border-radius: 10px;
+            background: var(--blue-650);
+            color: #fff;
+            padding: 8px 10px;
+            font-weight: 950;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .row-add-btn:hover{ opacity: .94; }
+        .row-direct-add{
+            cursor: default;
+        }
+        .row-direct-add:hover{
+            transform: none;
+        }
         .row-sub{
             margin-top: 7px;
             color: var(--muted);
@@ -1069,7 +1093,7 @@
 
         // Customize view selection
         customize: {
-            kind: null,                    // "pizza" | "burger"
+            kind: null,                    // "pizza" | "burger" | "menu"
             pizzaId: null,
             detail: null,                  // loaded from /pizzas/{pizzaId}
             sizeCm: null,                  // selected size
@@ -1338,18 +1362,31 @@
                     const hasBurgerToppings = Array.isArray(m.burgerToppings) && m.burgerToppings.length > 0;
                     const burgerVariants = getBurgerVariantFamily(m);
                     const hasBurgerVariants = burgerVariants.length > 1;
+                    const directAddCooldrink = isDirectAddCooldrink(m);
                     const variantBasePrice = hasBurgerVariants
                         ? Math.min(...burgerVariants.map(v => Number(v.basePrice || 0)).filter(Number.isFinite))
                         : Number(m.basePrice || 0);
+                    if (directAddCooldrink) row.classList.add("row-direct-add");
                     row.innerHTML = `
                         <div class="row-top">
                           <div class="row-title">${escapeHtml(m.name)}</div>
-                          <div class="row-price">${hasBurgerVariants ? ("From " + money(variantBasePrice)) : money(m.basePrice || 0)}</div>
+                          <div class="row-actions">
+                            <div class="row-price">${hasBurgerVariants ? ("From " + money(variantBasePrice)) : money(m.basePrice || 0)}</div>
+                            ${directAddCooldrink && !MENU_ONLY ? `<button type="button" class="row-add-btn" data-menu-add="${Number(m.menuItemId)}">Add to cart</button>` : ""}
+                          </div>
                         </div>
                         <div class="row-sub">${escapeHtml(m.shortDescription || m.description || (isBurger ? "Tap to customize burger options." : (MENU_ONLY ? "View item details." : "Tap to add to your order.")))}</div>
-                        <div class="row-cta">${MENU_ONLY ? ((hasModifiers || isBurger || hasBurgerToppings || hasBurgerVariants) ? "View options" : "View details") : (isBurger ? "Click to customize" : (hasModifiers ? "Click to choose options" : "Click to add"))}</div>
+                        ${directAddCooldrink ? "" : `<div class="row-cta">${MENU_ONLY ? ((hasModifiers || isBurger || hasBurgerToppings || hasBurgerVariants) ? "View options" : "View details") : (isBurger ? "Click to customize" : (hasModifiers ? "Click to choose options" : "Click to add"))}</div>`}
                     `;
-                    row.addEventListener("click", () => actions.openMenuItem(m.menuItemId));
+                    const addButton = row.querySelector("[data-menu-add]");
+                    if (addButton){
+                        addButton.addEventListener("click", (event) => {
+                            event.stopPropagation();
+                            actions.addMenuItemDirect(m);
+                        });
+                    } else if (!directAddCooldrink) {
+                        row.addEventListener("click", () => actions.openMenuItem(m.menuItemId));
+                    }
                     body.appendChild(row);
                 }
             };
@@ -1366,6 +1403,10 @@
         customize(){
             if (state.customize.kind === "burger"){
                 render.burgerCustomize();
+                return;
+            }
+            if (state.customize.kind === "menu"){
+                render.genericMenuCustomize();
                 return;
             }
 
@@ -1517,7 +1558,7 @@
             const proteins = burgerToppings.filter(isBurgerProtein);
             const defaults = burgerToppings.filter(t => !isBurgerProtein(t) && t.defaultSelected);
             const extras = burgerToppings.filter(t => !isBurgerProtein(t) && !t.defaultSelected);
-            const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
+            const groups = getVisibleMenuModifierGroups(item);
             const proteinQty = burgerProteinQtyRequired(item);
 
             setCustomizeCardHeader("cardSizes", "Burger Option", "Choose burger only or combo.");
@@ -1676,6 +1717,90 @@
             $("stickyTotal").textContent = money(pricing.lineTotal);
         },
 
+        genericMenuCustomize(){
+            const item = state.menuCustomize.menuItem;
+            $("btnAddToCart").textContent = "Add to cart";
+            $("cardSizes").style.display = "none";
+            $("cardDefaults").style.display = "none";
+            $("cardExtras").style.display = "";
+            $("cardQuote").style.display = "";
+
+            if (!item){
+                $("customizePizzaName").textContent = "Menu Item";
+                $("customizePizzaMeta").textContent = "Choose item options.";
+                $("sizeOptions").innerHTML = "";
+                $("defaultToppings").innerHTML = "";
+                $("extraToppingsGroups").innerHTML = "";
+                $("qtyValue").textContent = "1";
+                $("stickyQty").textContent = "1 item";
+                $("qBase").textContent = money(0);
+                $("qToppings").textContent = money(0);
+                $("qSubtotal").textContent = money(0);
+                $("qTotal").textContent = money(0);
+                $("stickyTotal").textContent = money(0);
+                return;
+            }
+
+            $("customizePizzaName").textContent = item.name || "Menu Item";
+            $("customizePizzaMeta").textContent = state.branch.id
+                ? `${state.branch.name} • ${MENU_ONLY ? "Menu details" : "Customize your item"}`
+                : (MENU_ONLY ? "Menu details" : "Customize your item");
+
+            setCustomizeCardHeader("cardExtras", "Options", "Choose any required or optional item options.");
+            const groupsEl = $("extraToppingsGroups");
+            groupsEl.innerHTML = "";
+            const groups = getVisibleMenuModifierGroups(item);
+
+            if (groups.length){
+                for (const g of groups){
+                    const groupId = Number(g.groupId);
+                    const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
+                    const max = Number(g.maxSelect || 0);
+                    const hint = min > 0 ? `Required • Choose ${min}${max ? "–" + max : ""}` : (max ? `Choose up to ${max}` : "");
+                    const groupName = safeText(g.name || "Options");
+                    const title = document.createElement("div");
+                    title.className = "group-title";
+                    title.textContent = hint ? `${groupName} • ${hint}` : groupName;
+                    groupsEl.appendChild(title);
+
+                    const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
+                    const opts = Array.isArray(g.options) ? g.options : [];
+                    for (const opt of opts){
+                        const optionId = Number(opt.optionId ?? opt.id);
+                        const id = `menu_page_mod_${groupId}_${optionId}`;
+                        const isRadio = max === 1 && min >= 1;
+                        const wrap = document.createElement("div");
+                        wrap.className = "opt";
+                        wrap.innerHTML = `
+                            <div class="opt-left">
+                              <input type="${isRadio ? "radio" : "checkbox"}" name="menu_page_group_${groupId}" id="${id}" ${selected.has(optionId) ? "checked" : ""} />
+                              <label for="${id}">${escapeHtml(opt.name)}</label>
+                            </div>
+                            <div class="opt-price">${Number(opt.price || 0) > 0 ? ("+" + money(opt.price)) : money(0)}</div>
+                        `;
+                        wrap.querySelector("input").addEventListener("change", (e) => {
+                            actions.toggleMenuOption(g, opt, e.target);
+                        });
+                        groupsEl.appendChild(wrap);
+                    }
+                }
+            } else {
+                groupsEl.innerHTML = `<div class="empty">No modifiers required.</div>`;
+            }
+
+            $("qtyValue").textContent = String(state.menuCustomize.qty);
+            $("stickyQty").textContent = `${state.menuCustomize.qty} item${state.menuCustomize.qty === 1 ? "" : "s"}`;
+
+            setCustomizeCardHeader("cardQuote", "Live Price", "Calculated from your item options.");
+            const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
+            $("quoteError").style.display = "none";
+            $("qBase").textContent = money(pricing.base);
+            $("qToppings").textContent = money(pricing.modifiers);
+            $("qSubtotal").textContent = money(pricing.subtotal);
+            $("qTotal").textContent = money(pricing.lineTotal);
+            $("stickyTotal").textContent = money(pricing.lineTotal);
+        },
+
         quote(){
             const q = state.customize.lastQuote;
             const errEl = $("quoteError");
@@ -1722,7 +1847,7 @@
 
             const groupsEl = $("menuItemGroups");
             groupsEl.innerHTML = "";
-            const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
+            const groups = getVisibleMenuModifierGroups(item);
             const burgerToppings = getBurgerToppingsForMenuItem(item);
             const burgerVariants = getBurgerVariantFamily(item);
 
@@ -1937,14 +2062,14 @@
 
             // Quantity controls
             $("qtyMinus").addEventListener("click", () => {
-                if (state.customize.kind === "burger"){
+                if (state.customize.kind === "burger" || state.customize.kind === "menu"){
                     actions.setMenuQty(state.menuCustomize.qty - 1);
                     return;
                 }
                 actions.setQty(state.customize.qty - 1);
             });
             $("qtyPlus").addEventListener("click", () => {
-                if (state.customize.kind === "burger"){
+                if (state.customize.kind === "burger" || state.customize.kind === "menu"){
                     actions.setMenuQty(state.menuCustomize.qty + 1);
                     return;
                 }
@@ -2241,6 +2366,10 @@
                 actions.addCustomizedBurgerToCart();
                 return;
             }
+            if (state.customize.kind === "menu"){
+                actions.addCustomizedMenuItemToCart();
+                return;
+            }
             actions.addCustomizedPizzaToCart();
         },
 
@@ -2283,7 +2412,7 @@
             const item = state.data.menuItems.find(m => Number(m.menuItemId) === id);
             if (!item) return;
 
-            const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
+            const groups = getVisibleMenuModifierGroups(item);
             const burgerToppings = getBurgerToppingsForMenuItem(item);
             const burgerVariants = getBurgerVariantFamily(item);
             if (isBurgerMenuItem(item)){
@@ -2295,12 +2424,23 @@
                 return;
             }
 
+            state.customize.kind = "menu";
+            state.customize.pizzaId = null;
+            state.customize.detail = null;
+            state.customize.sizeCm = null;
+            state.customize.selectedToppingIds = new Set();
+            state.customize.defaultToppingIds = new Set();
+            state.customize.extraToppingIds = new Set();
+            state.customize.qty = 1;
+            state.customize.lastQuote = null;
+            state.customize.isQuoting = false;
+
             state.menuCustomize.menuItem = item;
             state.menuCustomize.qty = 1;
             resetMenuCustomizeSelections(item);
 
-            ui.showMenuItemOverlay(true);
-            render.menuCustomize();
+            view.show("customize");
+            render.customize();
         },
 
         setMenuQty(qty){
@@ -2423,6 +2563,48 @@
             alert("Added to cart!");
         },
 
+        addCustomizedMenuItemToCart(){
+            if (MENU_ONLY) return;
+            const item = state.menuCustomize.menuItem;
+            if (!item) return;
+
+            const validation = validateMenuSelections(item, state.menuCustomize.selectedByGroup);
+            if (!validation.ok){
+                alert(validation.message);
+                return;
+            }
+
+            const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
+
+            store.addToCart({
+                type: "menu",
+                branchId: state.branch.id,
+                menuItemId: Number(item.menuItemId),
+                name: item.name || "Menu Item",
+                quantity: Number(state.menuCustomize.qty) || 1,
+                selectedBurgerToppingIds: pricing.selectedBurgerToppingIds,
+                selectedBurgerExtraToppingIds: pricing.selectedBurgerExtraToppingIds,
+                selectedModifierOptionIds: pricing.selectedModifierOptionIds,
+                selectedModifierNames: pricing.selectedOptionNames,
+                pricing: {
+                    base: pricing.base,
+                    modifiers: pricing.modifiers,
+                    subtotal: pricing.subtotal,
+                    lineTotal: pricing.lineTotal
+                }
+            });
+
+            state.customize.kind = null;
+            state.menuCustomize.menuItem = null;
+            state.menuCustomize.qty = 1;
+            state.menuCustomize.selectedByGroup = new Map();
+            state.menuCustomize.selectedBurgerToppingIds = new Set();
+            state.menuCustomize.selectedBurgerExtraToppingIds = new Set();
+            state.menuCustomize.selectedBurgerVariantId = null;
+            alert("Added to cart!");
+            view.show("list");
+        },
+
         addCustomizedBurgerToCart(){
             if (MENU_ONLY) return;
             const item = state.menuCustomize.menuItem;
@@ -2491,7 +2673,7 @@
     };
 
     function renderActiveMenuCustomizer(){
-        if (state.ui.view === "customize" && state.customize.kind === "burger"){
+        if (state.ui.view === "customize" && (state.customize.kind === "burger" || state.customize.kind === "menu")){
             render.customize();
             return;
         }
@@ -2513,7 +2695,7 @@
         state.menuCustomize.selectedBurgerExtraToppingIds = new Set();
         state.menuCustomize.selectedBurgerVariantId = item ? Number(item.menuItemId) : null;
 
-        const groups = Array.isArray(item?.modifierGroups) ? item.modifierGroups : [];
+        const groups = getVisibleMenuModifierGroups(item);
         for (const g of groups){
             const groupId = Number(g.groupId);
             const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
@@ -2619,6 +2801,69 @@
         }
         const price = Number(component?.price || 0);
         return price > 0 ? ("+" + money(price)) : money(0);
+    }
+
+    function isCooldrinkMenuItem(item){
+        const categoryName = safeText(item?.categoryName).toLowerCase();
+        return categoryName.includes("cool drink") || categoryName.includes("cooldrink");
+    }
+
+    function isRibMenuItem(item){
+        const name = safeText(item?.name).toLowerCase();
+        const categoryName = safeText(item?.categoryName).toLowerCase();
+        return name.includes("rib") || categoryName.includes("rib");
+    }
+
+    function isChipExtrasGroup(group){
+        const groupId = Number(group?.groupId ?? group?.id);
+        const name = safeText(group?.name).toLowerCase();
+        return groupId === 4 || name.includes("chip extras");
+    }
+
+    function isRibSideGroup(group){
+        const groupId = Number(group?.groupId ?? group?.id);
+        const name = safeText(group?.name).toLowerCase();
+        return groupId === 2 || name.includes("choose your side");
+    }
+
+    function isChipSideOption(option){
+        const name = safeText(option?.name).toLowerCase();
+        const linkedMenuItemId = Number(option?.menuItemId ?? option?.menu_item_id);
+        return name.includes("chip") || [601, 602, 603].includes(linkedMenuItemId);
+    }
+
+    function hasSelectedRibChipSide(item){
+        if (!isRibMenuItem(item)) return false;
+        const groups = Array.isArray(item?.modifierGroups) ? item.modifierGroups : [];
+        const sideGroup = groups.find(isRibSideGroup);
+        if (!sideGroup) return false;
+
+        const groupId = Number(sideGroup.groupId ?? sideGroup.id);
+        const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
+        const options = Array.isArray(sideGroup.options) ? sideGroup.options : [];
+        return options.some(option => {
+            const optionId = Number(option.optionId ?? option.id);
+            return selected.has(optionId) && isChipSideOption(option);
+        });
+    }
+
+    function getVisibleMenuModifierGroups(item){
+        const groups = Array.isArray(item?.modifierGroups) ? item.modifierGroups : [];
+        return groups.filter(group => {
+            if (!isChipExtrasGroup(group)) return true;
+            return hasSelectedRibChipSide(item);
+        });
+    }
+
+    function hasMenuCustomizations(item){
+        const groups = getVisibleMenuModifierGroups(item);
+        const burgerToppings = getBurgerToppingsForMenuItem(item);
+        const burgerVariants = getBurgerVariantFamily(item);
+        return groups.length > 0 || burgerToppings.length > 0 || burgerVariants.length > 1 || isBurgerMenuItem(item);
+    }
+
+    function isDirectAddCooldrink(item){
+        return isCooldrinkMenuItem(item) && !hasMenuCustomizations(item);
     }
 
     const debouncedQuote = debounce(() => actions.quoteNow(), 220);
@@ -2911,7 +3156,7 @@
 
         const extraToppingById = new Map();
         for (const topping of burgerToppings){
-            if (burgerComponentType(topping) !== "extra_topping" || topping.defaultSelected) continue;
+            if (isBurgerProtein(topping) || topping.defaultSelected) continue;
             const toppingId = Number(topping.toppingId ?? topping.id);
             if (!Number.isFinite(toppingId) || extraToppingById.has(toppingId)) continue;
             extraToppingById.set(toppingId, topping);
@@ -2925,7 +3170,7 @@
             if (toppingName) selectedOptionNames.push("Extra " + toppingName);
         }
 
-        const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
+        const groups = getVisibleMenuModifierGroups(item);
         for (const g of groups){
             const groupId = Number(g.groupId);
             const selected = selectedByGroup.get(groupId) || new Set();
@@ -2969,7 +3214,7 @@
             }
         }
 
-        const groups = Array.isArray(item.modifierGroups) ? item.modifierGroups : [];
+        const groups = getVisibleMenuModifierGroups(item);
         for (const g of groups){
             const groupId = Number(g.groupId);
             const selected = selectedByGroup.get(groupId) || new Set();

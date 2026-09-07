@@ -48,7 +48,22 @@ ADMIN_PASSWORD=admin
 APP_BASE_URL=http://44.251.232.187:8081
 SESSION_COOKIE_SECURE=false
 GOOGLE_MAPS_API_KEY=<key if maps are enabled>
+RUN_MIGRATION_SQL=true
 ```
+
+## Startup SQL Migration
+
+`src/main/resources/migration.sql` can run automatically on app startup. It updates the food/menu catalog while preserving customers and customer order history.
+
+This is enabled by default for the normal PostgreSQL app profile. If `migration.sql` changed in the commit, the app detects the new file checksum on startup and applies it once.
+
+To disable this behavior outside GitHub Actions, set:
+
+```text
+RUN_MIGRATION_SQL=false
+```
+
+The app stores the last applied SQL checksum in `app_migration_state`. To disable automatic SQL updates on deploy, set the GitHub secret `RUN_MIGRATION_SQL=false`.
 
 ## Flow
 

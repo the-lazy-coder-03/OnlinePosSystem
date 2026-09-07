@@ -1,0 +1,80 @@
+package org.example.onlinepossystem.shared.exception;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.server.ResponseStatusException;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.validation.BindException;
+
+import jakarta.validation.ConstraintViolationException;
+
+import java.util.NoSuchElementException;
+
+@ControllerAdvice
+public class GlobalExceptionHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(NoSuchElementException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public String handleNoSuchElementException(NoSuchElementException ex, Model model) {
+        logger.error("Resource not found: {}", ex.getMessage());
+        model.addAttribute("status", 404);
+        model.addAttribute("message", "The requested resource was not found.");
+        return "error";
+    }
+
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class, ConstraintViolationException.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String handleValidationExceptions(Exception ex, Model model) {
+        logger.error("Validation error: {}", ex.getMessage());
+        model.addAttribute("status", 400);
+        model.addAttribute("message", "Please check your input and try again.");
+        return "error";
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String handleIllegalArgument(IllegalArgumentException ex, Model model) {
+        logger.error("Bad request: {}", ex.getMessage());
+        model.addAttribute("status", 400);
+        model.addAttribute("message", "Please check your input and try again.");
+        return "error";
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public String handleDataIntegrityViolation(DataIntegrityViolationException ex, Model model) {
+        logger.error("Data integrity violation", ex);
+        model.addAttribute("status", 409);
+        model.addAttribute("message", "That request could not be completed because it conflicts with existing data.");
+        return "error";
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public String handleResponseStatusException(ResponseStatusException ex, Model model, HttpServletResponse response) {
+        logger.error("Response status exception: {} - {}", ex.getStatusCode(), ex.getReason());
+        response.setStatus(ex.getStatusCode().value());
+        model.addAttribute("status", ex.getStatusCode().value());
+        model.addAttribute("message", ex.getStatusCode().is4xxClientError()
+                ? "Please check your input and try again."
+                : "An unexpected error occurred.");
+        return "error";
+    }
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public String handleGeneralException(Exception ex, Model model) {
+        logger.error("Unhandled exception occurred", ex);
+        model.addAttribute("status", 500);
+        model.addAttribute("message", "An unexpected error occurred. Please try again later.");
+        return "error";
+    }
+}

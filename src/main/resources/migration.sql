@@ -1,7 +1,8 @@
 -- =========================================================
--- ONLINEPOS - FULL MIGRATION (CUSTOMERS KEPT)
+-- ONLINEPOS - FOOD CATALOG MIGRATION (ORDER HISTORY KEPT)
 -- - Clears aborted transaction state
--- - Drops and recreates all non-customer tables
+-- - Creates missing catalog/order tables without dropping existing data
+-- - Updates food/menu catalog rows in place
 -- - Stores each burger component only once
 -- - Uses one reusable Standard Burger recipe
 -- - Supports product-specific default additions without duplicating recipes
@@ -15,11 +16,14 @@
 -- - Mega Burger: Standard Burger recipe + two portions of one selected protein
 -- - Steak Burger: Standard Burger recipe
 -- - Bacon and Cheese Burger: Standard Burger recipe + Bacon + Cheese
+-- - Bacon and Egg Burger: Standard Burger recipe + Bacon + Egg
+-- - Dagwood: Standard Burger recipe + Bacon + Egg + Cheese
 -- - Every burger has a matching burger combo product
 --
 -- WARNING:
--- This is a destructive full rebuild for every table except customers.
--- Use it only for a fresh database or after creating a verified backup.
+-- This migration is designed to preserve customer orders and order history.
+-- Do not add DROP TABLE statements here unless you intentionally want to
+-- remove production data.
 -- =========================================================
 
 -- 1) Clear any aborted transaction state (safe even if none open)
@@ -28,59 +32,13 @@ ROLLBACK;
 BEGIN;
 
 -- =========================================================
--- 2) DROP (SAFE RE-RUNS) - DO NOT DROP customers
+-- 2) RECREATE VIEWS ONLY
 -- =========================================================
 
 -- Views
 DROP VIEW IF EXISTS v_burger_builder_defaults CASCADE;
 DROP VIEW IF EXISTS v_burger_builder_proteins CASCADE;
 DROP VIEW IF EXISTS v_burger_builder_extras   CASCADE;
-
--- Order tables (depend on everything)
-DROP TABLE IF EXISTS order_pizza_item_extra          CASCADE;
-DROP TABLE IF EXISTS order_pizza_item                CASCADE;
-DROP TABLE IF EXISTS order_burger_extra_component    CASCADE;
-DROP TABLE IF EXISTS order_burger_removed_component  CASCADE;
-DROP TABLE IF EXISTS order_burger_protein             CASCADE;
-DROP TABLE IF EXISTS order_menu_item_extra            CASCADE;
-DROP TABLE IF EXISTS order_menu_item                  CASCADE;
-DROP TABLE IF EXISTS customer_order                   CASCADE;
-
--- Menu tables
-DROP TABLE IF EXISTS menu_item_modifier_group          CASCADE;
-DROP TABLE IF EXISTS modifier_option                   CASCADE;
-DROP TABLE IF EXISTS modifier_group                    CASCADE;
-DROP TABLE IF EXISTS salad_ingredients                 CASCADE;
-
--- Old and replacement burger structures
-DROP TABLE IF EXISTS burger_toppings                   CASCADE;
-DROP TABLE IF EXISTS burger_recipe_choice_group        CASCADE;
-DROP TABLE IF EXISTS burger_choice_group_component     CASCADE;
-DROP TABLE IF EXISTS burger_choice_group               CASCADE;
-DROP TABLE IF EXISTS branch_burger_component_price     CASCADE;
-DROP TABLE IF EXISTS burger_item_default_component      CASCADE;
-DROP TABLE IF EXISTS burger_recipe_assignment          CASCADE;
-DROP TABLE IF EXISTS burger_recipe_component           CASCADE;
-DROP TABLE IF EXISTS burger_recipe                     CASCADE;
-DROP TABLE IF EXISTS burger_component                  CASCADE;
-
-DROP TABLE IF EXISTS branch_menu_item_price            CASCADE;
-DROP TABLE IF EXISTS menu_item                         CASCADE;
-DROP TABLE IF EXISTS menu_category                     CASCADE;
-
--- Pizza tables
-DROP TABLE IF EXISTS branch_extra_price       CASCADE;
-DROP TABLE IF EXISTS branch_pizza_price       CASCADE;
-DROP TABLE IF EXISTS pizza_default_ingredient CASCADE;
-DROP TABLE IF EXISTS pizza_allowed_size       CASCADE;
-DROP TABLE IF EXISTS ingredient               CASCADE;
-DROP TABLE IF EXISTS price_category           CASCADE;
-DROP TABLE IF EXISTS pizza                    CASCADE;
-DROP TABLE IF EXISTS pizza_category           CASCADE;
-DROP TABLE IF EXISTS pizza_size               CASCADE;
-
--- Core
-DROP TABLE IF EXISTS branch                   CASCADE;
 
 -- =========================================================
 -- 3) CUSTOMERS (CREATE IF NOT EXISTS, LIKE-FOR-LIKE)
@@ -126,7 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_customers_phone2 ON public.customers (phone2);
 -- 4) CORE TABLES
 -- =========================================================
 
-CREATE TABLE branch (
+CREATE TABLE IF NOT EXISTS branch (
                         branch_id INT PRIMARY KEY,
                         name      TEXT NOT NULL UNIQUE,
                         active    BOOLEAN NOT NULL DEFAULT TRUE
@@ -136,14 +94,14 @@ CREATE TABLE branch (
 -- 5) MENU (BURGERS / PASTAS / DRINKS / SIDES etc.)
 -- =========================================================
 
-CREATE TABLE menu_category (
+CREATE TABLE IF NOT EXISTS menu_category (
                                id         INT PRIMARY KEY,
                                name       TEXT NOT NULL UNIQUE,
                                sort_order INT NOT NULL DEFAULT 0,
                                active     BOOLEAN NOT NULL DEFAULT TRUE
 );
 
-CREATE TABLE menu_item (
+CREATE TABLE IF NOT EXISTS menu_item (
                            id          INT PRIMARY KEY,
                            category_id INT NOT NULL REFERENCES menu_category(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
                            name        TEXT NOT NULL,
@@ -155,14 +113,14 @@ CREATE TABLE menu_item (
                            UNIQUE (category_id, name)
 );
 
-CREATE TABLE branch_menu_item_price (
+CREATE TABLE IF NOT EXISTS branch_menu_item_price (
                                         branch_id    INT NOT NULL REFERENCES branch(branch_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
                                         menu_item_id INT NOT NULL REFERENCES menu_item(id)     ON UPDATE RESTRICT ON DELETE RESTRICT,
                                         price        NUMERIC(10,2) NOT NULL CHECK (price >= 0),
                                         PRIMARY KEY (branch_id, menu_item_id)
 );
 
-CREATE TABLE modifier_group (
+CREATE TABLE IF NOT EXISTS modifier_group (
                                 id         INT PRIMARY KEY,
                                 name       TEXT NOT NULL UNIQUE,
                                 required   BOOLEAN NOT NULL DEFAULT FALSE,
@@ -173,22 +131,43 @@ CREATE TABLE modifier_group (
                                     )
 );
 
-CREATE TABLE modifier_option (
+CREATE TABLE IF NOT EXISTS modifier_option (
                                  id           INT PRIMARY KEY,
                                  group_id     INT NOT NULL REFERENCES modifier_group(id) ON DELETE CASCADE,
                                  name         TEXT NOT NULL,
                                  menu_item_id INT REFERENCES menu_item(id) ON DELETE SET NULL,
+                                 additional_price NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (additional_price >= 0),
                                  UNIQUE (group_id, name)
 );
 
-CREATE TABLE menu_item_modifier_group (
+ALTER TABLE modifier_option
+    ADD COLUMN IF NOT EXISTS additional_price NUMERIC(10,2) NOT NULL DEFAULT 0;
+
+ALTER TABLE modifier_option
+    ALTER COLUMN additional_price TYPE NUMERIC(10,2) USING additional_price::NUMERIC(10,2),
+    ALTER COLUMN additional_price SET DEFAULT 0;
+
+UPDATE modifier_option
+SET additional_price = 0
+WHERE additional_price IS NULL;
+
+ALTER TABLE modifier_option
+    ALTER COLUMN additional_price SET NOT NULL;
+
+ALTER TABLE modifier_option
+    DROP CONSTRAINT IF EXISTS chk_modifier_option_additional_price;
+
+ALTER TABLE modifier_option
+    ADD CONSTRAINT chk_modifier_option_additional_price CHECK (additional_price >= 0);
+
+CREATE TABLE IF NOT EXISTS menu_item_modifier_group (
                                           menu_item_id INT NOT NULL REFERENCES menu_item(id) ON DELETE CASCADE,
                                           group_id     INT NOT NULL REFERENCES modifier_group(id) ON DELETE CASCADE,
                                           PRIMARY KEY (menu_item_id, group_id)
 );
 
 -- Every burger component is stored once.
-CREATE TABLE burger_component (
+CREATE TABLE IF NOT EXISTS burger_component (
                                   component_id   INT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                                   name           TEXT NOT NULL UNIQUE,
                                   component_type TEXT NOT NULL CHECK (
@@ -199,14 +178,14 @@ CREATE TABLE burger_component (
 );
 
 -- Reusable burger recipes.
-CREATE TABLE burger_recipe (
+CREATE TABLE IF NOT EXISTS burger_recipe (
                                recipe_id INT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                                name      TEXT NOT NULL UNIQUE,
                                active    BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 -- Default components included in a reusable recipe.
-CREATE TABLE burger_recipe_component (
+CREATE TABLE IF NOT EXISTS burger_recipe_component (
                                          recipe_id     INT NOT NULL REFERENCES burger_recipe(recipe_id) ON DELETE CASCADE,
                                          component_id  INT NOT NULL REFERENCES burger_component(component_id) ON DELETE RESTRICT,
                                          is_removable  BOOLEAN NOT NULL DEFAULT TRUE,
@@ -217,7 +196,7 @@ CREATE TABLE burger_recipe_component (
 -- Assigns a reusable recipe and protein quantity rule to each burger.
 -- Exactly one protein type is selected. The quantity defines how many
 -- portions of that same protein are included in each burger.
-CREATE TABLE burger_recipe_assignment (
+CREATE TABLE IF NOT EXISTS burger_recipe_assignment (
                                           burger_id                   INT PRIMARY KEY REFERENCES menu_item(id) ON DELETE CASCADE,
                                           recipe_id                   INT NOT NULL REFERENCES burger_recipe(recipe_id) ON DELETE RESTRICT,
                                           protein_quantity_required   INT NOT NULL DEFAULT 1 CHECK (protein_quantity_required > 0)
@@ -227,7 +206,7 @@ CREATE TABLE burger_recipe_assignment (
 -- This stores only differences from the shared Standard Burger recipe.
 -- For example, Cheese Burger adds Cheese, while Bacon and Cheese Burger
 -- adds Cheese and Bacon. The shared standard toppings are not duplicated.
-CREATE TABLE burger_item_default_component (
+CREATE TABLE IF NOT EXISTS burger_item_default_component (
                                                burger_id      INT NOT NULL REFERENCES menu_item(id) ON DELETE CASCADE,
                                                component_id   INT NOT NULL REFERENCES burger_component(component_id) ON DELETE RESTRICT,
                                                is_removable   BOOLEAN NOT NULL DEFAULT TRUE,
@@ -236,14 +215,14 @@ CREATE TABLE burger_item_default_component (
 );
 
 -- Optional branch-specific prices for protein choices and extra toppings.
-CREATE TABLE branch_burger_component_price (
+CREATE TABLE IF NOT EXISTS branch_burger_component_price (
                                                branch_id     INT NOT NULL REFERENCES branch(branch_id) ON DELETE CASCADE,
                                                component_id  INT NOT NULL REFERENCES burger_component(component_id) ON DELETE CASCADE,
                                                price         NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
                                                PRIMARY KEY (branch_id, component_id)
 );
 
-CREATE TABLE salad_ingredients (
+CREATE TABLE IF NOT EXISTS salad_ingredients (
                                    id              INT PRIMARY KEY,
                                    salad_id        INT NOT NULL REFERENCES menu_item(id) ON UPDATE RESTRICT ON DELETE CASCADE,
                                    ingredient_name TEXT NOT NULL,
@@ -255,14 +234,14 @@ CREATE TABLE salad_ingredients (
 -- 6) PIZZA CATALOG
 -- =========================================================
 
-CREATE TABLE pizza_category (
+CREATE TABLE IF NOT EXISTS pizza_category (
                                 pizza_category_id INT PRIMARY KEY,
                                 name              TEXT NOT NULL UNIQUE,
                                 sort_order        INT NOT NULL DEFAULT 0,
                                 active            BOOLEAN NOT NULL DEFAULT TRUE
 );
 
-CREATE TABLE pizza (
+CREATE TABLE IF NOT EXISTS pizza (
                        pizza_id          INT PRIMARY KEY,
                        pizza_category_id INT NOT NULL REFERENCES pizza_category(pizza_category_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
                        name              TEXT NOT NULL,
@@ -272,27 +251,27 @@ CREATE TABLE pizza (
                        CONSTRAINT uq_pizza_name UNIQUE (pizza_category_id, name)
 );
 
-CREATE TABLE pizza_size (
+CREATE TABLE IF NOT EXISTS pizza_size (
                             pizza_size_id INT PRIMARY KEY,
                             cm            INT NOT NULL UNIQUE,
                             sort_order    INT NOT NULL DEFAULT 0,
                             active        BOOLEAN NOT NULL DEFAULT TRUE
 );
 
-CREATE TABLE pizza_allowed_size (
+CREATE TABLE IF NOT EXISTS pizza_allowed_size (
                                     pizza_id      INT NOT NULL REFERENCES pizza(pizza_id) ON DELETE CASCADE,
                                     pizza_size_id INT NOT NULL REFERENCES pizza_size(pizza_size_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
                                     PRIMARY KEY (pizza_id, pizza_size_id)
 );
 
-CREATE TABLE price_category (
+CREATE TABLE IF NOT EXISTS price_category (
                                 price_category_id INT PRIMARY KEY,
                                 name              TEXT NOT NULL UNIQUE,
                                 sort_order        INT NOT NULL DEFAULT 0,
                                 active            BOOLEAN NOT NULL DEFAULT TRUE
 );
 
-CREATE TABLE ingredient (
+CREATE TABLE IF NOT EXISTS ingredient (
                             ingredient_id     INT PRIMARY KEY,
                             name              TEXT NOT NULL UNIQUE,
                             price_category_id INT NOT NULL REFERENCES price_category(price_category_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
@@ -300,7 +279,7 @@ CREATE TABLE ingredient (
                             seasonal          BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-CREATE TABLE pizza_default_ingredient (
+CREATE TABLE IF NOT EXISTS pizza_default_ingredient (
                                           pizza_id      INT NOT NULL REFERENCES pizza(pizza_id) ON DELETE CASCADE,
                                           ingredient_id INT NOT NULL REFERENCES ingredient(ingredient_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
                                           is_removable  BOOLEAN NOT NULL DEFAULT TRUE,
@@ -309,7 +288,7 @@ CREATE TABLE pizza_default_ingredient (
                                           PRIMARY KEY (pizza_id, ingredient_id)
 );
 
-CREATE TABLE branch_pizza_price (
+CREATE TABLE IF NOT EXISTS branch_pizza_price (
                                     branch_id     INT NOT NULL REFERENCES branch(branch_id) ON DELETE CASCADE,
                                     pizza_id      INT NOT NULL REFERENCES pizza(pizza_id) ON DELETE CASCADE,
                                     pizza_size_id INT NOT NULL REFERENCES pizza_size(pizza_size_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
@@ -317,7 +296,7 @@ CREATE TABLE branch_pizza_price (
                                     PRIMARY KEY (branch_id, pizza_id, pizza_size_id)
 );
 
-CREATE TABLE branch_extra_price (
+CREATE TABLE IF NOT EXISTS branch_extra_price (
                                     branch_id         INT NOT NULL REFERENCES branch(branch_id) ON DELETE CASCADE,
                                     price_category_id INT NOT NULL REFERENCES price_category(price_category_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
                                     pizza_size_id     INT NOT NULL REFERENCES pizza_size(pizza_size_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
@@ -329,7 +308,7 @@ CREATE TABLE branch_extra_price (
 -- 7) ORDERING (ONE HEADER TABLE)
 -- =========================================================
 
-CREATE TABLE customer_order (
+CREATE TABLE IF NOT EXISTS customer_order (
                                 order_id     BIGSERIAL PRIMARY KEY,
                                 branch_id    INT NOT NULL REFERENCES branch(branch_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
                                 customer_id  BIGINT REFERENCES public.customers(id) ON UPDATE RESTRICT ON DELETE SET NULL,
@@ -345,7 +324,7 @@ CREATE TABLE customer_order (
 );
 
 -- Menu order lines
-CREATE TABLE order_menu_item (
+CREATE TABLE IF NOT EXISTS order_menu_item (
                                  order_menu_item_id BIGSERIAL PRIMARY KEY,
                                  order_id           BIGINT NOT NULL REFERENCES customer_order(order_id) ON DELETE CASCADE,
                                  menu_item_id       INT NOT NULL REFERENCES menu_item(id) ON UPDATE RESTRICT ON DELETE RESTRICT,
@@ -356,7 +335,7 @@ CREATE TABLE order_menu_item (
 );
 
 -- Generic extras for non-burger menu items.
-CREATE TABLE order_menu_item_extra (
+CREATE TABLE IF NOT EXISTS order_menu_item_extra (
                                        order_menu_item_extra_id BIGSERIAL PRIMARY KEY,
                                        order_menu_item_id       BIGINT NOT NULL REFERENCES order_menu_item(order_menu_item_id) ON DELETE CASCADE,
                                        name                     TEXT NOT NULL,
@@ -367,7 +346,7 @@ CREATE TABLE order_menu_item_extra (
 -- One selected protein type per burger line.
 -- protein_qty_per_burger is 2 for the Mega Burger, ensuring that both
 -- protein portions are the same selected component.
-CREATE TABLE order_burger_protein (
+CREATE TABLE IF NOT EXISTS order_burger_protein (
                                       order_menu_item_id       BIGINT PRIMARY KEY
                                           REFERENCES order_menu_item(order_menu_item_id) ON DELETE CASCADE,
                                       component_id             INT NOT NULL
@@ -377,7 +356,7 @@ CREATE TABLE order_burger_protein (
 );
 
 -- Stores only default components the customer removed.
-CREATE TABLE order_burger_removed_component (
+CREATE TABLE IF NOT EXISTS order_burger_removed_component (
                                                 order_menu_item_id BIGINT NOT NULL
                                                     REFERENCES order_menu_item(order_menu_item_id) ON DELETE CASCADE,
                                                 component_id       INT NOT NULL
@@ -386,7 +365,7 @@ CREATE TABLE order_burger_removed_component (
 );
 
 -- Stores only optional toppings the customer added.
-CREATE TABLE order_burger_extra_component (
+CREATE TABLE IF NOT EXISTS order_burger_extra_component (
                                               order_menu_item_id BIGINT NOT NULL
                                                   REFERENCES order_menu_item(order_menu_item_id) ON DELETE CASCADE,
                                               component_id       INT NOT NULL
@@ -397,7 +376,7 @@ CREATE TABLE order_burger_extra_component (
 );
 
 -- Pizza order lines
-CREATE TABLE order_pizza_item (
+CREATE TABLE IF NOT EXISTS order_pizza_item (
                                   order_pizza_item_id  BIGSERIAL PRIMARY KEY,
                                   order_id             BIGINT NOT NULL REFERENCES customer_order(order_id) ON DELETE CASCADE,
                                   pizza_id             INT NOT NULL REFERENCES pizza(pizza_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
@@ -407,7 +386,7 @@ CREATE TABLE order_pizza_item (
                                   notes                TEXT
 );
 
-CREATE TABLE order_pizza_item_extra (
+CREATE TABLE IF NOT EXISTS order_pizza_item_extra (
                                         order_pizza_item_extra_id BIGSERIAL PRIMARY KEY,
                                         order_pizza_item_id       BIGINT NOT NULL REFERENCES order_pizza_item(order_pizza_item_id) ON DELETE CASCADE,
                                         ingredient_id             INT NOT NULL REFERENCES ingredient(ingredient_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
@@ -471,6 +450,8 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_validate_order_burger_protein ON order_burger_protein;
+
 CREATE TRIGGER trg_validate_order_burger_protein
     BEFORE INSERT OR UPDATE
     ON order_burger_protein
@@ -521,6 +502,8 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_validate_removed_burger_component ON order_burger_removed_component;
+
 CREATE TRIGGER trg_validate_removed_burger_component
     BEFORE INSERT OR UPDATE
     ON order_burger_removed_component
@@ -555,14 +538,17 @@ BEGIN
     FROM burger_component
     WHERE component_id = NEW.component_id;
 
-    IF v_component_type IS DISTINCT FROM 'extra_topping'
+    IF v_component_type IS NULL
+        OR v_component_type = 'protein'
         OR v_component_active IS DISTINCT FROM TRUE THEN
-        RAISE EXCEPTION 'Component % is not an active burger extra', NEW.component_id;
+        RAISE EXCEPTION 'Component % is not an active burger topping extra', NEW.component_id;
     END IF;
 
     RETURN NEW;
 END;
 $$;
+
+DROP TRIGGER IF EXISTS trg_validate_extra_burger_component ON order_burger_extra_component;
 
 CREATE TRIGGER trg_validate_extra_burger_component
     BEFORE INSERT OR UPDATE
@@ -592,7 +578,10 @@ INSERT INTO menu_category (id, name, sort_order) VALUES
                                                      (7, 'Salads', 70),
                                                      (8, 'Ribs', 80),
                                                      (9, 'Kiddies Meals', 90)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE
+    SET name = EXCLUDED.name,
+        sort_order = EXCLUDED.sort_order,
+        active = TRUE;
 
 -- 8.3 Menu items (fixed IDs)
 INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALUES
@@ -601,6 +590,15 @@ INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALU
                                                                                 (102, 4, 'Coke 2L', 'Coke bottle', FALSE, TRUE),
                                                                                 (103, 4, 'Coke Zero 300ml', 'Zero sugar', TRUE, FALSE),
                                                                                 (104, 4, 'Still Water 500ml', 'Bottled water', TRUE, FALSE),
+                                                                                (105, 4, 'Sprite 300ml', 'Sprite can', TRUE, FALSE),
+                                                                                (106, 4, 'Fanta Orange 300ml', 'Fanta Orange can', TRUE, FALSE),
+                                                                                (107, 4, 'Creme Soda 300ml', 'Creme Soda can', TRUE, FALSE),
+                                                                                (108, 4, 'Grapetiser 330ml', 'Sparkling grape juice', TRUE, FALSE),
+                                                                                (109, 4, 'Appletiser 330ml', 'Sparkling apple juice', TRUE, FALSE),
+                                                                                (110, 4, 'Naartjie Powerade', 'Sports drink', TRUE, FALSE),
+                                                                                (111, 4, 'Mountain Blast Powerade', 'Sports drink', TRUE, FALSE),
+                                                                                (112, 4, 'Sprite Zero 300ml', 'Zero sugar Sprite can', TRUE, FALSE),
+                                                                                (113, 4, 'Peach Ice Tea 300ml', 'Peach ice tea can', TRUE, FALSE),
 
                                                                                 -- Burgers
                                                                                 (201, 1, 'Cheese Burger',
@@ -613,6 +611,10 @@ INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALU
                                                                                  'Standard burger with one selected protein', FALSE, FALSE),
                                                                                 (205, 1, 'Bacon and Cheese Burger',
                                                                                  'Standard burger with bacon, cheese and one selected protein', FALSE, FALSE),
+                                                                                (206, 1, 'Bacon and Egg Burger',
+                                                                                 'Standard burger with bacon, egg and one selected protein', FALSE, FALSE),
+                                                                                (207, 1, 'Dagwood',
+                                                                                 'Standard burger with bacon, egg, cheese and one selected protein', FALSE, FALSE),
 
                                                                                 -- Burger Combos
                                                                                 (301, 2, 'Cheese Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
@@ -620,6 +622,8 @@ INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALU
                                                                                 (303, 2, 'Steak Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
                                                                                 (304, 2, 'Default Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
                                                                                 (305, 2, 'Bacon and Cheese Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
+                                                                                (306, 2, 'Bacon and Egg Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
+                                                                                (307, 2, 'Dagwood Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
 
                                                                                 -- Pastas
                                                                                 (401, 3, 'Chicken Alfredo Medium', 'Medium portion with protein and sauce', FALSE, FALSE),
@@ -634,13 +638,41 @@ INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALU
                                                                                 (602, 5, 'Chips Med', 'Medium chips', FALSE, FALSE),
                                                                                 (603, 5, 'Chips Large', 'Large chips', FALSE, FALSE),
                                                                                 (604, 5, 'Onion Rings', 'Single size onion rings', FALSE, FALSE),
-                                                                                (605, 5, 'Salad', 'Single salad portion', FALSE, FALSE)
-ON CONFLICT (id) DO NOTHING;
+                                                                                (605, 7, 'Salad', 'Single salad portion', FALSE, FALSE)
+ON CONFLICT (id) DO UPDATE
+    SET category_id = EXCLUDED.category_id,
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        is_300ml = EXCLUDED.is_300ml,
+        is_2l = EXCLUDED.is_2l,
+        active = TRUE;
 
 -- 8.4 Branch menu prices (example; expand this properly)
 INSERT INTO branch_menu_item_price (branch_id, menu_item_id, price) VALUES
                                                                         (1, 101, 18.00),
-                                                                        (2, 101, 16.00)
+                                                                        (2, 101, 16.00),
+                                                                        (1, 103, 18.00),
+                                                                        (2, 103, 16.00),
+                                                                        (1, 104, 18.00),
+                                                                        (2, 104, 16.00),
+                                                                        (1, 105, 18.00),
+                                                                        (2, 105, 16.00),
+                                                                        (1, 106, 18.00),
+                                                                        (2, 106, 16.00),
+                                                                        (1, 107, 18.00),
+                                                                        (2, 107, 16.00),
+                                                                        (1, 108, 21.00),
+                                                                        (2, 108, 19.00),
+                                                                        (1, 109, 21.00),
+                                                                        (2, 109, 19.00),
+                                                                        (1, 110, 21.00),
+                                                                        (2, 110, 19.00),
+                                                                        (1, 111, 21.00),
+                                                                        (2, 111, 19.00),
+                                                                        (1, 112, 18.00),
+                                                                        (2, 112, 16.00),
+                                                                        (1, 113, 18.00),
+                                                                        (2, 113, 16.00)
 ON CONFLICT (branch_id, menu_item_id) DO UPDATE
     SET price = EXCLUDED.price;
 
@@ -719,11 +751,15 @@ INSERT INTO burger_recipe_assignment (
       (203, 1, 1), -- Steak Burger
       (204, 1, 1), -- Default Burger
       (205, 1, 1), -- Bacon and Cheese Burger
+      (206, 1, 1), -- Bacon and Egg Burger
+      (207, 1, 1), -- Dagwood
       (301, 1, 1), -- Cheese Burger Combo
       (302, 1, 2), -- Mega Burger Combo
       (303, 1, 1), -- Steak Burger Combo
       (304, 1, 1), -- Default Burger Combo
-      (305, 1, 1)  -- Bacon and Cheese Burger Combo
+      (305, 1, 1), -- Bacon and Cheese Burger Combo
+      (306, 1, 1), -- Bacon and Egg Burger Combo
+      (307, 1, 1)  -- Dagwood Combo
 ON CONFLICT (burger_id) DO UPDATE
     SET recipe_id = EXCLUDED.recipe_id,
         protein_quantity_required = EXCLUDED.protein_quantity_required;
@@ -739,15 +775,25 @@ INSERT INTO burger_item_default_component (
       (201, 201, TRUE, 101), -- Cheese Burger: Cheese
       (205, 201, TRUE, 101), -- Bacon and Cheese Burger: Cheese
       (205, 202, TRUE, 102), -- Bacon and Cheese Burger: Bacon
+      (206, 202, TRUE, 101), -- Bacon and Egg Burger: Bacon
+      (206, 204, TRUE, 102), -- Bacon and Egg Burger: Egg
+      (207, 201, TRUE, 101), -- Dagwood: Cheese
+      (207, 202, TRUE, 102), -- Dagwood: Bacon
+      (207, 204, TRUE, 103), -- Dagwood: Egg
       (301, 201, TRUE, 101), -- Cheese Burger Combo: Cheese
       (305, 201, TRUE, 101), -- Bacon and Cheese Burger Combo: Cheese
-      (305, 202, TRUE, 102)  -- Bacon and Cheese Burger Combo: Bacon
+      (305, 202, TRUE, 102), -- Bacon and Cheese Burger Combo: Bacon
+      (306, 202, TRUE, 101), -- Bacon and Egg Burger Combo: Bacon
+      (306, 204, TRUE, 102), -- Bacon and Egg Burger Combo: Egg
+      (307, 201, TRUE, 101), -- Dagwood Combo: Cheese
+      (307, 202, TRUE, 102), -- Dagwood Combo: Bacon
+      (307, 204, TRUE, 103)  -- Dagwood Combo: Egg
 ON CONFLICT (burger_id, component_id) DO UPDATE
     SET is_removable = EXCLUDED.is_removable,
         sort_order = EXCLUDED.sort_order;
 
 -- Temporary R0.00 component prices for both branches.
--- Replace these values when the real protein and extra prices are known.
+-- Replace these values when the real protein and topping prices are known.
 INSERT INTO branch_burger_component_price (
     branch_id,
     component_id,
@@ -759,7 +805,7 @@ SELECT
     0.00
 FROM branch
          CROSS JOIN burger_component component
-WHERE component.component_type IN ('protein', 'extra_topping')
+WHERE component.active = TRUE
 ON CONFLICT (branch_id, component_id) DO UPDATE
     SET price = EXCLUDED.price;
 
@@ -773,28 +819,56 @@ ON CONFLICT (id) DO NOTHING;
 -- Burger proteins and toppings use the normalised burger tables above.
 -- The generic modifier system remains available for combo drink choices.
 INSERT INTO modifier_group (id, name, required, min_select, max_select) VALUES
-    (1, 'Choose your drink', TRUE, 1, 1)
+    (1, 'Choose your drink', TRUE, 1, 1),
+    (2, 'Choose your side', TRUE, 1, 1),
+    (3, 'Rib extras', FALSE, 0, 1),
+    (4, 'Chip extras', FALSE, 0, 2)
 ON CONFLICT (id) DO UPDATE
     SET name = EXCLUDED.name,
         required = EXCLUDED.required,
         min_select = EXCLUDED.min_select,
         max_select = EXCLUDED.max_select;
 
-INSERT INTO modifier_option (id, group_id, name, menu_item_id) VALUES
-                                                                   (1, 1, 'Coke 300ml', 101),
-                                                                   (2, 1, 'Coke Zero 300ml', 103)
+INSERT INTO modifier_option (id, group_id, name, menu_item_id, additional_price) VALUES
+                                                                   (1, 1, 'Grapetiser 330ml', 108, 3.00),
+                                                                   (2, 1, 'Appletiser 330ml', 109, 3.00),
+                                                                   (3, 1, 'Naartjie Powerade', 110, 3.00),
+                                                                   (4, 1, 'Mountain Blast Powerade', 111, 3.00),
+                                                                   (5, 1, 'Creme Soda 300ml', 107, 0.00),
+                                                                   (6, 1, 'Sprite 300ml', 105, 0.00),
+                                                                   (7, 1, 'Sprite Zero 300ml', 112, 0.00),
+                                                                   (8, 1, 'Peach Ice Tea 300ml', 113, 0.00),
+                                                                   (9, 2, 'Chips', 602, 0.00),
+                                                                   (10, 2, 'Onion Rings', 604, 0.00),
+                                                                   (11, 2, 'Salad', 605, 0.00),
+                                                                   (12, 3, 'Extra Rib Sauce', NULL, 0.00),
+                                                                   (13, 4, 'Extra Chip Sauce', NULL, 0.00),
+                                                                   (14, 4, 'Extra Rib Sauce', NULL, 0.00)
 ON CONFLICT (id) DO UPDATE
     SET group_id = EXCLUDED.group_id,
         name = EXCLUDED.name,
-        menu_item_id = EXCLUDED.menu_item_id;
+        menu_item_id = EXCLUDED.menu_item_id,
+        additional_price = EXCLUDED.additional_price;
 
 INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES
                                                                   (301, 1),
                                                                   (302, 1),
                                                                   (303, 1),
                                                                   (304, 1),
-                                                                  (305, 1)
+                                                                  (305, 1),
+                                                                  (306, 1),
+                                                                  (307, 1),
+                                                                  (501, 2),
+                                                                  (501, 3),
+                                                                  (501, 4),
+                                                                  (502, 2),
+                                                                  (502, 3),
+                                                                  (502, 4)
 ON CONFLICT (menu_item_id, group_id) DO NOTHING;
+
+DELETE FROM menu_item_modifier_group
+WHERE group_id = 4
+  AND menu_item_id IN (601, 602, 603);
 
 -- =========================================================
 -- 9) PIZZA SEED (FROM YOUR BIG SCRIPT)
@@ -805,13 +879,19 @@ INSERT INTO pizza_size (pizza_size_id, cm, sort_order) VALUES
                                                            (1, 19, 1),
                                                            (2, 23, 2),
                                                            (3, 30, 3)
-ON CONFLICT (pizza_size_id) DO NOTHING;
+ON CONFLICT (pizza_size_id) DO UPDATE
+    SET cm = EXCLUDED.cm,
+        sort_order = EXCLUDED.sort_order,
+        active = TRUE;
 
 -- Categories
 INSERT INTO pizza_category (pizza_category_id, name, sort_order) VALUES
                                                                      (1, 'Favourites', 1),
                                                                      (2, 'Supremes', 2)
-ON CONFLICT (pizza_category_id) DO NOTHING;
+ON CONFLICT (pizza_category_id) DO UPDATE
+    SET name = EXCLUDED.name,
+        sort_order = EXCLUDED.sort_order,
+        active = TRUE;
 
 -- Extra price categories
 INSERT INTO price_category (price_category_id, name, sort_order) VALUES
@@ -819,7 +899,10 @@ INSERT INTO price_category (price_category_id, name, sort_order) VALUES
                                                                      (2, 'Onion / Green Pepper / Capers / Banana / Fresh Tomato', 2),
                                                                      (3, 'Olives / Asparagus / Spinach / Mushrooms / Peppadew / Sundried Tomato / Pineapple', 3),
                                                                      (4, 'All Cheeses / Meats / Avo (seasonal)', 4)
-ON CONFLICT (price_category_id) DO NOTHING;
+ON CONFLICT (price_category_id) DO UPDATE
+    SET name = EXCLUDED.name,
+        sort_order = EXCLUDED.sort_order,
+        active = TRUE;
 
 -- Ingredients (toppings)
 INSERT INTO ingredient (ingredient_id, name, price_category_id, seasonal) VALUES
@@ -866,7 +949,11 @@ INSERT INTO ingredient (ingredient_id, name, price_category_id, seasonal) VALUES
                                                                               (41, 'mussels',         4, FALSE),
                                                                               (42, 'calamari',        4, FALSE),
                                                                               (43, 'crab sticks',     4, FALSE)
-ON CONFLICT (ingredient_id) DO NOTHING;
+ON CONFLICT (ingredient_id) DO UPDATE
+    SET name = EXCLUDED.name,
+        price_category_id = EXCLUDED.price_category_id,
+        seasonal = EXCLUDED.seasonal,
+        active = TRUE;
 
 -- Pizzas (Favourites + Supremes)
 INSERT INTO pizza (pizza_id, pizza_category_id, name, description, sort_order) VALUES
@@ -904,7 +991,12 @@ INSERT INTO pizza (pizza_id, pizza_category_id, name, description, sort_order) V
                                                                                    (215, 2, 'Creamy Chicken',   'creamy chicken, mushrooms, asparagus & garlic', 15),
                                                                                    (216, 2, 'Fruti Di Mare',    'shrimps, mussels, calamari, crab sticks & garlic', 16),
                                                                                    (217, 2, 'Al Greeka',        'anchovies & olives', 17)
-ON CONFLICT (pizza_id) DO NOTHING;
+ON CONFLICT (pizza_id) DO UPDATE
+    SET pizza_category_id = EXCLUDED.pizza_category_id,
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        sort_order = EXCLUDED.sort_order,
+        active = TRUE;
 
 -- Allowed sizes (as you specified)
 INSERT INTO pizza_allowed_size (pizza_id, pizza_size_id) VALUES
@@ -1079,7 +1171,7 @@ ON CONFLICT (branch_id, price_category_id, pizza_size_id) DO UPDATE
 
 -- Complete default build shown for each burger.
 -- Shared recipe components and product-specific additions are combined.
-CREATE VIEW v_burger_builder_defaults AS
+CREATE OR REPLACE VIEW v_burger_builder_defaults AS
 SELECT
     assignment.burger_id,
     menu.name AS burger_name,
@@ -1119,7 +1211,7 @@ FROM burger_recipe_assignment assignment
 WHERE component.active = TRUE;
 
 -- Shared protein choices. The quantity required comes from the burger.
-CREATE VIEW v_burger_builder_proteins AS
+CREATE OR REPLACE VIEW v_burger_builder_proteins AS
 SELECT
     assignment.burger_id,
     menu.name AS burger_name,
@@ -1140,7 +1232,7 @@ WHERE component.component_type = 'protein'
   AND component.active = TRUE;
 
 -- Shared additional topping choices.
-CREATE VIEW v_burger_builder_extras AS
+CREATE OR REPLACE VIEW v_burger_builder_extras AS
 SELECT
     assignment.burger_id,
     menu.name AS burger_name,
@@ -1157,33 +1249,33 @@ FROM burger_recipe_assignment assignment
          LEFT JOIN branch_burger_component_price price
                    ON price.branch_id = branch.branch_id
                        AND price.component_id = component.component_id
-WHERE component.component_type = 'extra_topping'
+WHERE component.component_type <> 'protein'
   AND component.active = TRUE;
 
 -- =========================================================
 -- 9.2) INDEXES FOR COMMON QUERIES
 -- =========================================================
 
-CREATE INDEX idx_customer_order_branch_status_created
+CREATE INDEX IF NOT EXISTS idx_customer_order_branch_status_created
     ON customer_order (branch_id, status, created_at DESC);
 
-CREATE INDEX idx_customer_order_customer_created
+CREATE INDEX IF NOT EXISTS idx_customer_order_customer_created
     ON customer_order (customer_id, created_at DESC)
     WHERE customer_id IS NOT NULL;
 
-CREATE INDEX idx_order_menu_item_order
+CREATE INDEX IF NOT EXISTS idx_order_menu_item_order
     ON order_menu_item (order_id);
 
-CREATE INDEX idx_order_pizza_item_order
+CREATE INDEX IF NOT EXISTS idx_order_pizza_item_order
     ON order_pizza_item (order_id);
 
-CREATE INDEX idx_burger_component_type_active
+CREATE INDEX IF NOT EXISTS idx_burger_component_type_active
     ON burger_component (component_type, active);
 
-CREATE INDEX idx_burger_recipe_assignment_recipe
+CREATE INDEX IF NOT EXISTS idx_burger_recipe_assignment_recipe
     ON burger_recipe_assignment (recipe_id);
 
-CREATE INDEX idx_burger_item_default_component_component
+CREATE INDEX IF NOT EXISTS idx_burger_item_default_component_component
     ON burger_item_default_component (component_id);
 
 COMMIT;

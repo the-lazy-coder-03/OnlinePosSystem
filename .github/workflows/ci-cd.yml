@@ -100,6 +100,7 @@ jobs:
           APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
           SESSION_COOKIE_SECURE: ${{ secrets.SESSION_COOKIE_SECURE }}
+          RUN_MIGRATION_SQL: ${{ secrets.RUN_MIGRATION_SQL }}
         run: |
           mkdir -p runtime
           {
@@ -122,6 +123,7 @@ jobs:
             echo "MAIL_SMTP_AUTH=false"
             echo "MAIL_SMTP_STARTTLS=false"
             echo "GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}"
+            echo "RUN_MIGRATION_SQL=${RUN_MIGRATION_SQL:-true}"
           } > runtime/online-pos-system.env
 
       - name: Copy files to EC2

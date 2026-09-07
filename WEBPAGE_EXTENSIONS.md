@@ -36,14 +36,6 @@ This file lists the main webpage names and browser paths used by the application
 | Admin Dashboard | `/admin` | `admin.html` | Admin menu and pricing dashboard |
 | Admin Live Orders | `/admin/orders` | `InputOrders.html` | Admin live orders page |
 
-## Template Files Without A Confirmed Page Route
-
-| File name | Notes |
-| --- | --- |
-| `test.html` | Template file exists, but no matching controller route was found |
-| `sql-code` | Resource file exists in the templates folder |
-| `prompt` | Resource file exists in the templates folder |
-
 ## API Routes
 
 These are backend routes, not normal webpages:
