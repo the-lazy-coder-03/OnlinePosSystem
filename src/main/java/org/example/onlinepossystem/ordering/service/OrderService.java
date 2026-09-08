@@ -4,6 +4,9 @@ import org.example.onlinepossystem.branch.api.BranchLookup;
 import org.example.onlinepossystem.branch.entity.Branch;
 import org.example.onlinepossystem.catalog.api.OrderCatalogResolver;
 import org.example.onlinepossystem.catalog.dto.MenuDTO;
+import org.example.onlinepossystem.customer.api.CustomerAccountReader;
+import org.example.onlinepossystem.customer.entity.Customer;
+import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
@@ -18,6 +21,7 @@ import org.example.onlinepossystem.ordering.entity.OrderPizzaItemExtra;
 import org.example.onlinepossystem.ordering.event.OrderCreatedEvent;
 import org.example.onlinepossystem.ordering.repository.OrderRepository;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,9 +29,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-public class OrderService implements OrderOperations {
+public class OrderService implements OrderOperations, CustomerOrderHistoryReader {
     private final OrderRepository orderRepository;
     private final BranchLookup branchLookup;
+    private final CustomerAccountReader customerAccountReader;
     private final OrderCatalogResolver catalogResolver;
     private final OrderRequestValidator orderRequestValidator;
     private final OrderResponseMapper orderResponseMapper;
@@ -35,12 +40,14 @@ public class OrderService implements OrderOperations {
 
     public OrderService(OrderRepository orderRepository,
                         BranchLookup branchLookup,
+                        CustomerAccountReader customerAccountReader,
                         OrderCatalogResolver catalogResolver,
                         OrderRequestValidator orderRequestValidator,
                         OrderResponseMapper orderResponseMapper,
                         ApplicationEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.branchLookup = branchLookup;
+        this.customerAccountReader = customerAccountReader;
         this.catalogResolver = catalogResolver;
         this.orderRequestValidator = orderRequestValidator;
         this.orderResponseMapper = orderResponseMapper;
@@ -55,11 +62,20 @@ public class OrderService implements OrderOperations {
     @Override
     @Transactional
     public OrderResponseDTO placeOrder(OrderRequestDTO request) {
+        return placeOrderForCustomer(request, null);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponseDTO placeOrderForCustomer(OrderRequestDTO request, String customerEmail) {
         orderRequestValidator.validate(request);
         Branch branch = branchLookup.requireByName(request.getBranchName());
+        Customer customer = resolveCustomer(customerEmail);
+        LocalDateTime createdAt = LocalDateTime.now();
 
         Order order = new Order();
         order.setBranch(branch);
+        order.setCustomer(customer);
         order.setCustomerName(request.getCustomerName());
         order.setPhone(request.getPhone());
         order.setHouseNumber(request.getHouseNumber());
@@ -69,8 +85,11 @@ public class OrderService implements OrderOperations {
         order.setPostalCode(request.getPostalCode());
         order.setComplexName(request.getComplexName());
         order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "pickup");
-        order.setCreatedAt(LocalDateTime.now());
+        order.setCreatedAt(createdAt);
         order.setStatus("Pending");
+        if (customer != null) {
+            customer.setLastOrderedAt(createdAt);
+        }
 
         for (OrderRequestDTO.OrderItemRequestDTO itemRequest : request.getItems()) {
             if (itemRequest.getPizzaId() != null) {
@@ -84,6 +103,22 @@ public class OrderService implements OrderOperations {
         OrderResponseDTO response = orderResponseMapper.toDto(savedOrder);
         eventPublisher.publishEvent(new OrderCreatedEvent(response));
         return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderResponseDTO> getRecentOrdersForCustomer(String customerEmail, int limit) {
+        if (customerEmail == null || customerEmail.isBlank() || limit < 1) {
+            return List.of();
+        }
+
+        return customerAccountReader.findByEmail(customerEmail)
+                .map(customer -> orderRepository
+                        .findByCustomerIdOrderByCreatedAtDesc(customer.getId(), PageRequest.of(0, limit))
+                        .stream()
+                        .map(orderResponseMapper::toDto)
+                        .toList())
+                .orElseGet(List::of);
     }
 
     @Override
@@ -160,6 +195,13 @@ public class OrderService implements OrderOperations {
         }
 
         return pizzaItem;
+    }
+
+    private Customer resolveCustomer(String customerEmail) {
+        if (customerEmail == null || customerEmail.isBlank()) {
+            return null;
+        }
+        return customerAccountReader.findByEmail(customerEmail).orElse(null);
     }
 
     private OrderMenuItem buildMenuItem(Integer branchId, OrderRequestDTO.OrderItemRequestDTO itemRequest) {

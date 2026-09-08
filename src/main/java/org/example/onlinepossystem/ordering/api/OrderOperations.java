@@ -8,6 +8,8 @@ import java.util.List;
 public interface OrderOperations {
     OrderResponseDTO placeOrder(OrderRequestDTO request);
 
+    OrderResponseDTO placeOrderForCustomer(OrderRequestDTO request, String customerEmail);
+
     List<OrderResponseDTO> getOrdersByBranch(String branchName);
 
     List<OrderResponseDTO> getPendingOrdersByBranch(String branchName);

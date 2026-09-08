@@ -8,6 +8,7 @@ import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -43,8 +44,12 @@ public class OrderController {
      */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<OrderResponseDTO> placeOrder(@Valid @RequestBody OrderRequestDTO request) {
-        return ResponseEntity.ok(orderOperations.placeOrder(request));
+    public ResponseEntity<OrderResponseDTO> placeOrder(
+            @Valid @RequestBody OrderRequestDTO request,
+            Authentication authentication
+    ) {
+        String customerEmail = authentication == null ? null : authentication.getName();
+        return ResponseEntity.ok(orderOperations.placeOrderForCustomer(request, customerEmail));
     }
 
     /**

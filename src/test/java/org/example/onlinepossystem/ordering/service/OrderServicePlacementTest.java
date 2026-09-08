@@ -29,9 +29,14 @@ import org.example.onlinepossystem.catalog.repository.PizzaCategoryRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaSizeRepository;
 import org.example.onlinepossystem.catalog.repository.PriceCategoryRepository;
+import org.example.onlinepossystem.customer.entity.Customer;
+import org.example.onlinepossystem.customer.service.CustomerService;
+import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
+import org.example.onlinepossystem.ordering.entity.Order;
+import org.example.onlinepossystem.ordering.repository.OrderRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -39,6 +44,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -51,6 +58,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class OrderServicePlacementTest {
     @Autowired
     private OrderOperations orderOperations;
+
+    @Autowired
+    private CustomerOrderHistoryReader customerOrderHistoryReader;
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private CustomerService customerService;
 
     @Autowired
     private BranchRepository branchRepository;
@@ -229,6 +245,59 @@ class OrderServicePlacementTest {
                 .hasMessageContaining("Ingredient not found with ID");
     }
 
+    @Test
+    void placeOrderForCustomerLinksOrderToCustomerAccount() {
+        MenuFixture fixture = createMenuFixture();
+        Customer customer = createCustomer("linked");
+
+        OrderResponseDTO response = orderOperations.placeOrderForCustomer(
+                request(fixture.branch().getName(), menuItem(fixture.menuItem().getId(), 1)),
+                customer.getEmail()
+        );
+        entityManager.flush();
+
+        Long linkedCustomerId = jdbcTemplate.queryForObject(
+                "SELECT customer_id FROM customer_order WHERE order_id = ?",
+                Long.class,
+                response.getId()
+        );
+        assertThat(linkedCustomerId).isEqualTo(customer.getId());
+    }
+
+    @Test
+    void customerOrderHistoryReturnsOnlyLinkedOrdersNewestFirstAndCapped() {
+        MenuFixture fixture = createMenuFixture();
+        Customer customer = createCustomer("history");
+        Customer otherCustomer = createCustomer("other");
+        LocalDateTime newest = LocalDateTime.now();
+        List<Long> expectedIds = new ArrayList<>();
+
+        for (int i = 0; i < 12; i++) {
+            OrderResponseDTO response = orderOperations.placeOrderForCustomer(
+                    request(fixture.branch().getName(), menuItem(fixture.menuItem().getId(), 1)),
+                    customer.getEmail()
+            );
+            setOrderCreatedAt(response.getId(), newest.minusMinutes(i));
+            if (i < 10) {
+                expectedIds.add(response.getId());
+            }
+        }
+
+        OrderResponseDTO otherResponse = orderOperations.placeOrderForCustomer(
+                request(fixture.branch().getName(), menuItem(fixture.menuItem().getId(), 1)),
+                otherCustomer.getEmail()
+        );
+        setOrderCreatedAt(otherResponse.getId(), newest.plusMinutes(1));
+        entityManager.flush();
+        entityManager.clear();
+
+        List<OrderResponseDTO> history = customerOrderHistoryReader.getRecentOrdersForCustomer(customer.getEmail(), 10);
+
+        assertThat(history).hasSize(10);
+        assertThat(history).extracting(OrderResponseDTO::getId).containsExactlyElementsOf(expectedIds);
+        assertThat(history).extracting(OrderResponseDTO::getId).doesNotContain(otherResponse.getId());
+    }
+
     private PizzaFixture createPizzaFixture() {
         String suffix = suffix();
         Branch branch = createBranch("Pizza Branch " + suffix);
@@ -377,6 +446,35 @@ class OrderServicePlacementTest {
 
     private Branch createBranch(String name) {
         return branchRepository.saveAndFlush(new Branch(nextId("branch", "branch_id"), name));
+    }
+
+    private Customer createCustomer(String label) {
+        String suffix = suffix();
+        return customerService.registerCustomer(
+                "Customer",
+                label,
+                label + "-" + suffix + "@example.com",
+                "Password1!",
+                uniquePhone(),
+                null,
+                "1",
+                "Main Street",
+                "Area",
+                null,
+                "Kenridge Branch",
+                "7550"
+        );
+    }
+
+    private String uniquePhone() {
+        String raw = Long.toUnsignedString(UUID.randomUUID().getMostSignificantBits());
+        return raw.length() > 20 ? raw.substring(0, 20) : raw;
+    }
+
+    private void setOrderCreatedAt(Long orderId, LocalDateTime createdAt) {
+        Order order = orderRepository.findById(orderId).orElseThrow();
+        order.setCreatedAt(createdAt);
+        orderRepository.saveAndFlush(order);
     }
 
     private OrderRequestDTO request(String branchName, OrderRequestDTO.OrderItemRequestDTO... items) {

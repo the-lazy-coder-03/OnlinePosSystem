@@ -91,20 +91,4 @@ public class MainController {
     public String inputOrdersPage() {
         return "InputOrders";
     }
-
-    // ====== Private Pages ======
-
-    @GetMapping("/profile/edit")
-    public String editProfilePage(Model model, Authentication authentication) {
-        if (authentication != null && authentication.isAuthenticated()) {
-            String email = authentication.getName();
-            return customerAccountReader.findByEmail(email)
-                    .map(customer -> {
-                        model.addAttribute("customer", customer);
-                        return "customerInfoEdit";
-                    })
-                    .orElse("redirect:/login");
-        }
-        return "redirect:/login";
-    }
 }

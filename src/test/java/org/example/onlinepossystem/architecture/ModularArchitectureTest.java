@@ -39,7 +39,7 @@ class ModularArchitectureTest {
             "bootstrap", Set.of("catalog", "staff"),
             "branch", Set.of(),
             "catalog", Set.of("branch"),
-            "customer", Set.of("security"),
+            "customer", Set.of("ordering", "security"),
             "location", Set.of(),
             "ordering", Set.of("branch", "catalog", "customer"),
             "security", Set.of(),

@@ -3,13 +3,17 @@ package org.example.onlinepossystem.customer.web;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import org.example.onlinepossystem.customer.dto.ProfilePageView;
+import org.example.onlinepossystem.customer.service.CustomerProfileService;
 import org.example.onlinepossystem.customer.service.CustomerService;
 import org.example.onlinepossystem.security.PasswordPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -20,9 +24,23 @@ public class CustomerController {
     private static final Logger logger = LoggerFactory.getLogger(CustomerController.class);
 
     private final CustomerService customerService;
+    private final CustomerProfileService customerProfileService;
 
-    public CustomerController(CustomerService customerService) {
+    public CustomerController(CustomerService customerService,
+                              CustomerProfileService customerProfileService) {
         this.customerService = customerService;
+        this.customerProfileService = customerProfileService;
+    }
+
+    @GetMapping("/profile/edit")
+    public String editProfilePage(Model model, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "redirect:/login";
+        }
+
+        return customerProfileService.getProfilePage(authentication.getName())
+                .map(profile -> populateProfileModel(model, profile))
+                .orElse("redirect:/login");
     }
 
     @PostMapping("/profile/update")
@@ -109,5 +127,11 @@ public class CustomerController {
         logger.info("New customer account registered");
 
         return "redirect:/login?registered";
+    }
+
+    private String populateProfileModel(Model model, ProfilePageView profile) {
+        model.addAttribute("customer", profile.customer());
+        model.addAttribute("recentOrders", profile.recentOrders());
+        return "customerInfoEdit";
     }
 }
