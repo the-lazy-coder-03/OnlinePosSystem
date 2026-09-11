@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.example.onlinepossystem.security.api.RateLimiter;
+import org.example.onlinepossystem.security.api.RequestClientIp;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -31,7 +32,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         if (isLoginRequest(request)) {
-            String key = "login:" + clientIp(request);
+            String key = "login:" + RequestClientIp.resolve(request);
             if (!rateLimiter.isAllowed(key, MAX_LOGIN_ATTEMPTS, LOGIN_WINDOW)) {
                 response.sendError(TOO_MANY_REQUESTS, "Too many login attempts. Please try again later.");
                 return;
@@ -46,11 +47,4 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
                 && ("/login".equals(request.getRequestURI()) || "/api/auth/login".equals(request.getRequestURI()));
     }
 
-    private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
 }

@@ -17,8 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
 
 @Service
 public class CatalogTaxonomyAdminService {
@@ -51,13 +49,13 @@ public class CatalogTaxonomyAdminService {
                 ? new PizzaCategory()
                 : pizzaCategoryRepository.findById(id).orElseGet(PizzaCategory::new);
         if (category.getId() == null) {
-            category.setId(nextId(pizzaCategoryRepository.findAll(), PizzaCategory::getId));
+            category.setId(CatalogAdminSupport.nextId(pizzaCategoryRepository.findAll(), PizzaCategory::getId));
         }
-        category.setName(cleanText(name));
+        category.setName(CatalogAdminSupport.cleanText(name));
         category.setSortOrder(sortOrder == null ? 0 : sortOrder);
         category.setActive(parameters.containsKey("active"));
         pizzaCategoryRepository.save(category);
-        logger.info("Admin action=savePizzaCategory pizzaCategoryId={} admin={}", category.getId(), actorName(actor));
+        logger.info("Admin action=savePizzaCategory pizzaCategoryId={} admin={}", category.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
@@ -67,13 +65,13 @@ public class CatalogTaxonomyAdminService {
                 ? new MenuCategory()
                 : menuCategoryRepository.findById(id).orElseGet(MenuCategory::new);
         if (category.getId() == null) {
-            category.setId(nextId(menuCategoryRepository.findAll(), MenuCategory::getId));
+            category.setId(CatalogAdminSupport.nextId(menuCategoryRepository.findAll(), MenuCategory::getId));
         }
-        category.setName(cleanText(name));
+        category.setName(CatalogAdminSupport.cleanText(name));
         category.setSortOrder(sortOrder == null ? 0 : sortOrder);
         category.setActive(parameters.containsKey("active"));
         menuCategoryRepository.save(category);
-        logger.info("Admin action=saveMenuCategory menuCategoryId={} admin={}", category.getId(), actorName(actor));
+        logger.info("Admin action=saveMenuCategory menuCategoryId={} admin={}", category.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
@@ -81,13 +79,13 @@ public class CatalogTaxonomyAdminService {
                               Map<String, String> parameters, String actor) {
         PizzaSize size = id == null ? new PizzaSize() : pizzaSizeRepository.findById(id).orElseGet(PizzaSize::new);
         if (size.getId() == null) {
-            size.setId(nextId(pizzaSizeRepository.findAll(), PizzaSize::getId));
+            size.setId(CatalogAdminSupport.nextId(pizzaSizeRepository.findAll(), PizzaSize::getId));
         }
         size.setCm(cm);
         size.setSortOrder(sortOrder == null ? 0 : sortOrder);
         size.setActive(parameters.containsKey("active"));
         pizzaSizeRepository.save(size);
-        logger.info("Admin action=savePizzaSize pizzaSizeId={} admin={}", size.getId(), actorName(actor));
+        logger.info("Admin action=savePizzaSize pizzaSizeId={} admin={}", size.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
@@ -97,13 +95,13 @@ public class CatalogTaxonomyAdminService {
                 ? new PriceCategory()
                 : priceCategoryRepository.findById(id).orElseGet(PriceCategory::new);
         if (category.getId() == null) {
-            category.setId(nextId(priceCategoryRepository.findAll(), PriceCategory::getId));
+            category.setId(CatalogAdminSupport.nextId(priceCategoryRepository.findAll(), PriceCategory::getId));
         }
-        category.setName(cleanText(name));
+        category.setName(CatalogAdminSupport.cleanText(name));
         category.setSortOrder(sortOrder == null ? 0 : sortOrder);
         category.setActive(parameters.containsKey("active"));
         priceCategoryRepository.save(category);
-        logger.info("Admin action=savePriceCategory priceCategoryId={} admin={}", category.getId(), actorName(actor));
+        logger.info("Admin action=savePriceCategory priceCategoryId={} admin={}", category.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
@@ -113,29 +111,16 @@ public class CatalogTaxonomyAdminService {
                 ? new Ingredient()
                 : ingredientRepository.findById(id).orElseGet(Ingredient::new);
         if (ingredient.getId() == null) {
-            ingredient.setId(nextId(ingredientRepository.findAll(), Ingredient::getId));
+            ingredient.setId(CatalogAdminSupport.nextId(ingredientRepository.findAll(), Ingredient::getId));
         }
         PriceCategory priceCategory = priceCategoryRepository.findById(priceCategoryId)
                 .orElseThrow(() -> new java.util.NoSuchElementException(
                         "Price category not found with ID: " + priceCategoryId));
-        ingredient.setName(cleanText(name));
+        ingredient.setName(CatalogAdminSupport.cleanText(name));
         ingredient.setPriceCategory(priceCategory);
         ingredient.setActive(parameters.containsKey("active"));
         ingredient.setSeasonal(parameters.containsKey("seasonal"));
         ingredientRepository.save(ingredient);
-        logger.info("Admin action=saveIngredient ingredientId={} admin={}", ingredient.getId(), actorName(actor));
-    }
-
-    private <T> Integer nextId(List<T> items, Function<T, Integer> idExtractor) {
-        return items.stream().map(idExtractor).filter(Objects::nonNull)
-                .mapToInt(Integer::intValue).max().orElse(0) + 1;
-    }
-
-    private String cleanText(String value) {
-        return value == null ? null : value.trim();
-    }
-
-    private String actorName(String actor) {
-        return actor == null || actor.isBlank() ? "unknown" : actor;
+        logger.info("Admin action=saveIngredient ingredientId={} admin={}", ingredient.getId(), CatalogAdminSupport.actorName(actor));
     }
 }

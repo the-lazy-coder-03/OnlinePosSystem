@@ -18,9 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Function;
 
 @Service
 public class MenuCatalogAdminService {
@@ -54,13 +51,13 @@ public class MenuCatalogAdminService {
                              List<Integer> modifierGroupIds, Map<String, String> parameters, String actor) {
         MenuItem menuItem = id == null ? new MenuItem() : menuItemRepository.findById(id).orElseGet(MenuItem::new);
         if (menuItem.getId() == null) {
-            menuItem.setId(nextId(menuItemRepository.findAll(), MenuItem::getId));
+            menuItem.setId(CatalogAdminSupport.nextId(menuItemRepository.findAll(), MenuItem::getId));
         }
         MenuCategory category = menuCategoryRepository.findById(categoryId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Menu category not found with ID: " + categoryId));
         menuItem.setCategory(category);
-        menuItem.setName(cleanText(name));
-        menuItem.setDescription(cleanText(description));
+        menuItem.setName(CatalogAdminSupport.cleanText(name));
+        menuItem.setDescription(CatalogAdminSupport.cleanText(description));
         menuItem.setSortOrder(sortOrder == null ? 0 : sortOrder);
         menuItem.setActive(parameters.containsKey("active"));
         menuItem.setIs300ml(parameters.containsKey("is300ml"));
@@ -69,12 +66,12 @@ public class MenuCatalogAdminService {
         MenuItem savedMenuItem = menuItemRepository.save(menuItem);
         replaceModifierGroups(savedMenuItem, modifierGroupIds);
         savePriceMatrix(savedMenuItem, parameters);
-        logger.info("Admin action=saveMenuItem menuItemId={} admin={}", savedMenuItem.getId(), actorName(actor));
+        logger.info("Admin action=saveMenuItem menuItemId={} admin={}", savedMenuItem.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     public void deleteMenuItem(Integer id, String actor) {
         menuItemRepository.deleteById(id);
-        logger.info("Admin action=deleteMenuItem menuItemId={} admin={}", id, actorName(actor));
+        logger.info("Admin action=deleteMenuItem menuItemId={} admin={}", id, CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
@@ -84,7 +81,7 @@ public class MenuCatalogAdminService {
                 .orElseThrow(() -> new java.util.NoSuchElementException("Menu item not found with ID: " + menuItemId));
         savePrice(branchId, menuItem, price);
         logger.info("Admin action=updateMenuItemPrice branchId={} menuItemId={} admin={}",
-                branchId, menuItemId, actorName(actor));
+                branchId, menuItemId, CatalogAdminSupport.actorName(actor));
     }
 
     private void replaceModifierGroups(MenuItem menuItem, List<Integer> modifierGroupIds) {
@@ -101,7 +98,7 @@ public class MenuCatalogAdminService {
 
     private void savePriceMatrix(MenuItem menuItem, Map<String, String> parameters) {
         for (BranchView branch : branchLookup.findAll()) {
-            parsePrice(parameters.get("menuPrice_" + branch.id()))
+            CatalogAdminSupport.parsePrice(parameters.get("menuPrice_" + branch.id()))
                     .ifPresent(price -> savePrice(branch.id(), menuItem, price));
         }
     }
@@ -114,27 +111,4 @@ public class MenuCatalogAdminService {
         branchMenuItemPriceRepository.save(branchPrice);
     }
 
-    private <T> Integer nextId(List<T> items, Function<T, Integer> idExtractor) {
-        return items.stream().map(idExtractor).filter(Objects::nonNull)
-                .mapToInt(Integer::intValue).max().orElse(0) + 1;
-    }
-
-    private Optional<Double> parsePrice(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return Optional.empty();
-        }
-        double price = Double.parseDouble(raw);
-        if (price < 0) {
-            throw new IllegalArgumentException("Price cannot be negative");
-        }
-        return Optional.of(price);
-    }
-
-    private String cleanText(String value) {
-        return value == null ? null : value.trim();
-    }
-
-    private String actorName(String actor) {
-        return actor == null || actor.isBlank() ? "unknown" : actor;
-    }
 }

@@ -29,28 +29,6 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
             join bpp.pizzaSize s
             join PizzaAllowedSize pas on pas.pizza = p and pas.pizzaSize = s
             where bpp.id.branchId = :branchId
-              and p.active = true
-              and s.active = true
-            order by p.sortOrder, s.sortOrder
-            """)
-    List<PizzaCardRow> findPizzaCardsByBranch(@Param("branchId") Integer branchId);
-
-    @Query("""
-            select new org.example.onlinepossystem.catalog.pizza.dto.PizzaCardRow(
-                p.id,
-                p.name,
-                p.category.id,
-                p.category.name,
-                s.cm,
-                bpp.price,
-                p.sortOrder,
-                s.sortOrder
-            )
-            from BranchPizzaPrice bpp
-            join bpp.pizza p
-            join bpp.pizzaSize s
-            join PizzaAllowedSize pas on pas.pizza = p and pas.pizzaSize = s
-            where bpp.id.branchId = :branchId
               and p.category.id = :categoryId
               and p.active = true
               and s.active = true

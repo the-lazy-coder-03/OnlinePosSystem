@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import org.example.onlinepossystem.customer.service.PasswordResetService;
+import org.example.onlinepossystem.security.api.RequestClientIp;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.annotation.Validated;
@@ -32,7 +33,7 @@ public class PasswordResetController {
             HttpServletRequest request,
             Model model
     ) {
-        model.addAttribute("message", passwordResetService.requestReset(email, clientIp(request)));
+        model.addAttribute("message", passwordResetService.requestReset(email, RequestClientIp.resolve(request)));
         return "forgot-password";
     }
 
@@ -59,11 +60,4 @@ public class PasswordResetController {
         }
     }
 
-    private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
 }

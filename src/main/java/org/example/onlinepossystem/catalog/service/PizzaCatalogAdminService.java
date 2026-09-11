@@ -23,9 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.function.Function;
 
 @Service
 public class PizzaCatalogAdminService {
@@ -65,25 +62,25 @@ public class PizzaCatalogAdminService {
                           List<Integer> ingredientIds, Map<String, String> parameters, String actor) {
         Pizza pizza = id == null ? new Pizza() : pizzaRepository.findById(id).orElseGet(Pizza::new);
         if (pizza.getId() == null) {
-            pizza.setId(nextId(pizzaRepository.findAll(), Pizza::getId));
+            pizza.setId(CatalogAdminSupport.nextId(pizzaRepository.findAll(), Pizza::getId));
         }
         PizzaCategory category = pizzaCategoryRepository.findById(categoryId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Pizza category not found with ID: " + categoryId));
         pizza.setCategory(category);
-        pizza.setName(cleanText(name));
-        pizza.setDescription(cleanText(description));
+        pizza.setName(CatalogAdminSupport.cleanText(name));
+        pizza.setDescription(CatalogAdminSupport.cleanText(description));
         pizza.setSortOrder(sortOrder == null ? 0 : sortOrder);
         pizza.setActive(parameters.containsKey("active"));
 
         Pizza savedPizza = pizzaRepository.save(pizza);
         replaceDefaultIngredients(savedPizza, ingredientIds);
         savePriceMatrix(savedPizza, parameters);
-        logger.info("Admin action=savePizza pizzaId={} admin={}", savedPizza.getId(), actorName(actor));
+        logger.info("Admin action=savePizza pizzaId={} admin={}", savedPizza.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     public void deletePizza(Integer id, String actor) {
         pizzaRepository.deleteById(id);
-        logger.info("Admin action=deletePizza pizzaId={} admin={}", id, actorName(actor));
+        logger.info("Admin action=deletePizza pizzaId={} admin={}", id, CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
@@ -95,7 +92,7 @@ public class PizzaCatalogAdminService {
                 .orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + pizzaSizeId));
         savePrice(branchId, pizza, pizzaSize, price);
         logger.info("Admin action=updatePizzaPrice branchId={} pizzaId={} sizeId={} admin={}",
-                branchId, pizzaId, pizzaSizeId, actorName(actor));
+                branchId, pizzaId, pizzaSizeId, CatalogAdminSupport.actorName(actor));
     }
 
     private void replaceDefaultIngredients(Pizza pizza, List<Integer> ingredientIds) {
@@ -115,7 +112,8 @@ public class PizzaCatalogAdminService {
         for (BranchView branch : branchLookup.findAll()) {
             for (PizzaSize size : pizzaSizeRepository.findAll()) {
                 String key = "pizzaPrice_" + branch.id() + "_" + size.getId();
-                parsePrice(parameters.get(key)).ifPresent(price -> savePrice(branch.id(), pizza, size, price));
+                CatalogAdminSupport.parsePrice(parameters.get(key))
+                        .ifPresent(price -> savePrice(branch.id(), pizza, size, price));
             }
         }
     }
@@ -134,27 +132,4 @@ public class PizzaCatalogAdminService {
         }
     }
 
-    private <T> Integer nextId(List<T> items, Function<T, Integer> idExtractor) {
-        return items.stream().map(idExtractor).filter(Objects::nonNull)
-                .mapToInt(Integer::intValue).max().orElse(0) + 1;
-    }
-
-    private Optional<Double> parsePrice(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return Optional.empty();
-        }
-        double price = Double.parseDouble(raw);
-        if (price < 0) {
-            throw new IllegalArgumentException("Price cannot be negative");
-        }
-        return Optional.of(price);
-    }
-
-    private String cleanText(String value) {
-        return value == null ? null : value.trim();
-    }
-
-    private String actorName(String actor) {
-        return actor == null || actor.isBlank() ? "unknown" : actor;
-    }
 }

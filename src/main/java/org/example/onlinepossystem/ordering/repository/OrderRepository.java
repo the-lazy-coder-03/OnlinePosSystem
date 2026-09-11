@@ -9,9 +9,7 @@ import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
-    List<Order> findByBranchId(Integer branchId);
     List<Order> findByBranchIdOrderByCreatedAtDesc(Integer branchId);
-    List<Order> findByBranchIdAndStatus(Integer branchId, String status);
     List<Order> findByBranchIdAndStatusOrderByCreatedAtDesc(Integer branchId, String status);
     List<Order> findAllByOrderByCreatedAtDesc();
     List<Order> findByCustomerIdOrderByCreatedAtDesc(Long customerId, Pageable pageable);

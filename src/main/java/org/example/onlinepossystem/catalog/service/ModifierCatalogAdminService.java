@@ -12,9 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 
 @Service
 public class ModifierCatalogAdminService {
@@ -38,17 +36,17 @@ public class ModifierCatalogAdminService {
                 ? new ModifierGroup()
                 : modifierGroupRepository.findById(id).orElseGet(ModifierGroup::new);
         if (group.getId() == null) {
-            group.setId(nextId(modifierGroupRepository.findAll(), ModifierGroup::getId));
+            group.setId(CatalogAdminSupport.nextId(modifierGroupRepository.findAll(), ModifierGroup::getId));
         }
         boolean required = parameters.containsKey("required");
         int min = minSelect == null ? (required ? 1 : 0) : Math.max(0, minSelect);
         int max = maxSelect == null ? Math.max(1, min) : Math.max(min, maxSelect);
-        group.setName(cleanText(name));
+        group.setName(CatalogAdminSupport.cleanText(name));
         group.setRequired(required);
         group.setMinSelect(min);
         group.setMaxSelect(max);
         modifierGroupRepository.save(group);
-        logger.info("Admin action=saveModifierGroup modifierGroupId={} admin={}", group.getId(), actorName(actor));
+        logger.info("Admin action=saveModifierGroup modifierGroupId={} admin={}", group.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
@@ -58,32 +56,20 @@ public class ModifierCatalogAdminService {
                 ? new ModifierOption()
                 : modifierOptionRepository.findById(id).orElseGet(ModifierOption::new);
         if (option.getId() == null) {
-            option.setId(nextId(modifierOptionRepository.findAll(), ModifierOption::getId));
+            option.setId(CatalogAdminSupport.nextId(modifierOptionRepository.findAll(), ModifierOption::getId));
         }
         ModifierGroup group = modifierGroupRepository.findById(groupId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Modifier group not found with ID: " + groupId));
         option.setGroupId(group.getId());
-        option.setName(cleanText(name));
+        option.setName(CatalogAdminSupport.cleanText(name));
         option.setMenuItemId(parseInteger(menuItemId).orElse(null));
         option.setAdditionalPrice(additionalPrice);
         modifierOptionRepository.save(option);
-        logger.info("Admin action=saveModifierOption modifierOptionId={} admin={}", option.getId(), actorName(actor));
-    }
-
-    private <T> Integer nextId(List<T> items, Function<T, Integer> idExtractor) {
-        return items.stream().map(idExtractor).filter(Objects::nonNull)
-                .mapToInt(Integer::intValue).max().orElse(0) + 1;
+        logger.info("Admin action=saveModifierOption modifierOptionId={} admin={}", option.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     private Optional<Integer> parseInteger(String raw) {
         return raw == null || raw.isBlank() ? Optional.empty() : Optional.of(Integer.valueOf(raw));
     }
 
-    private String cleanText(String value) {
-        return value == null ? null : value.trim();
-    }
-
-    private String actorName(String actor) {
-        return actor == null || actor.isBlank() ? "unknown" : actor;
-    }
 }

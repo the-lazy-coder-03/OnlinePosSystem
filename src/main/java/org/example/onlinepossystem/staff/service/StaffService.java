@@ -108,13 +108,6 @@ public class StaffService implements StaffDirectory, StaffOperations {
                 });
     }
 
-    /**
-     * Get all staff members (for admin purposes).
-     */
-    public List<Staff> getAllStaff() {
-        return staffRepository.findAll();
-    }
-
     private StaffAccount toAccount(Staff staff) {
         return new StaffAccount(staff.getId(), staff.getName(), staff.getBranch(), staff.getBranchCode());
     }

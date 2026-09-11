@@ -49,6 +49,6 @@ public class ToppingPriceAdminService {
         branchPrice.setPrice(price);
         branchExtraPriceRepository.save(branchPrice);
         logger.info("Admin action=updateToppingPrice branchId={} priceCategoryId={} sizeId={} admin={}",
-                branchId, priceCategoryId, pizzaSizeId, actor == null || actor.isBlank() ? "unknown" : actor);
+                branchId, priceCategoryId, pizzaSizeId, CatalogAdminSupport.actorName(actor));
     }
 }

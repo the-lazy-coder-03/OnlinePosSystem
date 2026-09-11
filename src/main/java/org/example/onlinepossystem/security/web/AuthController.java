@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.example.onlinepossystem.security.InvalidCredentialsException;
 import org.example.onlinepossystem.security.api.ApiAuthentication;
+import org.example.onlinepossystem.security.api.RequestClientIp;
 import org.example.onlinepossystem.security.dto.AuthRequest;
 import org.example.onlinepossystem.security.dto.AuthResponse;
 import org.springframework.http.ResponseEntity;
@@ -27,17 +28,10 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request, HttpServletRequest httpRequest) {
         try {
-            return ResponseEntity.ok(authenticationService.authenticate(request, clientIp(httpRequest)));
+            return ResponseEntity.ok(authenticationService.authenticate(request, RequestClientIp.resolve(httpRequest)));
         } catch (InvalidCredentialsException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, ex.getMessage());
         }
     }
 
-    private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
 }

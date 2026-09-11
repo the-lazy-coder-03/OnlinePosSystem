@@ -3,6 +3,7 @@ package org.example.onlinepossystem.security;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.example.onlinepossystem.security.api.RequestClientIp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.AuthenticationException;
@@ -26,7 +27,7 @@ public class LoggingAuthenticationFailureHandler extends SimpleUrlAuthentication
             HttpServletResponse response,
             AuthenticationException exception
     ) throws IOException, ServletException {
-        logger.warn("Failed login attempt from IP {}", clientIp(request));
+        logger.warn("Failed login attempt from IP {}", RequestClientIp.resolve(request));
 
         if ("true".equals(request.getParameter("adminLogin"))) {
             getRedirectStrategy().sendRedirect(request, response, "/admin/login?error");
@@ -36,11 +37,4 @@ public class LoggingAuthenticationFailureHandler extends SimpleUrlAuthentication
         super.onAuthenticationFailure(request, response, exception);
     }
 
-    private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
-    }
 }

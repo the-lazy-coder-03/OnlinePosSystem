@@ -214,7 +214,6 @@
     let branchOrders = [];
     let orderIndex = 0;
     let processedOrders = [];
-    let statusRefreshIntervalId = null;
     let liveStompClient = null;
     let liveReconnectTimerId = null;
     let liveReconnectDelayMs = 1000;
@@ -224,29 +223,6 @@
     const API_BASE_URL = '/api';
     const ADMIN_ORDERS_URL = `${API_BASE_URL}/admin/orders`;
     const ADMIN_ORDER_TOPIC = '/topic/admin/orders';
-
-    async function refreshStatus() {
-        try {
-            const res = await fetch("/api/status.php", { cache: "no-store" });
-            const data = await res.json();
-
-            // update DOM
-            const ordersCountEl = document.getElementById("ordersCount");
-            if (ordersCountEl) {
-                ordersCountEl.textContent = data.ordersCount;
-            }
-        } catch (e) {
-            console.error("refresh failed", e);
-        }
-    }
-
-    function startStatusRefresh() {
-        if (statusRefreshIntervalId) {
-            clearInterval(statusRefreshIntervalId);
-        }
-        refreshStatus();
-        statusRefreshIntervalId = setInterval(refreshStatus, 3000);
-    }
 
     function setLiveStatus(message) {
         const el = document.getElementById('liveStatus');
@@ -295,7 +271,6 @@
                 await fetchBranchOrders();
                 processedOrders = [];
                 showQueue();
-                startStatusRefresh();
             } else {
                 // Login failed
                 document.getElementById('codeError').style.display = 'block';

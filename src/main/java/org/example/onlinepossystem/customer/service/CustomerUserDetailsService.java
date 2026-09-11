@@ -57,7 +57,6 @@ public class CustomerUserDetailsService implements UserDetailsService {
                 .accountLocked(false)
                 .disabled(false)
                 .build();
-        //
     }
 
     private String formatPasswordForSpringSecurity(String storedPassword) {
