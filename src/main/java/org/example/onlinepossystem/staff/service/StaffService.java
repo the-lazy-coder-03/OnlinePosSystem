@@ -1,22 +1,38 @@
 package org.example.onlinepossystem.staff.service;
 
 import org.example.onlinepossystem.staff.api.StaffDirectory;
+import org.example.onlinepossystem.staff.api.StaffOperations;
 import org.example.onlinepossystem.staff.entity.Staff;
 import org.example.onlinepossystem.staff.repository.StaffRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
-public class StaffService implements StaffDirectory {
+public class StaffService implements StaffDirectory, StaffOperations {
 
     private final StaffRepository staffRepository;
 
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder passwordEncoder;
 
-    public StaffService(StaffRepository staffRepository) {
+    public StaffService(StaffRepository staffRepository,
+                        @Qualifier("staffPasswordEncoder") PasswordEncoder passwordEncoder) {
         this.staffRepository = staffRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    @Override
+    public Optional<String> authenticate(String pin, String code) {
+        if (code != null && !code.isEmpty()) {
+            return Optional.ofNullable(authenticateByCode(code));
+        }
+        if (pin != null && !pin.isEmpty()) {
+            return Optional.ofNullable(authenticateStaff(pin));
+        }
+        return Optional.empty();
     }
 
     /**
@@ -59,6 +75,7 @@ public class StaffService implements StaffDirectory {
     /**
      * Create a new staff member with a hashed PIN and optional branch code.
      */
+    @Override
     public Staff createStaff(String name, String branch, String plainPin, String branchCode) {
         String hashedPin = plainPin != null ? passwordEncoder.encode(plainPin) : null;
         Staff staff = new Staff(name, branch, hashedPin, branchCode);

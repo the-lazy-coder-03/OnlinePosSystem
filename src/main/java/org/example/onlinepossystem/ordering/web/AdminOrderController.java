@@ -2,19 +2,19 @@ package org.example.onlinepossystem.ordering.web;
 
 import jakarta.validation.Valid;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
+import org.example.onlinepossystem.ordering.api.OrderRealtimePublisher;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
 import org.example.onlinepossystem.ordering.dto.OrderWebhookRequest;
-import org.example.onlinepossystem.ordering.service.OrderLiveUpdateService;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -25,11 +25,11 @@ import java.util.Map;
 public class AdminOrderController {
 
     private final OrderOperations orderOperations;
-    private final OrderLiveUpdateService orderLiveUpdateService;
+    private final OrderRealtimePublisher orderRealtimePublisher;
 
-    public AdminOrderController(OrderOperations orderOperations, OrderLiveUpdateService orderLiveUpdateService) {
+    public AdminOrderController(OrderOperations orderOperations, OrderRealtimePublisher orderRealtimePublisher) {
         this.orderOperations = orderOperations;
-        this.orderLiveUpdateService = orderLiveUpdateService;
+        this.orderRealtimePublisher = orderRealtimePublisher;
     }
 
     @GetMapping
@@ -42,15 +42,18 @@ public class AdminOrderController {
         return ResponseEntity.ok(orderOperations.getOrdersByBranch(branch));
     }
 
-    @GetMapping(path = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamOrders() {
-        return orderLiveUpdateService.connectAdminStream();
+    @PutMapping("/{id}/status")
+    public ResponseEntity<OrderResponseDTO> updateOrderStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request
+    ) {
+        return ResponseEntity.ok(orderOperations.updateOrderStatus(id, request.get("status")));
     }
 
     @PostMapping("/webhook")
     public ResponseEntity<Map<String, Object>> receiveOrderNotification(@Valid @RequestBody OrderWebhookRequest request) {
         OrderResponseDTO order = orderOperations.getOrderById(request.orderId());
-        orderLiveUpdateService.sendOrderToAdmins(order);
+        orderRealtimePublisher.publishToAdmins(order);
         return ResponseEntity.ok(Map.of("success", true, "orderId", order.getId()));
     }
 }

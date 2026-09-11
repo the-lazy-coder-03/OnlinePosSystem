@@ -7,6 +7,7 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -56,6 +57,8 @@ class ModularArchitectureTest {
         noFields()
                 .should()
                 .beAnnotatedWith(Autowired.class)
+                .orShould()
+                .beAnnotatedWith(Value.class)
                 .check(classes);
     }
 
@@ -67,6 +70,42 @@ class ModularArchitectureTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAPackage("..repository..")
+                .check(classes);
+    }
+
+    @Test
+    void servicesDoNotDependOnWebRequestOrViewTypes() {
+        noClasses()
+                .that()
+                .resideInAPackage("..service..")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.ui.Model")
+                .orShould()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.security.core.Authentication")
+                .orShould()
+                .dependOnClassesThat()
+                .resideInAPackage("org.springframework.web..")
+                .check(classes);
+    }
+
+    @Test
+    void externalSdkTypesStayInsideAdaptersAndConfiguration() {
+        noClasses()
+                .that()
+                .resideOutsideOfPackages("..location.integration..", "..shared.config..")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.web.client.RestTemplate")
+                .check(classes);
+
+        noClasses()
+                .that()
+                .resideOutsideOfPackage("..customer.notification..")
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.mail.javamail.JavaMailSender")
                 .check(classes);
     }
 
@@ -139,6 +178,34 @@ class ModularArchitectureTest {
         assertThat(violations).isEmpty();
     }
 
+    @Test
+    void crossModuleDependenciesUsePublicOrDomainPackages() {
+        List<String> violations = new ArrayList<>();
+
+        for (JavaClass sourceClass : classes) {
+            Optional<String> sourceModule = moduleName(sourceClass.getPackageName());
+            if (sourceModule.isEmpty()) {
+                continue;
+            }
+
+            for (Dependency dependency : sourceClass.getDirectDependenciesFromSelf()) {
+                JavaClass targetClass = dependency.getTargetClass();
+                Optional<String> targetModule = moduleName(targetClass.getPackageName());
+                if (targetModule.isEmpty() || targetModule.equals(sourceModule)) {
+                    continue;
+                }
+
+                String targetPackage = targetClass.getPackageName();
+                if (isImplementationPackage(targetPackage)) {
+                    violations.add(sourceClass.getName() + " -> " + targetClass.getName());
+                }
+            }
+        }
+
+        violations.sort(Comparator.naturalOrder());
+        assertThat(violations).isEmpty();
+    }
+
     private Optional<String> moduleName(String packageName) {
         if (!packageName.startsWith(ROOT_PREFIX)) {
             return Optional.empty();
@@ -148,5 +215,13 @@ class ModularArchitectureTest {
         int separator = remainder.indexOf('.');
         String module = separator == -1 ? remainder : remainder.substring(0, separator);
         return MODULES.contains(module) ? Optional.of(module) : Optional.empty();
+    }
+
+    private boolean isImplementationPackage(String packageName) {
+        return packageName.contains(".service")
+                || packageName.contains(".repository")
+                || packageName.contains(".web")
+                || packageName.contains(".integration")
+                || packageName.contains(".notification");
     }
 }

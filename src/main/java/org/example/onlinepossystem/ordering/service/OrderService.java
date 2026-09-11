@@ -2,25 +2,15 @@ package org.example.onlinepossystem.ordering.service;
 
 import org.example.onlinepossystem.branch.api.BranchLookup;
 import org.example.onlinepossystem.branch.entity.Branch;
-import org.example.onlinepossystem.catalog.api.OrderCatalogResolver;
-import org.example.onlinepossystem.catalog.dto.MenuDTO;
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
 import org.example.onlinepossystem.customer.entity.Customer;
 import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
+import org.example.onlinepossystem.ordering.api.OrderEventPublisher;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
 import org.example.onlinepossystem.ordering.entity.Order;
-import org.example.onlinepossystem.ordering.entity.OrderBurgerExtraComponent;
-import org.example.onlinepossystem.ordering.entity.OrderBurgerProtein;
-import org.example.onlinepossystem.ordering.entity.OrderBurgerRemovedComponent;
-import org.example.onlinepossystem.ordering.entity.OrderMenuItem;
-import org.example.onlinepossystem.ordering.entity.OrderMenuItemExtra;
-import org.example.onlinepossystem.ordering.entity.OrderPizzaItem;
-import org.example.onlinepossystem.ordering.entity.OrderPizzaItemExtra;
-import org.example.onlinepossystem.ordering.event.OrderCreatedEvent;
 import org.example.onlinepossystem.ordering.repository.OrderRepository;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,30 +23,31 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     private final OrderRepository orderRepository;
     private final BranchLookup branchLookup;
     private final CustomerAccountReader customerAccountReader;
-    private final OrderCatalogResolver catalogResolver;
     private final OrderRequestValidator orderRequestValidator;
+    private final MenuOrderItemFactory menuOrderItemFactory;
+    private final PizzaOrderItemFactory pizzaOrderItemFactory;
+    private final OrderStatusPolicy orderStatusPolicy;
     private final OrderResponseMapper orderResponseMapper;
-    private final ApplicationEventPublisher eventPublisher;
+    private final OrderEventPublisher eventPublisher;
 
     public OrderService(OrderRepository orderRepository,
                         BranchLookup branchLookup,
                         CustomerAccountReader customerAccountReader,
-                        OrderCatalogResolver catalogResolver,
                         OrderRequestValidator orderRequestValidator,
+                        MenuOrderItemFactory menuOrderItemFactory,
+                        PizzaOrderItemFactory pizzaOrderItemFactory,
+                        OrderStatusPolicy orderStatusPolicy,
                         OrderResponseMapper orderResponseMapper,
-                        ApplicationEventPublisher eventPublisher) {
+                        OrderEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.branchLookup = branchLookup;
         this.customerAccountReader = customerAccountReader;
-        this.catalogResolver = catalogResolver;
         this.orderRequestValidator = orderRequestValidator;
+        this.menuOrderItemFactory = menuOrderItemFactory;
+        this.pizzaOrderItemFactory = pizzaOrderItemFactory;
+        this.orderStatusPolicy = orderStatusPolicy;
         this.orderResponseMapper = orderResponseMapper;
         this.eventPublisher = eventPublisher;
-    }
-
-    @Transactional(readOnly = true)
-    public List<MenuDTO> getMenuForBranch(String branchName) {
-        return catalogResolver.getMenuForBranch(branchName);
     }
 
     @Override
@@ -93,15 +84,15 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
 
         for (OrderRequestDTO.OrderItemRequestDTO itemRequest : request.getItems()) {
             if (itemRequest.getPizzaId() != null) {
-                order.addPizzaItem(buildPizzaItem(branch.getId(), itemRequest));
+                order.addPizzaItem(pizzaOrderItemFactory.create(branch.getId(), itemRequest));
             } else {
-                order.addMenuItem(buildMenuItem(branch.getId(), itemRequest));
+                order.addMenuItem(menuOrderItemFactory.create(branch.getId(), itemRequest));
             }
         }
 
         Order savedOrder = orderRepository.save(order);
         OrderResponseDTO response = orderResponseMapper.toDto(savedOrder);
-        eventPublisher.publishEvent(new OrderCreatedEvent(response));
+        eventPublisher.orderCreated(response, customerUsername(savedOrder));
         return response;
     }
 
@@ -148,10 +139,14 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     @Override
     @Transactional
     public OrderResponseDTO updateOrderStatus(Long orderId, String newStatus) {
+        String validatedStatus = orderStatusPolicy.requireValid(newStatus);
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Order not found with ID: " + orderId));
-        order.setStatus(newStatus);
-        return orderResponseMapper.toDto(orderRepository.save(order));
+        order.setStatus(validatedStatus);
+        Order savedOrder = orderRepository.save(order);
+        OrderResponseDTO response = orderResponseMapper.toDto(savedOrder);
+        eventPublisher.orderStatusChanged(response, customerUsername(savedOrder));
+        return response;
     }
 
     @Override
@@ -170,33 +165,6 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         return orderResponseMapper.toDto(order);
     }
 
-    private OrderPizzaItem buildPizzaItem(Integer branchId, OrderRequestDTO.OrderItemRequestDTO itemRequest) {
-        OrderCatalogResolver.ResolvedPizzaItem resolvedItem = catalogResolver.resolvePizzaItem(
-                branchId,
-                itemRequest.getPizzaId(),
-                itemRequest.getPizzaSizeId(),
-                itemRequest.getSizeCm(),
-                toCatalogCustomizations(itemRequest.getCustomizations())
-        );
-
-        OrderPizzaItem pizzaItem = new OrderPizzaItem();
-        pizzaItem.setPizza(resolvedItem.pizza());
-        pizzaItem.setPizzaSize(resolvedItem.pizzaSize());
-        pizzaItem.setQty(itemRequest.getQuantity());
-        pizzaItem.setBasePriceAtTime(resolvedItem.basePrice());
-        pizzaItem.setNotes(itemRequest.getNotes());
-
-        for (OrderCatalogResolver.ResolvedPizzaExtra resolvedExtra : resolvedItem.extras()) {
-            OrderPizzaItemExtra extra = new OrderPizzaItemExtra();
-            extra.setIngredient(resolvedExtra.ingredient());
-            extra.setQty(resolvedExtra.quantity());
-            extra.setUnitPriceAtTime(resolvedExtra.unitPrice());
-            pizzaItem.addExtra(extra);
-        }
-
-        return pizzaItem;
-    }
-
     private Customer resolveCustomer(String customerEmail) {
         if (customerEmail == null || customerEmail.isBlank()) {
             return null;
@@ -204,74 +172,11 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         return customerAccountReader.findByEmail(customerEmail).orElse(null);
     }
 
-    private OrderMenuItem buildMenuItem(Integer branchId, OrderRequestDTO.OrderItemRequestDTO itemRequest) {
-        OrderCatalogResolver.ResolvedMenuItem resolvedItem = catalogResolver.resolveMenuItem(
-                branchId,
-                itemRequest.getMenuItemId(),
-                toCatalogCustomizations(itemRequest.getCustomizations())
-        );
-
-        OrderMenuItem orderItem = new OrderMenuItem();
-        orderItem.setMenuItem(resolvedItem.menuItem());
-        orderItem.setQty(itemRequest.getQuantity());
-        orderItem.setUnitPriceAtTime(resolvedItem.unitPrice());
-        orderItem.setNotes(itemRequest.getNotes());
-
-        applyBurgerSelection(orderItem, resolvedItem.burgerSelection());
-        for (OrderCatalogResolver.ResolvedGenericMenuExtra resolvedExtra : resolvedItem.extras()) {
-            OrderMenuItemExtra extra = new OrderMenuItemExtra();
-            extra.setName(resolvedExtra.name());
-            extra.setQty(resolvedExtra.quantity());
-            extra.setUnitPriceAtTime(resolvedExtra.unitPrice());
-            orderItem.addExtra(extra);
+    private String customerUsername(Order order) {
+        if (order == null || order.getCustomer() == null) {
+            return null;
         }
-
-        return orderItem;
+        return order.getCustomer().getEmail();
     }
 
-    private void applyBurgerSelection(
-            OrderMenuItem orderItem,
-            OrderCatalogResolver.ResolvedBurgerSelection burgerSelection
-    ) {
-        if (burgerSelection == null || burgerSelection.protein() == null) {
-            return;
-        }
-
-        OrderCatalogResolver.ResolvedBurgerProtein resolvedProtein = burgerSelection.protein();
-        OrderBurgerProtein protein = new OrderBurgerProtein();
-        protein.setComponent(resolvedProtein.component());
-        protein.setProteinQtyPerBurger(resolvedProtein.quantity());
-        protein.setUnitPriceAtTime(resolvedProtein.unitPrice());
-        orderItem.setBurgerProtein(protein);
-
-        for (OrderCatalogResolver.ResolvedBurgerComponent resolvedComponent : burgerSelection.removedComponents()) {
-            OrderBurgerRemovedComponent removedComponent = new OrderBurgerRemovedComponent();
-            removedComponent.setComponent(resolvedComponent.component());
-            orderItem.addRemovedBurgerComponent(removedComponent);
-        }
-
-        for (OrderCatalogResolver.ResolvedBurgerComponent resolvedComponent : burgerSelection.extraComponents()) {
-            OrderBurgerExtraComponent extraComponent = new OrderBurgerExtraComponent();
-            extraComponent.setComponent(resolvedComponent.component());
-            extraComponent.setQty(resolvedComponent.quantity());
-            extraComponent.setUnitPriceAtTime(resolvedComponent.unitPrice());
-            orderItem.addExtraBurgerComponent(extraComponent);
-        }
-    }
-
-    private List<OrderCatalogResolver.CatalogCustomizationRequest> toCatalogCustomizations(
-            List<OrderRequestDTO.CustomizationRequestDTO> customizations
-    ) {
-        if (customizations == null) {
-            return List.of();
-        }
-        return customizations.stream()
-                .filter(customization -> customization != null)
-                .map(customization -> new OrderCatalogResolver.CatalogCustomizationRequest(
-                        customization.getId(),
-                        customization.getQuantity(),
-                        customization.getType()
-                ))
-                .toList();
-    }
 }

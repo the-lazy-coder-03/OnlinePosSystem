@@ -1,5 +1,6 @@
 package org.example.onlinepossystem.catalog.service;
 
+import org.example.onlinepossystem.catalog.api.CatalogAdministration;
 import org.example.onlinepossystem.branch.api.BranchLookup;
 import org.example.onlinepossystem.branch.entity.Branch;
 import org.example.onlinepossystem.catalog.entity.BranchExtraPrice;
@@ -34,13 +35,12 @@ import org.example.onlinepossystem.catalog.repository.PizzaSizeRepository;
 import org.example.onlinepossystem.catalog.repository.PriceCategoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.ui.Model;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,7 +49,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-public class CatalogAdminService {
+public class CatalogAdminService implements CatalogAdministration {
 
     private static final Logger logger = LoggerFactory.getLogger(CatalogAdminService.class);
 
@@ -104,7 +104,9 @@ public class CatalogAdminService {
         this.menuItemModifierGroupRepository = menuItemModifierGroupRepository;
     }
 
-    public void populateDashboard(Model model) {
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> getDashboardAttributes() {
         List<Pizza> pizzas = sorted(pizzaRepository.findAll(), Comparator
                 .comparingInt((Pizza p) -> p.getCategory() == null ? 9999 : safeInt(p.getCategory().getSortOrder()))
                 .thenComparingInt(p -> safeInt(p.getSortOrder()))
@@ -134,54 +136,52 @@ public class CatalogAdminService {
                 .comparingInt((ModifierOption o) -> safeInt(o.getGroupId()))
                 .thenComparing(ModifierOption::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
 
-        model.addAttribute("pizzas", pizzas);
-        model.addAttribute("menuItems", menuItems);
-        model.addAttribute("branches", sorted(branchLookup.findAll(), Comparator.comparing(Branch::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))));
-        model.addAttribute("pizzaCategories", pizzaCategories);
-        model.addAttribute("menuCategories", menuCategories);
-        model.addAttribute("pizzaSizes", pizzaSizes);
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("pizzas", pizzas);
+        attributes.put("menuItems", menuItems);
+        attributes.put("branches", sorted(branchLookup.findAll(), Comparator.comparing(Branch::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))));
+        attributes.put("pizzaCategories", pizzaCategories);
+        attributes.put("menuCategories", menuCategories);
+        attributes.put("pizzaSizes", pizzaSizes);
         List<BranchPizzaPrice> branchPizzaPrices = branchPizzaPriceRepository.findAll();
         List<BranchMenuItemPrice> branchMenuItemPrices = branchMenuItemPriceRepository.findAll();
         List<PizzaDefaultIngredient> pizzaDefaultIngredients = pizzaDefaultIngredientRepository.findAll();
         List<MenuItemModifierGroup> menuItemModifierGroups = menuItemModifierGroupRepository.findAll();
 
-        model.addAttribute("branchPizzaPrices", branchPizzaPrices);
-        model.addAttribute("branchMenuItemPrices", branchMenuItemPrices);
-        model.addAttribute("priceCategories", priceCategories);
-        model.addAttribute("branchExtraPrices", branchExtraPriceRepository.findAll());
-        model.addAttribute("ingredients", ingredients);
-        model.addAttribute("pizzaDefaultIngredients", pizzaDefaultIngredients);
-        model.addAttribute("modifierGroups", modifierGroups);
-        model.addAttribute("modifierOptions", modifierOptions);
-        model.addAttribute("menuItemModifierGroups", menuItemModifierGroups);
-        model.addAttribute("pizzaIngredientIdsByPizzaId", pizzaDefaultIngredients.stream()
+        attributes.put("branchPizzaPrices", branchPizzaPrices);
+        attributes.put("branchMenuItemPrices", branchMenuItemPrices);
+        attributes.put("priceCategories", priceCategories);
+        attributes.put("branchExtraPrices", branchExtraPriceRepository.findAll());
+        attributes.put("ingredients", ingredients);
+        attributes.put("pizzaDefaultIngredients", pizzaDefaultIngredients);
+        attributes.put("modifierGroups", modifierGroups);
+        attributes.put("modifierOptions", modifierOptions);
+        attributes.put("menuItemModifierGroups", menuItemModifierGroups);
+        attributes.put("pizzaIngredientIdsByPizzaId", pizzaDefaultIngredients.stream()
                 .filter(pdi -> pdi.getPizza() != null && pdi.getIngredient() != null)
                 .collect(Collectors.groupingBy(
                         pdi -> pdi.getPizza().getId(),
                         Collectors.mapping(pdi -> String.valueOf(pdi.getIngredient().getId()), Collectors.joining(",")))));
-        model.addAttribute("modifierGroupIdsByMenuItemId", menuItemModifierGroups.stream()
+        attributes.put("modifierGroupIdsByMenuItemId", menuItemModifierGroups.stream()
                 .collect(Collectors.groupingBy(
                         MenuItemModifierGroup::getMenuItemId,
                         Collectors.mapping(link -> String.valueOf(link.getGroupId()), Collectors.joining(",")))));
-        model.addAttribute("activePizzaCount", pizzas.stream().filter(Pizza::isActive).count());
-        model.addAttribute("activeMenuItemCount", menuItems.stream().filter(MenuItem::isActive).count());
-        model.addAttribute("activeIngredientCount", ingredients.stream().filter(Ingredient::isActive).count());
-    }
-
-    public String adminOrdersPage(Model model) {
-        model.addAttribute("adminMode", true);
-        return "InputOrders";
+        attributes.put("activePizzaCount", pizzas.stream().filter(Pizza::isActive).count());
+        attributes.put("activeMenuItemCount", menuItems.stream().filter(MenuItem::isActive).count());
+        attributes.put("activeIngredientCount", ingredients.stream().filter(Ingredient::isActive).count());
+        return attributes;
     }
 
     @Transactional
-    public String savePizza(Integer id,
+    @Override
+    public void savePizza(Integer id,
                             String name,
                             Integer categoryId,
                             String description,
                             Integer sortOrder,
                             List<Integer> ingredientIds,
                             Map<String, String> params,
-                            Authentication authentication) {
+                            String actor) {
         Pizza pizza = id == null
                 ? new Pizza()
                 : pizzaRepository.findById(id).orElseGet(Pizza::new);
@@ -201,40 +201,40 @@ public class CatalogAdminService {
         replaceDefaultIngredients(savedPizza, ingredientIds);
         savePizzaPriceMatrix(savedPizza, params);
 
-        logger.info("Admin action={} pizzaId={} admin={}", "savePizza", savedPizza.getId(), adminName(authentication));
-        return "redirect:/admin#items";
+        logger.info("Admin action={} pizzaId={} admin={}", "savePizza", savedPizza.getId(), actorName(actor));
     }
 
-    public String deletePizza(Integer id, Authentication authentication) {
+    @Override
+    public void deletePizza(Integer id, String actor) {
         pizzaRepository.deleteById(id);
-        logger.info("Admin action={} pizzaId={} admin={}", "deletePizza", id, adminName(authentication));
-        return "redirect:/admin#items";
+        logger.info("Admin action={} pizzaId={} admin={}", "deletePizza", id, actorName(actor));
     }
 
-    public String updatePizzaPrice(Integer branchId,
+    @Override
+    public void updatePizzaPrice(Integer branchId,
                                    Integer pizzaId,
                                    Integer pizzaSizeId,
                                    Double price,
-                                   Authentication authentication) {
+                                   String actor) {
         Branch branch = branchLookup.requireById(branchId);
         Pizza pizza = pizzaRepository.findById(pizzaId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza not found with ID: " + pizzaId));
         PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + pizzaSizeId));
         savePizzaPrice(branch, pizza, pizzaSize, price);
 
         logger.info("Admin action={} branchId={} pizzaId={} sizeId={} admin={}",
-                "updatePizzaPrice", branchId, pizzaId, pizzaSizeId, adminName(authentication));
-        return "redirect:/admin#pricing";
+                "updatePizzaPrice", branchId, pizzaId, pizzaSizeId, actorName(actor));
     }
 
     @Transactional
-    public String saveMenuItem(Integer id,
+    @Override
+    public void saveMenuItem(Integer id,
                                String name,
                                Integer categoryId,
                                String description,
                                Integer sortOrder,
                                List<Integer> modifierGroupIds,
                                Map<String, String> params,
-                               Authentication authentication) {
+                               String actor) {
         MenuItem menuItem = id == null
                 ? new MenuItem()
                 : menuItemRepository.findById(id).orElseGet(MenuItem::new);
@@ -256,34 +256,34 @@ public class CatalogAdminService {
         replaceMenuItemModifierGroups(savedMenuItem, modifierGroupIds);
         saveMenuItemPriceMatrix(savedMenuItem, params);
 
-        logger.info("Admin action={} menuItemId={} admin={}", "saveMenuItem", savedMenuItem.getId(), adminName(authentication));
-        return "redirect:/admin#items";
+        logger.info("Admin action={} menuItemId={} admin={}", "saveMenuItem", savedMenuItem.getId(), actorName(actor));
     }
 
-    public String deleteMenuItem(Integer id, Authentication authentication) {
+    @Override
+    public void deleteMenuItem(Integer id, String actor) {
         menuItemRepository.deleteById(id);
-        logger.info("Admin action={} menuItemId={} admin={}", "deleteMenuItem", id, adminName(authentication));
-        return "redirect:/admin#items";
+        logger.info("Admin action={} menuItemId={} admin={}", "deleteMenuItem", id, actorName(actor));
     }
 
-    public String updateMenuItemPrice(Integer branchId,
+    @Override
+    public void updateMenuItemPrice(Integer branchId,
                                       Integer menuItemId,
                                       Double price,
-                                      Authentication authentication) {
+                                      String actor) {
         Branch branch = branchLookup.requireById(branchId);
         MenuItem menuItem = menuItemRepository.findById(menuItemId).orElseThrow(() -> new java.util.NoSuchElementException("Menu item not found with ID: " + menuItemId));
 
         saveMenuItemPrice(branch, menuItem, price);
         logger.info("Admin action={} branchId={} menuItemId={} admin={}",
-                "updateMenuItemPrice", branchId, menuItemId, adminName(authentication));
-        return "redirect:/admin#pricing";
+                "updateMenuItemPrice", branchId, menuItemId, actorName(actor));
     }
 
-    public String updateToppingPrice(Integer branchId,
+    @Override
+    public void updateToppingPrice(Integer branchId,
                                      Integer priceCategoryId,
                                      Integer pizzaSizeId,
                                      Double price,
-                                     Authentication authentication) {
+                                     String actor) {
         Branch branch = branchLookup.requireById(branchId);
         PriceCategory priceCategory = priceCategoryRepository.findById(priceCategoryId).orElseThrow(() -> new java.util.NoSuchElementException("Price category not found with ID: " + priceCategoryId));
         PizzaSize pizzaSize = pizzaSizeRepository.findById(pizzaSizeId).orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found with ID: " + pizzaSizeId));
@@ -293,15 +293,15 @@ public class CatalogAdminService {
         bep.setPrice(price);
         branchExtraPriceRepository.save(bep);
         logger.info("Admin action={} branchId={} priceCategoryId={} sizeId={} admin={}",
-                "updateToppingPrice", branchId, priceCategoryId, pizzaSizeId, adminName(authentication));
-        return "redirect:/admin#pricing";
+                "updateToppingPrice", branchId, priceCategoryId, pizzaSizeId, actorName(actor));
     }
 
-    public String savePizzaCategory(Integer id,
+    @Override
+    public void savePizzaCategory(Integer id,
                                     String name,
                                     Integer sortOrder,
                                     Map<String, String> params,
-                                    Authentication authentication) {
+                                    String actor) {
         PizzaCategory category = id == null
                 ? new PizzaCategory()
                 : pizzaCategoryRepository.findById(id).orElseGet(PizzaCategory::new);
@@ -312,15 +312,15 @@ public class CatalogAdminService {
         category.setSortOrder(sortOrder == null ? 0 : sortOrder);
         category.setActive(params.containsKey("active"));
         pizzaCategoryRepository.save(category);
-        logger.info("Admin action={} pizzaCategoryId={} admin={}", "savePizzaCategory", category.getId(), adminName(authentication));
-        return "redirect:/admin#categories";
+        logger.info("Admin action={} pizzaCategoryId={} admin={}", "savePizzaCategory", category.getId(), actorName(actor));
     }
 
-    public String saveMenuCategory(Integer id,
+    @Override
+    public void saveMenuCategory(Integer id,
                                    String name,
                                    Integer sortOrder,
                                    Map<String, String> params,
-                                   Authentication authentication) {
+                                   String actor) {
         MenuCategory category = id == null
                 ? new MenuCategory()
                 : menuCategoryRepository.findById(id).orElseGet(MenuCategory::new);
@@ -331,15 +331,15 @@ public class CatalogAdminService {
         category.setSortOrder(sortOrder == null ? 0 : sortOrder);
         category.setActive(params.containsKey("active"));
         menuCategoryRepository.save(category);
-        logger.info("Admin action={} menuCategoryId={} admin={}", "saveMenuCategory", category.getId(), adminName(authentication));
-        return "redirect:/admin#categories";
+        logger.info("Admin action={} menuCategoryId={} admin={}", "saveMenuCategory", category.getId(), actorName(actor));
     }
 
-    public String savePizzaSize(Integer id,
+    @Override
+    public void savePizzaSize(Integer id,
                                 Integer cm,
                                 Integer sortOrder,
                                 Map<String, String> params,
-                                Authentication authentication) {
+                                String actor) {
         PizzaSize size = id == null
                 ? new PizzaSize()
                 : pizzaSizeRepository.findById(id).orElseGet(PizzaSize::new);
@@ -350,15 +350,15 @@ public class CatalogAdminService {
         size.setSortOrder(sortOrder == null ? 0 : sortOrder);
         size.setActive(params.containsKey("active"));
         pizzaSizeRepository.save(size);
-        logger.info("Admin action={} pizzaSizeId={} admin={}", "savePizzaSize", size.getId(), adminName(authentication));
-        return "redirect:/admin#categories";
+        logger.info("Admin action={} pizzaSizeId={} admin={}", "savePizzaSize", size.getId(), actorName(actor));
     }
 
-    public String savePriceCategory(Integer id,
+    @Override
+    public void savePriceCategory(Integer id,
                                     String name,
                                     Integer sortOrder,
                                     Map<String, String> params,
-                                    Authentication authentication) {
+                                    String actor) {
         PriceCategory category = id == null
                 ? new PriceCategory()
                 : priceCategoryRepository.findById(id).orElseGet(PriceCategory::new);
@@ -369,15 +369,15 @@ public class CatalogAdminService {
         category.setSortOrder(sortOrder == null ? 0 : sortOrder);
         category.setActive(params.containsKey("active"));
         priceCategoryRepository.save(category);
-        logger.info("Admin action={} priceCategoryId={} admin={}", "savePriceCategory", category.getId(), adminName(authentication));
-        return "redirect:/admin#categories";
+        logger.info("Admin action={} priceCategoryId={} admin={}", "savePriceCategory", category.getId(), actorName(actor));
     }
 
-    public String saveIngredient(Integer id,
+    @Override
+    public void saveIngredient(Integer id,
                                  String name,
                                  Integer priceCategoryId,
                                  Map<String, String> params,
-                                 Authentication authentication) {
+                                 String actor) {
         Ingredient ingredient = id == null
                 ? new Ingredient()
                 : ingredientRepository.findById(id).orElseGet(Ingredient::new);
@@ -391,16 +391,16 @@ public class CatalogAdminService {
         ingredient.setActive(params.containsKey("active"));
         ingredient.setSeasonal(params.containsKey("seasonal"));
         ingredientRepository.save(ingredient);
-        logger.info("Admin action={} ingredientId={} admin={}", "saveIngredient", ingredient.getId(), adminName(authentication));
-        return "redirect:/admin#ingredients";
+        logger.info("Admin action={} ingredientId={} admin={}", "saveIngredient", ingredient.getId(), actorName(actor));
     }
 
-    public String saveModifierGroup(Integer id,
+    @Override
+    public void saveModifierGroup(Integer id,
                                     String name,
                                     Integer minSelect,
                                     Integer maxSelect,
                                     Map<String, String> params,
-                                    Authentication authentication) {
+                                    String actor) {
         ModifierGroup group = id == null
                 ? new ModifierGroup()
                 : modifierGroupRepository.findById(id).orElseGet(ModifierGroup::new);
@@ -415,16 +415,16 @@ public class CatalogAdminService {
         group.setMinSelect(min);
         group.setMaxSelect(max);
         modifierGroupRepository.save(group);
-        logger.info("Admin action={} modifierGroupId={} admin={}", "saveModifierGroup", group.getId(), adminName(authentication));
-        return "redirect:/admin#modifiers";
+        logger.info("Admin action={} modifierGroupId={} admin={}", "saveModifierGroup", group.getId(), actorName(actor));
     }
 
-    public String saveModifierOption(Integer id,
+    @Override
+    public void saveModifierOption(Integer id,
                                      Integer groupId,
                                      String name,
                                      String menuItemId,
                                      BigDecimal additionalPrice,
-                                     Authentication authentication) {
+                                     String actor) {
         ModifierOption option = id == null
                 ? new ModifierOption()
                 : modifierOptionRepository.findById(id).orElseGet(ModifierOption::new);
@@ -438,8 +438,7 @@ public class CatalogAdminService {
         option.setMenuItemId(parseInteger(menuItemId).orElse(null));
         option.setAdditionalPrice(additionalPrice);
         modifierOptionRepository.save(option);
-        logger.info("Admin action={} modifierOptionId={} admin={}", "saveModifierOption", option.getId(), adminName(authentication));
-        return "redirect:/admin#modifiers";
+        logger.info("Admin action={} modifierOptionId={} admin={}", "saveModifierOption", option.getId(), actorName(actor));
     }
 
     private void replaceDefaultIngredients(Pizza pizza, List<Integer> ingredientIds) {
@@ -554,7 +553,7 @@ public class CatalogAdminService {
         return value == null ? null : value.trim();
     }
 
-    private String adminName(Authentication authentication) {
-        return authentication == null ? "unknown" : authentication.getName();
+    private String actorName(String actor) {
+        return actor == null || actor.isBlank() ? "unknown" : actor;
     }
 }

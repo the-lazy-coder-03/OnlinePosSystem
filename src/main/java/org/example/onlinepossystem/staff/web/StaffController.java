@@ -1,6 +1,6 @@
 package org.example.onlinepossystem.staff.web;
 
-import org.example.onlinepossystem.staff.service.StaffService;
+import org.example.onlinepossystem.staff.api.StaffOperations;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,10 +14,10 @@ import java.util.Map;
 @RequestMapping("/api/staff")
 public class StaffController {
 
-    private final StaffService staffService;
+    private final StaffOperations staffOperations;
 
-    public StaffController(StaffService staffService) {
-        this.staffService = staffService;
+    public StaffController(StaffOperations staffOperations) {
+        this.staffOperations = staffOperations;
     }
 
     /**
@@ -34,28 +34,18 @@ public class StaffController {
         String enteredPin = request.get("pin");
         String enteredCode = request.get("code");
 
-        String branch = null;
-
-        if (enteredCode != null && !enteredCode.isEmpty()) {
-            branch = staffService.authenticateByCode(enteredCode);
-        } else if (enteredPin != null && !enteredPin.isEmpty()) {
-            branch = staffService.authenticateStaff(enteredPin);
-        } else {
+        if ((enteredCode == null || enteredCode.isEmpty()) && (enteredPin == null || enteredPin.isEmpty())) {
             return ResponseEntity.badRequest()
                     .body(Map.of("success", false, "message", "PIN or Code is required"));
         }
 
-        if (branch != null) {
-            // Authentication successful
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "branch", branch
-            ));
-        } else {
-            // Authentication failed
-            return ResponseEntity.status(401)
-                    .body(Map.of("success", false, "message", "Invalid credentials"));
-        }
+        return staffOperations.authenticate(enteredPin, enteredCode)
+                .<ResponseEntity<?>>map(branch -> ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "branch", branch
+                )))
+                .orElseGet(() -> ResponseEntity.status(401)
+                        .body(Map.of("success", false, "message", "Invalid credentials")));
     }
 
     /**
@@ -76,7 +66,7 @@ public class StaffController {
                     .body(Map.of("success", false, "message", "Name, branch, and PIN are required"));
         }
 
-        var staff = staffService.createStaff(name, branch, pin);
+        var staff = staffOperations.createStaff(name, branch, pin, null);
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "staffId", staff.getId()

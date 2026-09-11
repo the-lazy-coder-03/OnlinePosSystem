@@ -5,6 +5,8 @@ import org.example.onlinepossystem.catalog.pizza.dto.PizzaDetail;
 import org.example.onlinepossystem.catalog.pizza.dto.PriceQuoteRequest;
 import org.example.onlinepossystem.catalog.pizza.dto.PriceQuoteResponse;
 import org.example.onlinepossystem.catalog.pizza.service.PizzaService;
+import org.example.onlinepossystem.catalog.pizza.service.InvalidPizzaSelectionException;
+import org.example.onlinepossystem.catalog.pizza.service.PizzaNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 @RestController
 @RequestMapping("/api/branches/{branchId}/pizzas")
@@ -28,7 +31,7 @@ public class PizzaController {
 
     @GetMapping
     public PizzaCategorySplit listPizzas(@PathVariable Integer branchId) {
-        return pizzaService.listPizzasByCategory(branchId);
+        return translateServiceErrors(() -> pizzaService.listPizzasByCategory(branchId));
     }
 
     @GetMapping("/{pizzaId}")
@@ -37,7 +40,7 @@ public class PizzaController {
             @PathVariable Integer pizzaId,
             @RequestParam(value = "sizeCm", required = false) Integer sizeCm
     ) {
-        return pizzaService.getPizzaDetail(branchId, pizzaId, sizeCm);
+        return translateServiceErrors(() -> pizzaService.getPizzaDetail(branchId, pizzaId, sizeCm));
     }
 
     @PostMapping("/{pizzaId}/quote")
@@ -49,6 +52,18 @@ public class PizzaController {
         if (request.sizeCm() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sizeCm is required");
         }
-        return pizzaService.quotePrice(branchId, pizzaId, request.sizeCm(), request.selectedToppingIds());
+        return translateServiceErrors(
+                () -> pizzaService.quotePrice(branchId, pizzaId, request.sizeCm(), request.selectedToppingIds())
+        );
+    }
+
+    private <T> T translateServiceErrors(Supplier<T> action) {
+        try {
+            return action.get();
+        } catch (PizzaNotFoundException ex) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
+        } catch (InvalidPizzaSelectionException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        }
     }
 }

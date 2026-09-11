@@ -5,8 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import org.example.onlinepossystem.customer.dto.ProfilePageView;
 import org.example.onlinepossystem.customer.service.CustomerProfileService;
+import org.example.onlinepossystem.customer.service.CustomerRegistrationException;
 import org.example.onlinepossystem.customer.service.CustomerService;
-import org.example.onlinepossystem.security.PasswordPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
@@ -98,32 +98,28 @@ public class CustomerController {
             @RequestParam(required = false) String phone2,
             @RequestParam(required = false, name = "preferred_store") String preferredStore
     ) {
-        if (!PasswordPolicy.isValid(password)) {
-            return "redirect:/register?error=password";
+        try {
+            customerService.registerCustomer(
+                    firstName,
+                    lastName,
+                    email,
+                    password,
+                    phone,
+                    phone2,
+                    houseNumber,
+                    street,
+                    area,
+                    null,
+                    preferredStore,
+                    postalCode
+            );
+        } catch (CustomerRegistrationException ex) {
+            return switch (ex.getReason()) {
+                case PASSWORD -> "redirect:/register?error=password";
+                case EMAIL -> "redirect:/register?error=email";
+                case PHONE -> "redirect:/register?error=phone";
+            };
         }
-
-        if (customerService.emailExists(email)) {
-            return "redirect:/register?error=email";
-        }
-
-        if (customerService.phoneExists(phone)) {
-            return "redirect:/register?error=phone";
-        }
-
-        customerService.registerCustomer(
-                firstName,
-                lastName,
-                email,
-                password,
-                phone,
-                phone2,
-                houseNumber,
-                street,
-                area,
-                null,
-                preferredStore,
-                postalCode
-        );
         logger.info("New customer account registered");
 
         return "redirect:/login?registered";

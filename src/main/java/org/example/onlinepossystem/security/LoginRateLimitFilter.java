@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.example.onlinepossystem.security.api.RateLimiter;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -17,9 +18,9 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     private static final int TOO_MANY_REQUESTS = 429;
     private static final Duration LOGIN_WINDOW = Duration.ofMinutes(15);
 
-    private final SimpleRateLimiter rateLimiter;
+    private final RateLimiter rateLimiter;
 
-    public LoginRateLimitFilter(SimpleRateLimiter rateLimiter) {
+    public LoginRateLimitFilter(RateLimiter rateLimiter) {
         this.rateLimiter = rateLimiter;
     }
 

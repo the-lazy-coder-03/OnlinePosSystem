@@ -1,5 +1,6 @@
 package org.example.onlinepossystem.security;
 
+import org.example.onlinepossystem.security.api.RateLimiter;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -8,10 +9,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-public class SimpleRateLimiter {
+public class SimpleRateLimiter implements RateLimiter {
 
     private final Map<String, AttemptWindow> attempts = new ConcurrentHashMap<>();
 
+    @Override
     public boolean isAllowed(String key, int maxAttempts, Duration window) {
         Instant now = Instant.now();
         AttemptWindow current = attempts.compute(key, (ignored, existing) -> {
@@ -23,6 +25,7 @@ public class SimpleRateLimiter {
         return current.count <= maxAttempts;
     }
 
+    @Override
     public void reset(String key) {
         attempts.remove(key);
     }

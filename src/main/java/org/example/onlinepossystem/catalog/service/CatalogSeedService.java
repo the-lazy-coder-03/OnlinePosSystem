@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.catalog.service;
 
 import org.example.onlinepossystem.branch.api.BranchLookup;
+import org.example.onlinepossystem.catalog.api.CatalogSeeder;
 import org.example.onlinepossystem.branch.entity.Branch;
 import org.example.onlinepossystem.catalog.entity.BranchExtraPrice;
 import org.example.onlinepossystem.catalog.entity.BranchMenuItemPrice;
@@ -30,7 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class CatalogSeedService {
+public class CatalogSeedService implements CatalogSeeder {
     private final BranchLookup branchLookup;
     private final MenuCategoryRepository menuCategoryRepository;
     private final MenuItemRepository menuItemRepository;
@@ -74,6 +75,7 @@ public class CatalogSeedService {
     }
 
     @Transactional
+    @Override
     public void seedMenuData() {
         if (branchLookup.hasAnyBranches()) {
             System.out.println("ℹ️ Database already has branches. Checking if Kenridge/Uitzicht exist...");

@@ -11,9 +11,7 @@ import org.example.onlinepossystem.catalog.pizza.dto.ToppingItem;
 import org.example.onlinepossystem.catalog.pizza.dto.ToppingPrice;
 import org.example.onlinepossystem.catalog.pizza.dto.ToppingRow;
 import org.example.onlinepossystem.catalog.pizza.repository.PizzaReadRepository;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -44,7 +42,7 @@ public class PizzaService {
     public PizzaDetail getPizzaDetail(Integer branchId, Integer pizzaId, Integer sizeCmParam) {
         List<PizzaSizePriceRow> sizeRows = pizzaReadRepository.findSizePricesForPizza(branchId, pizzaId);
         if (sizeRows.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Pizza not found for branch");
+            throw new PizzaNotFoundException("Pizza not found for branch");
         }
 
         String name = sizeRows.get(0).name();
@@ -56,7 +54,7 @@ public class PizzaService {
         SizePrice selectedSize = availableSizes.stream()
                 .filter(size -> Objects.equals(size.sizeCm(), selectedSizeCm))
                 .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Size not available for pizza"));
+                .orElseThrow(() -> new InvalidPizzaSelectionException("Size not available for pizza"));
 
         List<ToppingRow> toppingRows = pizzaReadRepository.findToppingsForPizzaAndSize(branchId, pizzaId, selectedSizeCm);
 
@@ -87,7 +85,7 @@ public class PizzaService {
 
     public PriceQuoteResponse quotePrice(Integer branchId, Integer pizzaId, Integer sizeCm, List<Integer> selectedToppingIds) {
         Double basePriceRaw = pizzaReadRepository.findBasePrice(branchId, pizzaId, sizeCm)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Price not found for pizza and size"));
+                .orElseThrow(() -> new PizzaNotFoundException("Price not found for pizza and size"));
 
         List<Integer> uniqueToppings = (selectedToppingIds == null ? List.<Integer>of() : selectedToppingIds)
                 .stream()

@@ -2,6 +2,7 @@ package org.example.onlinepossystem.security;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.onlinepossystem.security.api.TokenService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -18,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
-public class JwtService {
+public class JwtService implements TokenService {
 
     private static final String HMAC_ALGORITHM = "HmacSHA256";
     private static final TypeReference<Map<String, Object>> CLAIMS_TYPE = new TypeReference<>() {
@@ -41,6 +42,7 @@ public class JwtService {
         this.expirationSeconds = expirationSeconds;
     }
 
+    @Override
     public String generateToken(UserDetails userDetails) {
         Instant now = Instant.now();
         List<String> roles = userDetails.getAuthorities().stream()
@@ -65,6 +67,7 @@ public class JwtService {
         }
     }
 
+    @Override
     public String extractUsername(String token) {
         Object subject = parseClaims(token).get("sub");
         if (!(subject instanceof String username) || username.isBlank()) {
@@ -73,11 +76,13 @@ public class JwtService {
         return username;
     }
 
+    @Override
     public boolean isTokenValid(String token, UserDetails userDetails) {
         String username = extractUsername(token);
         return username.equals(userDetails.getUsername()) && !isExpired(parseClaims(token));
     }
 
+    @Override
     public long getExpirationSeconds() {
         return expirationSeconds;
     }

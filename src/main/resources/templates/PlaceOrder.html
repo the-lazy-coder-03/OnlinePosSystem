@@ -1052,10 +1052,15 @@
     </main>
 </div>
 
+<script src="/js/stomp-client.js"></script>
 <script th:inline="javascript">
     const MENU_ONLY = /*[[${menuOnly == true}]]*/ false;
     const INITIAL_BRANCH_ID = /*[[${branchId}]]*/ null;
     const INITIAL_BRANCH_NAME = /*[[${branchName ?: ''}]]*/ "";
+    const CUSTOMER_ORDER_QUEUE = "/user/queue/orders";
+    let customerStompClient = null;
+    let customerReconnectTimerId = null;
+    let customerReconnectDelayMs = 1000;
 
     /************************************************************
      * Single, structured state object (required)
@@ -3626,6 +3631,52 @@
         }
     });
 
+    function connectCustomerOrderStream(){
+        if (MENU_ONLY || customerStompClient) {
+            return;
+        }
+
+        customerStompClient = createSimpleStompClient({
+            onConnect: () => {
+                customerReconnectDelayMs = 1000;
+                customerStompClient.subscribe(CUSTOMER_ORDER_QUEUE, frame => {
+                    try {
+                        showCustomerRealtimeNotice(JSON.parse(frame.body));
+                    } catch (error) {
+                        console.error("Could not read customer order event:", error);
+                    }
+                });
+            },
+            onDisconnect: () => {
+                customerReconnectTimerId = setTimeout(() => {
+                    customerStompClient = null;
+                    connectCustomerOrderStream();
+                }, customerReconnectDelayMs);
+                customerReconnectDelayMs = Math.min(customerReconnectDelayMs * 2, 15000);
+            },
+            onError: error => {
+                console.error("Customer order live connection error:", error);
+            }
+        });
+        customerStompClient.connect();
+    }
+
+    function showCustomerRealtimeNotice(payload){
+        const orderId = payload?.orderId || payload?.order?.id;
+        const status = payload?.status || payload?.order?.status || "Pending";
+        const message = payload?.message || (orderId ? `Order #${orderId} status: ${status}.` : `Order status: ${status}.`);
+        state.ui.orderNotice = {
+            type: status === "Rejected" ? "error" : "success",
+            message: orderId ? `Order #${orderId}: ${message}` : message
+        };
+
+        if (state.ui.view === "summary") {
+            renderSummary();
+        } else {
+            alert(state.ui.orderNotice.message);
+        }
+    }
+
     /************************************************************
      * Boot
      ************************************************************/
@@ -3635,6 +3686,7 @@
             render.sidebar();
             render.list();
             await actions.init();
+            connectCustomerOrderStream();
         } catch (e){
             alert(e.message || "Failed to initialize.");
             console.error(e);

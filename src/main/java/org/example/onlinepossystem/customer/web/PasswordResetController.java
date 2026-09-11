@@ -3,7 +3,6 @@ package org.example.onlinepossystem.customer.web;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import org.example.onlinepossystem.security.PasswordPolicy;
 import org.example.onlinepossystem.customer.service.PasswordResetService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -11,7 +10,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.server.ResponseStatusException;
 
 @Controller
 @Validated
@@ -51,23 +49,12 @@ public class PasswordResetController {
             @RequestParam @NotBlank String confirmPassword,
             Model model
     ) {
-        if (!password.equals(confirmPassword)) {
-            model.addAttribute("token", token);
-            model.addAttribute("error", "Passwords do not match.");
-            return "reset-password";
-        }
-
-        if (!PasswordPolicy.isValid(password)) {
-            model.addAttribute("token", token);
-            model.addAttribute("error", PasswordPolicy.MESSAGE);
-            return "reset-password";
-        }
-
         try {
-            passwordResetService.resetPassword(token, password);
+            passwordResetService.resetPassword(token, password, confirmPassword);
             return "redirect:/login?reset";
-        } catch (ResponseStatusException ex) {
-            model.addAttribute("error", ex.getReason());
+        } catch (IllegalArgumentException ex) {
+            model.addAttribute("token", token);
+            model.addAttribute("error", ex.getMessage());
             return "reset-password";
         }
     }

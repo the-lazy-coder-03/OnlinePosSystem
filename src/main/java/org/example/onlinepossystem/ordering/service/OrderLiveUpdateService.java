@@ -1,63 +1,114 @@
 package org.example.onlinepossystem.ordering.service;
 
+import org.example.onlinepossystem.ordering.dto.OrderRealtimeMessage;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
+import org.example.onlinepossystem.ordering.api.OrderRealtimePublisher;
 import org.example.onlinepossystem.ordering.event.OrderCreatedEvent;
+import org.example.onlinepossystem.ordering.event.OrderStatusChangedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.messaging.simp.SimpMessageSendingOperations;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
-public class OrderLiveUpdateService {
+public class OrderLiveUpdateService implements OrderRealtimePublisher {
 
     private static final Logger logger = LoggerFactory.getLogger(OrderLiveUpdateService.class);
-    private static final long STREAM_TIMEOUT_MS = Duration.ofHours(6).toMillis();
+    private static final String ADMIN_ORDERS_TOPIC = "/topic/admin/orders";
+    private static final String ADMIN_BRANCH_TOPIC_PREFIX = "/topic/admin/branches/";
+    private static final String CUSTOMER_ORDERS_QUEUE = "/queue/orders";
 
-    private final List<SseEmitter> adminEmitters = new CopyOnWriteArrayList<>();
+    private final SimpMessageSendingOperations messagingTemplate;
 
-    public SseEmitter connectAdminStream() {
-        SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MS);
-        adminEmitters.add(emitter);
-
-        emitter.onCompletion(() -> adminEmitters.remove(emitter));
-        emitter.onTimeout(() -> adminEmitters.remove(emitter));
-        emitter.onError(error -> adminEmitters.remove(emitter));
-
-        try {
-            emitter.send(SseEmitter.event().name("connected").data("ok"));
-        } catch (IOException ex) {
-            adminEmitters.remove(emitter);
-        }
-
-        return emitter;
+    public OrderLiveUpdateService(SimpMessageSendingOperations messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
     }
 
+    @Async("realtimeTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleOrderCreated(OrderCreatedEvent event) {
-        sendOrderToAdmins(event.order());
+        publishToAdmins(event.order());
+        sendOrderSubmittedToCustomer(event.order(), event.customerUsername());
     }
 
-    public void sendOrderToAdmins(OrderResponseDTO order) {
-        int delivered = 0;
-        for (SseEmitter emitter : adminEmitters) {
-            try {
-                emitter.send(SseEmitter.event()
-                        .name("order-created")
-                        .id(String.valueOf(order.getId()))
-                        .data(order));
-                delivered++;
-            } catch (IOException | IllegalStateException ex) {
-                adminEmitters.remove(emitter);
-            }
+    @Async("realtimeTaskExecutor")
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleOrderStatusChanged(OrderStatusChangedEvent event) {
+        publishToAdmins(event.order());
+        sendStatusToCustomer(event.order(), event.customerUsername());
+    }
+
+    @Override
+    public void publishToAdmins(OrderResponseDTO order) {
+        if (order == null || order.getId() == null) {
+            return;
         }
 
-        logger.info("Sent new order event to admin stream. orderId={} delivered={}", order.getId(), delivered);
+        try {
+            messagingTemplate.convertAndSend(ADMIN_ORDERS_TOPIC, order);
+            if (order.getBranchId() != null) {
+                messagingTemplate.convertAndSend(ADMIN_BRANCH_TOPIC_PREFIX + order.getBranchId() + "/orders", order);
+            }
+            logger.info("Sent realtime admin order update. orderId={} status={}", order.getId(), order.getStatus());
+        } catch (RuntimeException ex) {
+            logger.warn("Could not send realtime admin order update. orderId={}", order.getId(), ex);
+        }
+    }
+
+    private void sendOrderSubmittedToCustomer(OrderResponseDTO order, String customerUsername) {
+        sendCustomerMessage(order, customerUsername, "ORDER_SUBMITTED", "Your order has been successfully submitted.");
+    }
+
+    private void sendStatusToCustomer(OrderResponseDTO order, String customerUsername) {
+        sendCustomerMessage(order, customerUsername, eventType(order), customerMessage(order));
+    }
+
+    private void sendCustomerMessage(OrderResponseDTO order, String customerUsername, String eventType, String message) {
+        if (order == null || order.getId() == null || customerUsername == null || customerUsername.isBlank()) {
+            return;
+        }
+
+        OrderRealtimeMessage payload = new OrderRealtimeMessage(
+                eventType,
+                order.getId(),
+                order.getBranchId(),
+                order.getBranchName(),
+                order.getStatus(),
+                message,
+                order
+        );
+        try {
+            messagingTemplate.convertAndSendToUser(customerUsername, CUSTOMER_ORDERS_QUEUE, payload);
+            logger.info("Sent realtime customer order update. orderId={} user={} eventType={}",
+                    order.getId(), customerUsername, eventType);
+        } catch (RuntimeException ex) {
+            logger.warn("Could not send realtime customer order update. orderId={} user={}",
+                    order.getId(), customerUsername, ex);
+        }
+    }
+
+    private String eventType(OrderResponseDTO order) {
+        return switch (safeStatus(order)) {
+            case "Preparing" -> "ORDER_PREPARING";
+            case "Completed" -> "ORDER_COMPLETED";
+            case "Rejected" -> "ORDER_REJECTED";
+            default -> "ORDER_SUBMITTED";
+        };
+    }
+
+    private String customerMessage(OrderResponseDTO order) {
+        return switch (safeStatus(order)) {
+            case "Preparing" -> "Your order is being prepared.";
+            case "Completed" -> "Your order has been completed.";
+            case "Rejected" -> "Your order has been rejected.";
+            default -> "Your order has been successfully submitted.";
+        };
+    }
+
+    private String safeStatus(OrderResponseDTO order) {
+        return order == null || order.getStatus() == null ? "Pending" : order.getStatus();
     }
 }

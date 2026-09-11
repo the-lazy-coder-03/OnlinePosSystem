@@ -2,21 +2,16 @@ package org.example.onlinepossystem.customer.service;
 
 import org.example.onlinepossystem.customer.entity.Customer;
 import org.example.onlinepossystem.customer.entity.PasswordResetToken;
+import org.example.onlinepossystem.customer.notification.PasswordResetNotifier;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
 import org.example.onlinepossystem.customer.repository.PasswordResetTokenRepository;
 import org.example.onlinepossystem.security.PasswordPolicy;
-import org.example.onlinepossystem.security.SimpleRateLimiter;
+import org.example.onlinepossystem.security.api.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.http.HttpStatus;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -36,28 +31,24 @@ public class PasswordResetService {
     private final CustomerRepository customerRepository;
     private final PasswordResetTokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JavaMailSender mailSender;
-    private final SimpleRateLimiter rateLimiter;
-    private final SecureRandom secureRandom = new SecureRandom();
-    private final String appBaseUrl;
-    private final String mailFrom;
+    private final PasswordResetNotifier passwordResetNotifier;
+    private final RateLimiter rateLimiter;
+    private final SecureRandom secureRandom;
 
     public PasswordResetService(
             CustomerRepository customerRepository,
             PasswordResetTokenRepository tokenRepository,
             PasswordEncoder passwordEncoder,
-            ObjectProvider<JavaMailSender> mailSenderProvider,
-            SimpleRateLimiter rateLimiter,
-            @Value("${app.base-url:http://localhost:8080}") String appBaseUrl,
-            @Value("${spring.mail.username:no-reply@localhost}") String mailFrom
+            PasswordResetNotifier passwordResetNotifier,
+            RateLimiter rateLimiter,
+            SecureRandom secureRandom
     ) {
         this.customerRepository = customerRepository;
         this.tokenRepository = tokenRepository;
         this.passwordEncoder = passwordEncoder;
-        this.mailSender = mailSenderProvider.getIfAvailable();
+        this.passwordResetNotifier = passwordResetNotifier;
         this.rateLimiter = rateLimiter;
-        this.appBaseUrl = appBaseUrl;
-        this.mailFrom = mailFrom;
+        this.secureRandom = secureRandom;
     }
 
     @Transactional
@@ -81,21 +72,24 @@ public class PasswordResetService {
             resetToken.setExpiresAt(LocalDateTime.now().plus(RESET_EXPIRY));
             tokenRepository.save(resetToken);
 
-            sendResetEmail(customer.getEmail(), resetToken.getToken());
+            passwordResetNotifier.sendResetLink(customer.getEmail(), resetToken.getToken());
         });
 
         return GENERIC_RESET_MESSAGE;
     }
 
     @Transactional
-    public void resetPassword(String token, String newPassword) {
+    public void resetPassword(String token, String newPassword, String confirmPassword) {
+        if (!newPassword.equals(confirmPassword)) {
+            throw new IllegalArgumentException("Passwords do not match.");
+        }
         if (!PasswordPolicy.isValid(newPassword)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, PasswordPolicy.MESSAGE);
+            throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
         }
 
         PasswordResetToken resetToken = tokenRepository.findByTokenAndUsedFalse(token)
                 .filter(t -> t.getExpiresAt().isAfter(LocalDateTime.now()))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reset link is invalid or has expired."));
+                .orElseThrow(() -> new IllegalArgumentException("Reset link is invalid or has expired."));
 
         Customer customer = resetToken.getCustomer();
         customer.setPassword(passwordEncoder.encode(newPassword));
@@ -112,25 +106,4 @@ public class PasswordResetService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    private void sendResetEmail(String email, String token) {
-        if (mailSender == null) {
-            logger.warn("Password reset email could not be sent because mail is not configured");
-            return;
-        }
-
-        String resetUrl = appBaseUrl + "/reset-password?token=" + token;
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailFrom);
-        message.setTo(email);
-        message.setSubject("Reset your Pete's Pizza password");
-        message.setText("""
-                A password reset was requested for your Pete's Pizza account.
-
-                Use this link within 30 minutes:
-                %s
-
-                If you did not request this, you can ignore this email.
-                """.formatted(resetUrl));
-        mailSender.send(message);
-    }
 }

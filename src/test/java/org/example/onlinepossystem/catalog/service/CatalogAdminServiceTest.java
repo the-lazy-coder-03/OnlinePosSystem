@@ -95,7 +95,7 @@ class CatalogAdminServiceTest {
     void saveMenuCategoryCreatesAndUpdatesCategory() {
         String suffix = suffix();
 
-        String createRedirect = catalogAdminService.saveMenuCategory(
+        catalogAdminService.saveMenuCategory(
                 null,
                 "  Admin Menu Category " + suffix + "  ",
                 21,
@@ -104,7 +104,7 @@ class CatalogAdminServiceTest {
         );
         MenuCategory created = findMenuCategory("Admin Menu Category " + suffix);
 
-        String updateRedirect = catalogAdminService.saveMenuCategory(
+        catalogAdminService.saveMenuCategory(
                 created.getId(),
                 "Updated Admin Menu Category " + suffix,
                 31,
@@ -113,8 +113,6 @@ class CatalogAdminServiceTest {
         );
         MenuCategory updated = menuCategoryRepository.findById(created.getId()).orElseThrow();
 
-        assertThat(createRedirect).isEqualTo("redirect:/admin#categories");
-        assertThat(updateRedirect).isEqualTo("redirect:/admin#categories");
         assertThat(updated.getName()).isEqualTo("Updated Admin Menu Category " + suffix);
         assertThat(updated.getSortOrder()).isEqualTo(31);
         assertThat(updated.isActive()).isFalse();
@@ -141,7 +139,7 @@ class CatalogAdminServiceTest {
         params.put("is300ml", "on");
         params.put("menuPrice_" + branch.getId(), "64.50");
 
-        String redirect = catalogAdminService.saveMenuItem(
+        catalogAdminService.saveMenuItem(
                 null,
                 "  Admin Menu Item " + suffix + "  ",
                 category.getId(),
@@ -153,7 +151,6 @@ class CatalogAdminServiceTest {
         );
         MenuItem saved = findMenuItem("Admin Menu Item " + suffix);
 
-        assertThat(redirect).isEqualTo("redirect:/admin#items");
         assertThat(saved.getDescription()).isEqualTo("Saved from service");
         assertThat(saved.getSortOrder()).isEqualTo(12);
         assertThat(saved.isActive()).isTrue();
@@ -195,7 +192,7 @@ class CatalogAdminServiceTest {
         params.put("active", "on");
         params.put("pizzaPrice_" + branch.getId() + "_" + size.getId(), "142.75");
 
-        String redirect = catalogAdminService.savePizza(
+        catalogAdminService.savePizza(
                 null,
                 "  Admin Pizza " + suffix + "  ",
                 category.getId(),
@@ -207,7 +204,6 @@ class CatalogAdminServiceTest {
         );
         Pizza saved = findPizza("Admin Pizza " + suffix);
 
-        assertThat(redirect).isEqualTo("redirect:/admin#items");
         assertThat(saved.getDescription()).isEqualTo("Saved pizza");
         assertThat(saved.getSortOrder()).isEqualTo(9);
         assertThat(saved.isActive()).isTrue();

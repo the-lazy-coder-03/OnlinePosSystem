@@ -2,7 +2,7 @@ package org.example.onlinepossystem.bootstrap;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.onlinepossystem.catalog.service.CatalogSeedService;
+import org.example.onlinepossystem.catalog.api.CatalogSeeder;
 import org.example.onlinepossystem.staff.api.StaffDirectory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
@@ -19,16 +19,16 @@ public class Database implements CommandLineRunner {
 
     private final DataSource dataSource;
     private final StaffDirectory staffDirectory;
-    private final CatalogSeedService catalogSeedService;
+    private final CatalogSeeder catalogSeeder;
     private final ObjectMapper objectMapper;
 
     public Database(DataSource dataSource,
                     StaffDirectory staffDirectory,
-                    CatalogSeedService catalogSeedService,
+                    CatalogSeeder catalogSeeder,
                     ObjectMapper objectMapper) {
         this.dataSource = dataSource;
         this.staffDirectory = staffDirectory;
-        this.catalogSeedService = catalogSeedService;
+        this.catalogSeeder = catalogSeeder;
         this.objectMapper = objectMapper;
     }
 
@@ -41,7 +41,7 @@ public class Database implements CommandLineRunner {
                 System.out.println("✅ Connected to database successfully!");
 
                 syncStaffFromFile();
-                catalogSeedService.seedMenuData();
+                catalogSeeder.seedMenuData();
             } else {
                 System.out.println("❌ Failed to connect to database");
             }

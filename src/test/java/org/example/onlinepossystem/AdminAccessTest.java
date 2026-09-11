@@ -17,6 +17,7 @@ import java.util.Map;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -62,8 +63,17 @@ public class AdminAccessTest {
 
     @Test
     @WithMockUser(username = "user", roles = {"USER"})
-    public void testAdminOrderStreamForbiddenForUserRole() throws Exception {
-        mockMvc.perform(get("/api/admin/orders/stream"))
+    public void testAdminOrdersApiForbiddenForUserRole() throws Exception {
+        mockMvc.perform(get("/api/admin/orders"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "user", roles = {"USER"})
+    public void testAdminOrderStatusUpdateForbiddenForUserRole() throws Exception {
+        mockMvc.perform(put("/api/admin/orders/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"Preparing\"}"))
                 .andExpect(status().isForbidden());
     }
 

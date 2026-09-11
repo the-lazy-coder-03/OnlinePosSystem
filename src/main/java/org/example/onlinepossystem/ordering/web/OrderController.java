@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import org.example.onlinepossystem.catalog.api.OrderCatalogResolver;
 import org.example.onlinepossystem.catalog.dto.MenuDTO;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
+import org.example.onlinepossystem.ordering.api.InvalidOrderStatusException;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
 import org.springframework.http.ResponseEntity;
@@ -76,17 +77,11 @@ public class OrderController {
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {
 
-        String newStatus = request.get("status");
-
-        if (newStatus == null || (!newStatus.equals("Pending")
-                && !newStatus.equals("Preparing")
-                && !newStatus.equals("Completed")
-                && !newStatus.equals("Rejected"))) {
+        try {
+            return ResponseEntity.ok(orderOperations.updateOrderStatus(id, request.get("status")));
+        } catch (InvalidOrderStatusException ex) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", "Invalid status. Must be Pending, Preparing, Completed, or Rejected."));
+                    .body(Map.of("success", false, "message", ex.getMessage()));
         }
-
-        OrderResponseDTO updatedOrder = orderOperations.updateOrderStatus(id, newStatus);
-        return ResponseEntity.ok(updatedOrder);
     }
 }

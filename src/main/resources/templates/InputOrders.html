@@ -207,6 +207,7 @@
     </div>
 </div>
 
+<script src="/js/stomp-client.js"></script>
 <script th:inline="javascript">
     const ADMIN_MODE = /*[[${adminMode ?: false}]]*/ false;
     let currentBranch = '';
@@ -214,14 +215,15 @@
     let orderIndex = 0;
     let processedOrders = [];
     let statusRefreshIntervalId = null;
-    let liveEventSource = null;
+    let liveStompClient = null;
     let liveReconnectTimerId = null;
     let liveReconnectDelayMs = 1000;
+    let liveReconnectEnabled = false;
 
     // API BASE URL
     const API_BASE_URL = '/api';
     const ADMIN_ORDERS_URL = `${API_BASE_URL}/admin/orders`;
-    const ADMIN_STREAM_URL = `${ADMIN_ORDERS_URL}/stream`;
+    const ADMIN_ORDER_TOPIC = '/topic/admin/orders';
 
     async function refreshStatus() {
         try {
@@ -347,8 +349,9 @@
     function connectOrderStream() {
         if (!ADMIN_MODE) return;
 
-        if (liveEventSource) {
-            liveEventSource.close();
+        if (liveStompClient) {
+            liveReconnectEnabled = false;
+            liveStompClient.disconnect();
         }
         if (liveReconnectTimerId) {
             clearTimeout(liveReconnectTimerId);
@@ -356,29 +359,33 @@
         }
 
         setLiveStatus('Connecting to live order updates...');
-        liveEventSource = new EventSource(ADMIN_STREAM_URL);
-
-        liveEventSource.addEventListener('connected', () => {
-            liveReconnectDelayMs = 1000;
-            setLiveStatus('Live order updates connected.');
-        });
-
-        liveEventSource.addEventListener('order-created', event => {
-            try {
-                const order = JSON.parse(event.data);
-                upsertOrder(order);
-                setLiveStatus(`New order received: #${order.id}`);
-            } catch (error) {
-                console.error('Could not read live order event:', error);
+        liveReconnectEnabled = true;
+        liveStompClient = createSimpleStompClient({
+            onConnect: () => {
+                liveReconnectDelayMs = 1000;
+                setLiveStatus('Live order updates connected.');
+                liveStompClient.subscribe(ADMIN_ORDER_TOPIC, frame => {
+                    try {
+                        const payload = JSON.parse(frame.body);
+                        const order = payload.order || payload;
+                        upsertOrder(order);
+                        setLiveStatus(`Order update received: #${order.id}`);
+                    } catch (error) {
+                        console.error('Could not read live order event:', error);
+                    }
+                });
+            },
+            onDisconnect: () => {
+                if (!liveReconnectEnabled) return;
+                setLiveStatus('Live updates disconnected. Reconnecting...');
+                liveReconnectTimerId = setTimeout(connectOrderStream, liveReconnectDelayMs);
+                liveReconnectDelayMs = Math.min(liveReconnectDelayMs * 2, 15000);
+            },
+            onError: error => {
+                console.error('Live order connection error:', error);
             }
         });
-
-        liveEventSource.onerror = () => {
-            setLiveStatus('Live updates disconnected. Reconnecting...');
-            liveEventSource.close();
-            liveReconnectTimerId = setTimeout(connectOrderStream, liveReconnectDelayMs);
-            liveReconnectDelayMs = Math.min(liveReconnectDelayMs * 2, 15000);
-        };
+        liveStompClient.connect();
     }
 
     function formatItemsSummary(order) {
@@ -406,7 +413,10 @@
 
     async function updateOrderStatus(orderId, status) {
         try {
-            const response = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
+            const url = ADMIN_MODE
+                ? `${ADMIN_ORDERS_URL}/${orderId}/status`
+                : `${API_BASE_URL}/orders/${orderId}/status`;
+            const response = await fetch(url, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status })

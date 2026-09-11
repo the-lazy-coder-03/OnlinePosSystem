@@ -1,6 +1,6 @@
 package org.example.onlinepossystem.admin.web;
 
-import org.example.onlinepossystem.catalog.service.CatalogAdminService;
+import org.example.onlinepossystem.catalog.api.CatalogAdministration;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -17,15 +17,15 @@ import java.util.Map;
 @Controller
 @RequestMapping("/admin")
 public class AdminController {
-    private final CatalogAdminService catalogAdminService;
+    private final CatalogAdministration catalogAdministration;
 
-    public AdminController(CatalogAdminService catalogAdminService) {
-        this.catalogAdminService = catalogAdminService;
+    public AdminController(CatalogAdministration catalogAdministration) {
+        this.catalogAdministration = catalogAdministration;
     }
 
     @GetMapping
     public String adminDashboard(Model model) {
-        catalogAdminService.populateDashboard(model);
+        model.addAllAttributes(catalogAdministration.getDashboardAttributes());
         return "admin";
     }
 
@@ -44,12 +44,14 @@ public class AdminController {
                             @RequestParam(required = false) List<Integer> ingredientIds,
                             @RequestParam Map<String, String> params,
                             Authentication authentication) {
-        return catalogAdminService.savePizza(id, name, categoryId, description, sortOrder, ingredientIds, params, authentication);
+        catalogAdministration.savePizza(id, name, categoryId, description, sortOrder, ingredientIds, params, actor(authentication));
+        return "redirect:/admin#items";
     }
 
     @PostMapping("/pizzas/delete/{id}")
     public String deletePizza(@PathVariable Integer id, Authentication authentication) {
-        return catalogAdminService.deletePizza(id, authentication);
+        catalogAdministration.deletePizza(id, actor(authentication));
+        return "redirect:/admin#items";
     }
 
     @PostMapping("/pizzas/price")
@@ -58,7 +60,8 @@ public class AdminController {
                                    @RequestParam Integer pizzaSizeId,
                                    @RequestParam Double price,
                                    Authentication authentication) {
-        return catalogAdminService.updatePizzaPrice(branchId, pizzaId, pizzaSizeId, price, authentication);
+        catalogAdministration.updatePizzaPrice(branchId, pizzaId, pizzaSizeId, price, actor(authentication));
+        return "redirect:/admin#pricing";
     }
 
     @PostMapping("/menu-items/save")
@@ -70,12 +73,14 @@ public class AdminController {
                                @RequestParam(required = false) List<Integer> modifierGroupIds,
                                @RequestParam Map<String, String> params,
                                Authentication authentication) {
-        return catalogAdminService.saveMenuItem(id, name, categoryId, description, sortOrder, modifierGroupIds, params, authentication);
+        catalogAdministration.saveMenuItem(id, name, categoryId, description, sortOrder, modifierGroupIds, params, actor(authentication));
+        return "redirect:/admin#items";
     }
 
     @PostMapping("/menu-items/delete/{id}")
     public String deleteMenuItem(@PathVariable Integer id, Authentication authentication) {
-        return catalogAdminService.deleteMenuItem(id, authentication);
+        catalogAdministration.deleteMenuItem(id, actor(authentication));
+        return "redirect:/admin#items";
     }
 
     @PostMapping("/menu-items/price")
@@ -83,7 +88,8 @@ public class AdminController {
                                       @RequestParam Integer menuItemId,
                                       @RequestParam Double price,
                                       Authentication authentication) {
-        return catalogAdminService.updateMenuItemPrice(branchId, menuItemId, price, authentication);
+        catalogAdministration.updateMenuItemPrice(branchId, menuItemId, price, actor(authentication));
+        return "redirect:/admin#pricing";
     }
 
     @PostMapping("/toppings/price")
@@ -92,7 +98,8 @@ public class AdminController {
                                      @RequestParam Integer pizzaSizeId,
                                      @RequestParam Double price,
                                      Authentication authentication) {
-        return catalogAdminService.updateToppingPrice(branchId, priceCategoryId, pizzaSizeId, price, authentication);
+        catalogAdministration.updateToppingPrice(branchId, priceCategoryId, pizzaSizeId, price, actor(authentication));
+        return "redirect:/admin#pricing";
     }
 
     @PostMapping("/pizza-categories/save")
@@ -101,7 +108,8 @@ public class AdminController {
                                     @RequestParam(required = false) Integer sortOrder,
                                     @RequestParam Map<String, String> params,
                                     Authentication authentication) {
-        return catalogAdminService.savePizzaCategory(id, name, sortOrder, params, authentication);
+        catalogAdministration.savePizzaCategory(id, name, sortOrder, params, actor(authentication));
+        return "redirect:/admin#categories";
     }
 
     @PostMapping("/menu-categories/save")
@@ -110,7 +118,8 @@ public class AdminController {
                                    @RequestParam(required = false) Integer sortOrder,
                                    @RequestParam Map<String, String> params,
                                    Authentication authentication) {
-        return catalogAdminService.saveMenuCategory(id, name, sortOrder, params, authentication);
+        catalogAdministration.saveMenuCategory(id, name, sortOrder, params, actor(authentication));
+        return "redirect:/admin#categories";
     }
 
     @PostMapping("/pizza-sizes/save")
@@ -119,7 +128,8 @@ public class AdminController {
                                 @RequestParam(required = false) Integer sortOrder,
                                 @RequestParam Map<String, String> params,
                                 Authentication authentication) {
-        return catalogAdminService.savePizzaSize(id, cm, sortOrder, params, authentication);
+        catalogAdministration.savePizzaSize(id, cm, sortOrder, params, actor(authentication));
+        return "redirect:/admin#categories";
     }
 
     @PostMapping("/price-categories/save")
@@ -128,7 +138,8 @@ public class AdminController {
                                     @RequestParam(required = false) Integer sortOrder,
                                     @RequestParam Map<String, String> params,
                                     Authentication authentication) {
-        return catalogAdminService.savePriceCategory(id, name, sortOrder, params, authentication);
+        catalogAdministration.savePriceCategory(id, name, sortOrder, params, actor(authentication));
+        return "redirect:/admin#categories";
     }
 
     @PostMapping("/ingredients/save")
@@ -137,7 +148,8 @@ public class AdminController {
                                  @RequestParam Integer priceCategoryId,
                                  @RequestParam Map<String, String> params,
                                  Authentication authentication) {
-        return catalogAdminService.saveIngredient(id, name, priceCategoryId, params, authentication);
+        catalogAdministration.saveIngredient(id, name, priceCategoryId, params, actor(authentication));
+        return "redirect:/admin#ingredients";
     }
 
     @PostMapping("/modifier-groups/save")
@@ -147,7 +159,8 @@ public class AdminController {
                                     @RequestParam(required = false) Integer maxSelect,
                                     @RequestParam Map<String, String> params,
                                     Authentication authentication) {
-        return catalogAdminService.saveModifierGroup(id, name, minSelect, maxSelect, params, authentication);
+        catalogAdministration.saveModifierGroup(id, name, minSelect, maxSelect, params, actor(authentication));
+        return "redirect:/admin#modifiers";
     }
 
     @PostMapping("/modifier-options/save")
@@ -157,6 +170,11 @@ public class AdminController {
                                      @RequestParam(required = false) String menuItemId,
                                      @RequestParam(required = false) BigDecimal additionalPrice,
                                      Authentication authentication) {
-        return catalogAdminService.saveModifierOption(id, groupId, name, menuItemId, additionalPrice, authentication);
+        catalogAdministration.saveModifierOption(id, groupId, name, menuItemId, additionalPrice, actor(authentication));
+        return "redirect:/admin#modifiers";
+    }
+
+    private String actor(Authentication authentication) {
+        return authentication == null ? null : authentication.getName();
     }
 }

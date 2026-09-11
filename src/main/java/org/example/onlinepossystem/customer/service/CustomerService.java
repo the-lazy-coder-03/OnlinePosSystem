@@ -37,7 +37,13 @@ public class CustomerService implements CustomerAccountReader {
                                      String postalCode) {
 
         if (!PasswordPolicy.isValid(password)) {
-            throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
+            throw new CustomerRegistrationException(CustomerRegistrationException.Reason.PASSWORD, PasswordPolicy.MESSAGE);
+        }
+        if (emailExists(email)) {
+            throw new CustomerRegistrationException(CustomerRegistrationException.Reason.EMAIL, "Email is already registered.");
+        }
+        if (phoneExists(phone)) {
+            throw new CustomerRegistrationException(CustomerRegistrationException.Reason.PHONE, "Phone number is already registered.");
         }
 
         Customer customer = new Customer();

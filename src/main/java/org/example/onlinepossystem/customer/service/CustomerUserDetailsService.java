@@ -13,15 +13,17 @@ import org.springframework.stereotype.Service;
 public class CustomerUserDetailsService implements UserDetailsService {
 
     private final CustomerRepository customerRepository;
+    private final String adminUsername;
+    private final String adminPassword;
 
-    @Value("${ADMIN_USERNAME}")
-    private String adminUsername;
-
-    @Value("${ADMIN_PASSWORD}")
-    private String adminPassword;
-
-    public CustomerUserDetailsService(CustomerRepository customerRepository) {
+    public CustomerUserDetailsService(
+            CustomerRepository customerRepository,
+            @Value("${ADMIN_USERNAME}") String adminUsername,
+            @Value("${ADMIN_PASSWORD}") String adminPassword
+    ) {
         this.customerRepository = customerRepository;
+        this.adminUsername = adminUsername;
+        this.adminPassword = adminPassword;
     }
 
     @Override
