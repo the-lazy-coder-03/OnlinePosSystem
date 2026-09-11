@@ -6,12 +6,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import org.example.onlinepossystem.branch.entity.Branch;
-import org.example.onlinepossystem.customer.entity.Customer;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -26,13 +22,11 @@ public class Order {
     @Column(name = "order_id")
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "customer_id")
-    private Customer customer;
+    @Column(name = "customer_id")
+    private Long customerId;
 
-    @ManyToOne
-    @JoinColumn(name = "branch_id", nullable = false)
-    private Branch branch;
+    @Column(name = "branch_id", nullable = false)
+    private Integer branchId;
 
     @Column(name = "order_type", nullable = false)
     private String orderType = "pickup";
@@ -80,10 +74,10 @@ public class Order {
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    public Branch getBranch() { return branch; }
-    public void setBranch(Branch branch) { this.branch = branch; }
-    public Customer getCustomer() { return customer; }
-    public void setCustomer(Customer customer) { this.customer = customer; }
+    public Integer getBranchId() { return branchId; }
+    public void setBranchId(Integer branchId) { this.branchId = branchId; }
+    public Long getCustomerId() { return customerId; }
+    public void setCustomerId(Long customerId) { this.customerId = customerId; }
     public String getOrderType() { return orderType; }
     public void setOrderType(String orderType) { this.orderType = orderType; }
     public String getStatus() { return status; }

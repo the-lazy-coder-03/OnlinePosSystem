@@ -1,9 +1,11 @@
 package org.example.onlinepossystem.customer.service;
 
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
+import org.example.onlinepossystem.customer.api.CustomerAccount;
+import org.example.onlinepossystem.customer.api.CustomerOrderRecorder;
 import org.example.onlinepossystem.customer.entity.Customer;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
-import org.example.onlinepossystem.security.PasswordPolicy;
+import org.example.onlinepossystem.security.api.PasswordPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -12,15 +14,18 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
-public class CustomerService implements CustomerAccountReader {
+public class CustomerService implements CustomerAccountReader, CustomerOrderRecorder {
 
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordPolicy passwordPolicy;
 
     public CustomerService(CustomerRepository customerRepository,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder,
+                           PasswordPolicy passwordPolicy) {
         this.customerRepository = customerRepository;
         this.passwordEncoder = passwordEncoder;
+        this.passwordPolicy = passwordPolicy;
     }
 
     public Customer registerCustomer(String firstName,
@@ -36,8 +41,8 @@ public class CustomerService implements CustomerAccountReader {
                                      String preferredStore,
                                      String postalCode) {
 
-        if (!PasswordPolicy.isValid(password)) {
-            throw new CustomerRegistrationException(CustomerRegistrationException.Reason.PASSWORD, PasswordPolicy.MESSAGE);
+        if (!passwordPolicy.isValid(password)) {
+            throw new CustomerRegistrationException(CustomerRegistrationException.Reason.PASSWORD, passwordPolicy.validationMessage());
         }
         if (emailExists(email)) {
             throw new CustomerRegistrationException(CustomerRegistrationException.Reason.EMAIL, "Email is already registered.");
@@ -70,8 +75,21 @@ public class CustomerService implements CustomerAccountReader {
     }
 
     @Override
-    public Optional<Customer> findByEmail(String email) {
-        return customerRepository.findByEmail(email);
+    public Optional<CustomerAccount> findByEmail(String email) {
+        return customerRepository.findByEmail(email).map(this::toAccount);
+    }
+
+    @Override
+    public Optional<CustomerAccount> findById(Long id) {
+        return customerRepository.findById(id).map(this::toAccount);
+    }
+
+    @Override
+    public void recordOrderPlaced(Long customerId, LocalDateTime orderedAt) {
+        customerRepository.findById(customerId).ifPresent(customer -> {
+            customer.setLastOrderedAt(orderedAt);
+            customerRepository.save(customer);
+        });
     }
 
     public boolean emailExists(String email) {
@@ -109,12 +127,32 @@ public class CustomerService implements CustomerAccountReader {
         customer.setComplexName(complexName);
 
         if (newPassword != null && !newPassword.isEmpty()) {
-            if (!PasswordPolicy.isValid(newPassword)) {
-                throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
+            if (!passwordPolicy.isValid(newPassword)) {
+                throw new IllegalArgumentException(passwordPolicy.validationMessage());
             }
             customer.setPassword(passwordEncoder.encode(newPassword));
         }
 
         return customerRepository.save(customer);
+    }
+
+    private CustomerAccount toAccount(Customer customer) {
+        return new CustomerAccount(
+                customer.getId(),
+                customer.getPhone1(),
+                customer.getPhone2(),
+                customer.getEmail(),
+                customer.getHouseNumber(),
+                customer.getStreet(),
+                customer.getArea(),
+                customer.getComplexName(),
+                customer.getLastOrderedAt(),
+                customer.getPreferredStore(),
+                customer.getCity(),
+                customer.getPostalCode(),
+                customer.getFirstName(),
+                customer.getLastName(),
+                customer.getRole()
+        );
     }
 }

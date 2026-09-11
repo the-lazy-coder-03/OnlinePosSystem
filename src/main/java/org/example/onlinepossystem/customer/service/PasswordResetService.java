@@ -5,7 +5,7 @@ import org.example.onlinepossystem.customer.entity.PasswordResetToken;
 import org.example.onlinepossystem.customer.notification.PasswordResetNotifier;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
 import org.example.onlinepossystem.customer.repository.PasswordResetTokenRepository;
-import org.example.onlinepossystem.security.PasswordPolicy;
+import org.example.onlinepossystem.security.api.PasswordPolicy;
 import org.example.onlinepossystem.security.api.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +34,7 @@ public class PasswordResetService {
     private final PasswordResetNotifier passwordResetNotifier;
     private final RateLimiter rateLimiter;
     private final SecureRandom secureRandom;
+    private final PasswordPolicy passwordPolicy;
 
     public PasswordResetService(
             CustomerRepository customerRepository,
@@ -41,7 +42,8 @@ public class PasswordResetService {
             PasswordEncoder passwordEncoder,
             PasswordResetNotifier passwordResetNotifier,
             RateLimiter rateLimiter,
-            SecureRandom secureRandom
+            SecureRandom secureRandom,
+            PasswordPolicy passwordPolicy
     ) {
         this.customerRepository = customerRepository;
         this.tokenRepository = tokenRepository;
@@ -49,6 +51,7 @@ public class PasswordResetService {
         this.passwordResetNotifier = passwordResetNotifier;
         this.rateLimiter = rateLimiter;
         this.secureRandom = secureRandom;
+        this.passwordPolicy = passwordPolicy;
     }
 
     @Transactional
@@ -83,8 +86,8 @@ public class PasswordResetService {
         if (!newPassword.equals(confirmPassword)) {
             throw new IllegalArgumentException("Passwords do not match.");
         }
-        if (!PasswordPolicy.isValid(newPassword)) {
-            throw new IllegalArgumentException(PasswordPolicy.MESSAGE);
+        if (!passwordPolicy.isValid(newPassword)) {
+            throw new IllegalArgumentException(passwordPolicy.validationMessage());
         }
 
         PasswordResetToken resetToken = tokenRepository.findByTokenAndUsedFalse(token)

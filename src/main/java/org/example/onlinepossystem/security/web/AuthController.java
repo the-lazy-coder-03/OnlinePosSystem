@@ -2,8 +2,8 @@ package org.example.onlinepossystem.security.web;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.example.onlinepossystem.security.ApiAuthenticationService;
 import org.example.onlinepossystem.security.InvalidCredentialsException;
+import org.example.onlinepossystem.security.api.ApiAuthentication;
 import org.example.onlinepossystem.security.dto.AuthRequest;
 import org.example.onlinepossystem.security.dto.AuthResponse;
 import org.springframework.http.ResponseEntity;
@@ -18,9 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private final ApiAuthenticationService authenticationService;
+    private final ApiAuthentication authenticationService;
 
-    public AuthController(ApiAuthenticationService authenticationService) {
+    public AuthController(ApiAuthentication authenticationService) {
         this.authenticationService = authenticationService;
     }
 

@@ -8,7 +8,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
-import org.example.onlinepossystem.branch.entity.Branch;
 
 import java.io.Serializable;
 import java.util.Objects;
@@ -19,11 +18,6 @@ public class BranchExtraPrice {
 
     @EmbeddedId
     private BranchExtraPriceId id;
-
-    @ManyToOne
-    @MapsId("branchId")
-    @JoinColumn(name = "branch_id")
-    private Branch branch;
 
     @ManyToOne
     @MapsId("priceCategoryId")
@@ -40,18 +34,16 @@ public class BranchExtraPrice {
 
     public BranchExtraPrice() {}
 
-    public BranchExtraPrice(Branch branch, PriceCategory priceCategory, PizzaSize pizzaSize, Double price) {
-        this.branch = branch;
+    public BranchExtraPrice(Integer branchId, PriceCategory priceCategory, PizzaSize pizzaSize, Double price) {
         this.priceCategory = priceCategory;
         this.pizzaSize = pizzaSize;
         this.price = price;
-        this.id = new BranchExtraPriceId(branch.getId(), priceCategory.getId(), pizzaSize.getId());
+        this.id = new BranchExtraPriceId(branchId, priceCategory.getId(), pizzaSize.getId());
     }
 
     public BranchExtraPriceId getId() { return id; }
     public void setId(BranchExtraPriceId id) { this.id = id; }
-    public Branch getBranch() { return branch; }
-    public void setBranch(Branch branch) { this.branch = branch; }
+    public Integer getBranchId() { return id == null ? null : id.getBranchId(); }
     public PriceCategory getPriceCategory() { return priceCategory; }
     public void setPriceCategory(PriceCategory priceCategory) { this.priceCategory = priceCategory; }
     public PizzaSize getPizzaSize() { return pizzaSize; }

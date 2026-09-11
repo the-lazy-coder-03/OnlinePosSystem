@@ -130,7 +130,7 @@ class CustomerProfileControllerTest {
                 false,
                 false
         ));
-        branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch, item, price));
+        branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch.getId(), item, price));
         return new MenuFixture(branch, item);
     }
 

@@ -32,6 +32,7 @@ import org.example.onlinepossystem.catalog.repository.PriceCategoryRepository;
 import org.example.onlinepossystem.customer.entity.Customer;
 import org.example.onlinepossystem.customer.service.CustomerService;
 import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
+import org.example.onlinepossystem.ordering.api.CustomerOrderSummary;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
@@ -291,11 +292,11 @@ class OrderServicePlacementTest {
         entityManager.flush();
         entityManager.clear();
 
-        List<OrderResponseDTO> history = customerOrderHistoryReader.getRecentOrdersForCustomer(customer.getEmail(), 10);
+        List<CustomerOrderSummary> history = customerOrderHistoryReader.getRecentOrdersForCustomer(customer.getEmail(), 10);
 
         assertThat(history).hasSize(10);
-        assertThat(history).extracting(OrderResponseDTO::getId).containsExactlyElementsOf(expectedIds);
-        assertThat(history).extracting(OrderResponseDTO::getId).doesNotContain(otherResponse.getId());
+        assertThat(history).extracting(CustomerOrderSummary::id).containsExactlyElementsOf(expectedIds);
+        assertThat(history).extracting(CustomerOrderSummary::id).doesNotContain(otherResponse.getId());
     }
 
     private PizzaFixture createPizzaFixture() {
@@ -331,8 +332,8 @@ class OrderServicePlacementTest {
         ));
 
         pizzaAllowedSizeRepository.saveAndFlush(new PizzaAllowedSize(pizza, size));
-        branchPizzaPriceRepository.saveAndFlush(new BranchPizzaPrice(branch, pizza, size, 119.99));
-        branchExtraPriceRepository.saveAndFlush(new BranchExtraPrice(branch, priceCategory, size, 12.50));
+        branchPizzaPriceRepository.saveAndFlush(new BranchPizzaPrice(branch.getId(), pizza, size, 119.99));
+        branchExtraPriceRepository.saveAndFlush(new BranchExtraPrice(branch.getId(), priceCategory, size, 12.50));
         return new PizzaFixture(branch, pizza, size, extraIngredient);
     }
 
@@ -368,7 +369,7 @@ class OrderServicePlacementTest {
         );
         option.setAdditionalPrice(new BigDecimal("8.75"));
         modifierOptionRepository.saveAndFlush(option);
-        branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch, item, 49.95));
+        branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch.getId(), item, 49.95));
         return new MenuFixture(branch, item, option);
     }
 
@@ -389,7 +390,7 @@ class OrderServicePlacementTest {
                 false,
                 false
         ));
-        branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch, burger, 89.00));
+        branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch.getId(), burger, 89.00));
         entityManager.flush();
 
         int componentBaseId = nextId("burger_component", "component_id");

@@ -31,21 +31,23 @@ class ModularArchitectureTest {
             "customer",
             "location",
             "ordering",
+            "profile",
             "security",
             "shared",
             "staff"
     );
-    private static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.of(
-            "admin", Set.of("catalog"),
-            "bootstrap", Set.of("catalog", "staff"),
-            "branch", Set.of(),
-            "catalog", Set.of("branch"),
-            "customer", Set.of("ordering", "security"),
-            "location", Set.of(),
-            "ordering", Set.of("branch", "catalog", "customer"),
-            "security", Set.of(),
-            "shared", Set.of("customer"),
-            "staff", Set.of()
+    private static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.ofEntries(
+            Map.entry("admin", Set.of("catalog")),
+            Map.entry("bootstrap", Set.of("catalog", "staff")),
+            Map.entry("branch", Set.of()),
+            Map.entry("catalog", Set.of("branch")),
+            Map.entry("customer", Set.of("security")),
+            Map.entry("location", Set.of()),
+            Map.entry("ordering", Set.of("branch", "catalog", "customer")),
+            Map.entry("profile", Set.of("customer", "ordering")),
+            Map.entry("security", Set.of()),
+            Map.entry("shared", Set.of("customer")),
+            Map.entry("staff", Set.of())
     );
 
     private final JavaClasses classes = new ClassFileImporter()
@@ -179,7 +181,7 @@ class ModularArchitectureTest {
     }
 
     @Test
-    void crossModuleDependenciesUsePublicOrDomainPackages() {
+    void crossModuleDependenciesUsePublicContractsOnly() {
         List<String> violations = new ArrayList<>();
 
         for (JavaClass sourceClass : classes) {
@@ -196,7 +198,7 @@ class ModularArchitectureTest {
                 }
 
                 String targetPackage = targetClass.getPackageName();
-                if (isImplementationPackage(targetPackage)) {
+                if (!isPublicContractPackage(targetPackage)) {
                     violations.add(sourceClass.getName() + " -> " + targetClass.getName());
                 }
             }
@@ -217,11 +219,10 @@ class ModularArchitectureTest {
         return MODULES.contains(module) ? Optional.of(module) : Optional.empty();
     }
 
-    private boolean isImplementationPackage(String packageName) {
-        return packageName.contains(".service")
-                || packageName.contains(".repository")
-                || packageName.contains(".web")
-                || packageName.contains(".integration")
-                || packageName.contains(".notification");
+    private boolean isPublicContractPackage(String packageName) {
+        return packageName.endsWith(".api")
+                || packageName.contains(".api.")
+                || packageName.endsWith(".dto")
+                || packageName.contains(".dto.");
     }
 }

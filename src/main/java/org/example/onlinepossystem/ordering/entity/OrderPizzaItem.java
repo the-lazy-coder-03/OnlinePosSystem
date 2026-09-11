@@ -10,8 +10,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import org.example.onlinepossystem.catalog.entity.Pizza;
-import org.example.onlinepossystem.catalog.entity.PizzaSize;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,13 +27,11 @@ public class OrderPizzaItem {
     @com.fasterxml.jackson.annotation.JsonBackReference
     private Order order;
 
-    @ManyToOne
-    @JoinColumn(name = "pizza_id", nullable = false)
-    private Pizza pizza;
+    @Column(name = "pizza_id", nullable = false)
+    private Integer pizzaId;
 
-    @ManyToOne
-    @JoinColumn(name = "pizza_size_id", nullable = false)
-    private PizzaSize pizzaSize;
+    @Column(name = "pizza_size_id", nullable = false)
+    private Integer pizzaSizeId;
 
     @Column(nullable = false)
     private Integer qty = 1;
@@ -55,10 +51,10 @@ public class OrderPizzaItem {
     public void setId(Long id) { this.id = id; }
     public Order getOrder() { return order; }
     public void setOrder(Order order) { this.order = order; }
-    public Pizza getPizza() { return pizza; }
-    public void setPizza(Pizza pizza) { this.pizza = pizza; }
-    public PizzaSize getPizzaSize() { return pizzaSize; }
-    public void setPizzaSize(PizzaSize pizzaSize) { this.pizzaSize = pizzaSize; }
+    public Integer getPizzaId() { return pizzaId; }
+    public void setPizzaId(Integer pizzaId) { this.pizzaId = pizzaId; }
+    public Integer getPizzaSizeId() { return pizzaSizeId; }
+    public void setPizzaSizeId(Integer pizzaSizeId) { this.pizzaSizeId = pizzaSizeId; }
     public Integer getQty() { return qty; }
     public void setQty(Integer qty) { this.qty = qty; }
     public Double getBasePriceAtTime() { return basePriceAtTime; }

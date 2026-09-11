@@ -1,4 +1,4 @@
-package org.example.onlinepossystem.customer.dto;
+package org.example.onlinepossystem.profile.dto;
 
 import java.util.List;
 

@@ -1,14 +1,12 @@
 package org.example.onlinepossystem.catalog.service;
 
-import jakarta.persistence.EntityManager;
 import org.example.onlinepossystem.branch.api.BranchLookup;
-import org.example.onlinepossystem.branch.entity.Branch;
+import org.example.onlinepossystem.branch.api.BranchView;
 import org.example.onlinepossystem.catalog.api.OrderCatalogResolver;
 import org.example.onlinepossystem.catalog.dto.MenuDTO;
 import org.example.onlinepossystem.catalog.entity.BranchExtraPrice;
 import org.example.onlinepossystem.catalog.entity.BranchMenuItemPrice;
 import org.example.onlinepossystem.catalog.entity.BranchPizzaPrice;
-import org.example.onlinepossystem.catalog.entity.BurgerComponent;
 import org.example.onlinepossystem.catalog.entity.Ingredient;
 import org.example.onlinepossystem.catalog.entity.MenuItem;
 import org.example.onlinepossystem.catalog.entity.ModifierOption;
@@ -52,7 +50,6 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
     private final PizzaRepository pizzaRepository;
     private final BranchExtraPriceRepository branchExtraPriceRepository;
     private final ModifierOptionRepository modifierOptionRepository;
-    private final EntityManager entityManager;
 
     public CatalogOrderResolver(BranchLookup branchLookup,
                                 MenuItemRepository menuItemRepository,
@@ -64,8 +61,7 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                                 BranchPizzaPriceRepository branchPizzaPriceRepository,
                                 PizzaRepository pizzaRepository,
                                 BranchExtraPriceRepository branchExtraPriceRepository,
-                                ModifierOptionRepository modifierOptionRepository,
-                                EntityManager entityManager) {
+                                ModifierOptionRepository modifierOptionRepository) {
         this.branchLookup = branchLookup;
         this.menuItemRepository = menuItemRepository;
         this.branchMenuItemPriceRepository = branchMenuItemPriceRepository;
@@ -77,7 +73,6 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
         this.pizzaRepository = pizzaRepository;
         this.branchExtraPriceRepository = branchExtraPriceRepository;
         this.modifierOptionRepository = modifierOptionRepository;
-        this.entityManager = entityManager;
     }
 
     @Override
@@ -85,17 +80,17 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
         if (branchName == null || branchName.isBlank()) {
             throw new IllegalArgumentException("Branch name is required.");
         }
-        Branch branch = branchLookup.requireByName(branchName);
+        BranchView branch = branchLookup.requireByName(branchName);
 
         List<MenuDTO> menu = new ArrayList<>();
-        List<BranchMenuItemPrice> menuItemPrices = branchMenuItemPriceRepository.findByBranchId(branch.getId());
+        List<BranchMenuItemPrice> menuItemPrices = branchMenuItemPriceRepository.findByBranchId(branch.id());
         Map<Integer, Double> itemPriceMap = menuItemPrices.stream()
                 .collect(Collectors.toMap(p -> p.getMenuItem().getId(), BranchMenuItemPrice::getPrice, (v1, v2) -> v1));
 
         List<MenuItem> items = menuItemRepository.findAllByActiveTrue();
         List<Integer> menuItemIds = items.stream().map(MenuItem::getId).toList();
         Map<Integer, List<BurgerComponentRow>> burgerComponentsByMenuItem = burgerComponentReadRepository
-                .findComponentsForMenuItems(branch.getId(), menuItemIds)
+                .findComponentsForMenuItems(branch.id(), menuItemIds)
                 .stream()
                 .collect(Collectors.groupingBy(
                         BurgerComponentRow::burgerId,
@@ -141,7 +136,7 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
             menu.add(dto);
         }
 
-        List<BranchPizzaPrice> pizzaPrices = branchPizzaPriceRepository.findByBranchId(branch.getId());
+        List<BranchPizzaPrice> pizzaPrices = branchPizzaPriceRepository.findByBranchId(branch.id());
         Map<Integer, List<BranchPizzaPrice>> pizzaPriceMap = pizzaPrices.stream()
                 .collect(Collectors.groupingBy(p -> p.getPizza().getId()));
 
@@ -212,13 +207,21 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                             + ingredient.getName() + " size: " + size.getCm() + "cm in branch: " + branchId));
 
             extras.add(new ResolvedPizzaExtra(
-                    ingredient,
+                    ingredient.getId(),
+                    ingredient.getName(),
                     safeQuantity(customization.quantity()),
                     extraPrice.getPrice()
             ));
         }
 
-        return new ResolvedPizzaItem(pizza, size, price.getPrice(), extras);
+        return new ResolvedPizzaItem(
+                pizza.getId(),
+                pizza.getName(),
+                size.getId(),
+                size.getCm(),
+                price.getPrice(),
+                extras
+        );
     }
 
     @Override
@@ -242,7 +245,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
         );
 
         return new ResolvedMenuItem(
-                menuItem,
+                menuItem.getId(),
+                menuItem.getName(),
                 branchPrice.getPrice(),
                 resolvedCustomizations.burgerSelection(),
                 resolvedCustomizations.genericExtras()
@@ -322,7 +326,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
 
         BurgerComponentRow protein = selectedProteins.get(0);
         ResolvedBurgerProtein resolvedProtein = new ResolvedBurgerProtein(
-                burgerComponentReference(protein.componentId()),
+                protein.componentId(),
+                protein.name(),
                 burgerConfig.proteinQuantityRequired(),
                 toMoney(protein.price())
         );
@@ -339,7 +344,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                 throw new IllegalArgumentException(component.name() + " cannot be removed from " + menuItem.getName() + ".");
             }
             removedComponents.add(new ResolvedBurgerComponent(
-                    burgerComponentReference(component.componentId()),
+                    component.componentId(),
+                    component.name(),
                     1,
                     BigDecimal.ZERO
             ));
@@ -371,7 +377,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                     ));
 
             extraComponents.add(new ResolvedBurgerComponent(
-                    burgerComponentReference(component.componentId()),
+                    component.componentId(),
+                    component.name(),
                     selectedExtra.getValue(),
                     toMoney(component.price())
             ));
@@ -511,8 +518,34 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
         return value == null ? BigDecimal.ZERO : BigDecimal.valueOf(value);
     }
 
-    private BurgerComponent burgerComponentReference(Integer componentId) {
-        return entityManager.getReference(BurgerComponent.class, componentId);
+    @Override
+    public Optional<NamedReference> findMenuItem(Integer id) {
+        return menuItemRepository.findById(id)
+                .map(item -> new NamedReference(item.getId(), item.getName()));
+    }
+
+    @Override
+    public Optional<NamedReference> findPizza(Integer id) {
+        return pizzaRepository.findById(id)
+                .map(pizza -> new NamedReference(pizza.getId(), pizza.getName()));
+    }
+
+    @Override
+    public Optional<SizeReference> findPizzaSize(Integer id) {
+        return pizzaSizeRepository.findById(id)
+                .map(size -> new SizeReference(size.getId(), size.getCm()));
+    }
+
+    @Override
+    public Optional<NamedReference> findIngredient(Integer id) {
+        return ingredientRepository.findById(id)
+                .map(ingredient -> new NamedReference(ingredient.getId(), ingredient.getName()));
+    }
+
+    @Override
+    public Optional<NamedReference> findBurgerComponent(Integer id) {
+        return burgerComponentReadRepository.findNameById(id)
+                .map(name -> new NamedReference(id, name));
     }
 
     private record MenuCustomizations(

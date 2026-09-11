@@ -6,6 +6,7 @@ import org.example.onlinepossystem.customer.notification.PasswordResetNotifier;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
 import org.example.onlinepossystem.customer.repository.PasswordResetTokenRepository;
 import org.example.onlinepossystem.security.SimpleRateLimiter;
+import org.example.onlinepossystem.security.DefaultPasswordPolicy;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,7 +34,8 @@ class PasswordResetServiceTest {
                 encoder,
                 notifier,
                 rateLimiter,
-                secureRandom
+                secureRandom,
+                new DefaultPasswordPolicy()
         );
         Customer customer = new Customer();
         customer.setEmail("customer@example.com");

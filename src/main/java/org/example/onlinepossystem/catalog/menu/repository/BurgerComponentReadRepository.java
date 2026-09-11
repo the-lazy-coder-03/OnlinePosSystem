@@ -159,6 +159,19 @@ public class BurgerComponentReadRepository {
         return rows.stream().findFirst();
     }
 
+    public Optional<String> findNameById(Integer componentId) {
+        if (componentId == null || !normalizedBurgerTablesExist()) {
+            return Optional.empty();
+        }
+        String sql = "SELECT name FROM burger_component WHERE component_id = :componentId";
+        List<String> rows = jdbcTemplate.query(
+                sql,
+                new MapSqlParameterSource("componentId", componentId),
+                (rs, rowNum) -> rs.getString("name")
+        );
+        return rows.stream().findFirst();
+    }
+
     public record BurgerConfig(Integer burgerId, Integer proteinQuantityRequired) {
     }
 

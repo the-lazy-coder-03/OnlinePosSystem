@@ -27,15 +27,15 @@ public class PizzaOrderItemFactory {
         );
 
         OrderPizzaItem pizzaItem = new OrderPizzaItem();
-        pizzaItem.setPizza(resolvedItem.pizza());
-        pizzaItem.setPizzaSize(resolvedItem.pizzaSize());
+        pizzaItem.setPizzaId(resolvedItem.pizzaId());
+        pizzaItem.setPizzaSizeId(resolvedItem.pizzaSizeId());
         pizzaItem.setQty(request.getQuantity());
         pizzaItem.setBasePriceAtTime(resolvedItem.basePrice());
         pizzaItem.setNotes(request.getNotes());
 
         for (OrderCatalogResolver.ResolvedPizzaExtra resolvedExtra : resolvedItem.extras()) {
             OrderPizzaItemExtra extra = new OrderPizzaItemExtra();
-            extra.setIngredient(resolvedExtra.ingredient());
+            extra.setIngredientId(resolvedExtra.ingredientId());
             extra.setQty(resolvedExtra.quantity());
             extra.setUnitPriceAtTime(resolvedExtra.unitPrice());
             pizzaItem.addExtra(extra);

@@ -1,10 +1,12 @@
 package org.example.onlinepossystem.ordering.service;
 
 import org.example.onlinepossystem.branch.api.BranchLookup;
-import org.example.onlinepossystem.branch.entity.Branch;
+import org.example.onlinepossystem.branch.api.BranchView;
+import org.example.onlinepossystem.customer.api.CustomerAccount;
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
-import org.example.onlinepossystem.customer.entity.Customer;
+import org.example.onlinepossystem.customer.api.CustomerOrderRecorder;
 import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
+import org.example.onlinepossystem.ordering.api.CustomerOrderSummary;
 import org.example.onlinepossystem.ordering.api.OrderEventPublisher;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
@@ -23,30 +25,36 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     private final OrderRepository orderRepository;
     private final BranchLookup branchLookup;
     private final CustomerAccountReader customerAccountReader;
+    private final CustomerOrderRecorder customerOrderRecorder;
     private final OrderRequestValidator orderRequestValidator;
     private final MenuOrderItemFactory menuOrderItemFactory;
     private final PizzaOrderItemFactory pizzaOrderItemFactory;
     private final OrderStatusPolicy orderStatusPolicy;
     private final OrderResponseMapper orderResponseMapper;
+    private final CustomerOrderSummaryMapper customerOrderSummaryMapper;
     private final OrderEventPublisher eventPublisher;
 
     public OrderService(OrderRepository orderRepository,
                         BranchLookup branchLookup,
                         CustomerAccountReader customerAccountReader,
+                        CustomerOrderRecorder customerOrderRecorder,
                         OrderRequestValidator orderRequestValidator,
                         MenuOrderItemFactory menuOrderItemFactory,
                         PizzaOrderItemFactory pizzaOrderItemFactory,
                         OrderStatusPolicy orderStatusPolicy,
                         OrderResponseMapper orderResponseMapper,
+                        CustomerOrderSummaryMapper customerOrderSummaryMapper,
                         OrderEventPublisher eventPublisher) {
         this.orderRepository = orderRepository;
         this.branchLookup = branchLookup;
         this.customerAccountReader = customerAccountReader;
+        this.customerOrderRecorder = customerOrderRecorder;
         this.orderRequestValidator = orderRequestValidator;
         this.menuOrderItemFactory = menuOrderItemFactory;
         this.pizzaOrderItemFactory = pizzaOrderItemFactory;
         this.orderStatusPolicy = orderStatusPolicy;
         this.orderResponseMapper = orderResponseMapper;
+        this.customerOrderSummaryMapper = customerOrderSummaryMapper;
         this.eventPublisher = eventPublisher;
     }
 
@@ -60,13 +68,13 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     @Transactional
     public OrderResponseDTO placeOrderForCustomer(OrderRequestDTO request, String customerEmail) {
         orderRequestValidator.validate(request);
-        Branch branch = branchLookup.requireByName(request.getBranchName());
-        Customer customer = resolveCustomer(customerEmail);
+        BranchView branch = branchLookup.requireByName(request.getBranchName());
+        CustomerAccount customer = resolveCustomer(customerEmail);
         LocalDateTime createdAt = LocalDateTime.now();
 
         Order order = new Order();
-        order.setBranch(branch);
-        order.setCustomer(customer);
+        order.setBranchId(branch.id());
+        order.setCustomerId(customer == null ? null : customer.id());
         order.setCustomerName(request.getCustomerName());
         order.setPhone(request.getPhone());
         order.setHouseNumber(request.getHouseNumber());
@@ -79,14 +87,14 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         order.setCreatedAt(createdAt);
         order.setStatus("Pending");
         if (customer != null) {
-            customer.setLastOrderedAt(createdAt);
+            customerOrderRecorder.recordOrderPlaced(customer.id(), createdAt);
         }
 
         for (OrderRequestDTO.OrderItemRequestDTO itemRequest : request.getItems()) {
             if (itemRequest.getPizzaId() != null) {
-                order.addPizzaItem(pizzaOrderItemFactory.create(branch.getId(), itemRequest));
+                order.addPizzaItem(pizzaOrderItemFactory.create(branch.id(), itemRequest));
             } else {
-                order.addMenuItem(menuOrderItemFactory.create(branch.getId(), itemRequest));
+                order.addMenuItem(menuOrderItemFactory.create(branch.id(), itemRequest));
             }
         }
 
@@ -98,16 +106,17 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponseDTO> getRecentOrdersForCustomer(String customerEmail, int limit) {
+    public List<CustomerOrderSummary> getRecentOrdersForCustomer(String customerEmail, int limit) {
         if (customerEmail == null || customerEmail.isBlank() || limit < 1) {
             return List.of();
         }
 
         return customerAccountReader.findByEmail(customerEmail)
                 .map(customer -> orderRepository
-                        .findByCustomerIdOrderByCreatedAtDesc(customer.getId(), PageRequest.of(0, limit))
+                        .findByCustomerIdOrderByCreatedAtDesc(customer.id(), PageRequest.of(0, limit))
                         .stream()
                         .map(orderResponseMapper::toDto)
+                        .map(customerOrderSummaryMapper::toSummary)
                         .toList())
                 .orElseGet(List::of);
     }
@@ -118,8 +127,8 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         if (branchName == null || branchName.isBlank()) {
             throw new IllegalArgumentException("Branch name is required.");
         }
-        Branch branch = branchLookup.requireByName(branchName);
-        return orderRepository.findByBranchIdOrderByCreatedAtDesc(branch.getId()).stream()
+        BranchView branch = branchLookup.requireByName(branchName);
+        return orderRepository.findByBranchIdOrderByCreatedAtDesc(branch.id()).stream()
                 .map(orderResponseMapper::toDto)
                 .toList();
     }
@@ -130,8 +139,8 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         if (branchName == null || branchName.isBlank()) {
             throw new IllegalArgumentException("Branch name is required.");
         }
-        Branch branch = branchLookup.requireByName(branchName);
-        return orderRepository.findByBranchIdAndStatusOrderByCreatedAtDesc(branch.getId(), "Pending").stream()
+        BranchView branch = branchLookup.requireByName(branchName);
+        return orderRepository.findByBranchIdAndStatusOrderByCreatedAtDesc(branch.id(), "Pending").stream()
                 .map(orderResponseMapper::toDto)
                 .toList();
     }
@@ -165,7 +174,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         return orderResponseMapper.toDto(order);
     }
 
-    private Customer resolveCustomer(String customerEmail) {
+    private CustomerAccount resolveCustomer(String customerEmail) {
         if (customerEmail == null || customerEmail.isBlank()) {
             return null;
         }
@@ -173,10 +182,12 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     }
 
     private String customerUsername(Order order) {
-        if (order == null || order.getCustomer() == null) {
+        if (order == null || order.getCustomerId() == null) {
             return null;
         }
-        return order.getCustomer().getEmail();
+        return customerAccountReader.findById(order.getCustomerId())
+                .map(CustomerAccount::email)
+                .orElse(null);
     }
 
 }

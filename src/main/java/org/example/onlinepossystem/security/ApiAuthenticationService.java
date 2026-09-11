@@ -1,5 +1,6 @@
 package org.example.onlinepossystem.security;
 
+import org.example.onlinepossystem.security.api.ApiAuthentication;
 import org.example.onlinepossystem.security.api.TokenService;
 import org.example.onlinepossystem.security.dto.AuthRequest;
 import org.example.onlinepossystem.security.dto.AuthResponse;
@@ -15,7 +16,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
-public class ApiAuthenticationService {
+public class ApiAuthenticationService implements ApiAuthentication {
     private static final Logger logger = LoggerFactory.getLogger(ApiAuthenticationService.class);
 
     private final AuthenticationManager authenticationManager;
@@ -26,6 +27,7 @@ public class ApiAuthenticationService {
         this.tokenService = tokenService;
     }
 
+    @Override
     public AuthResponse authenticate(AuthRequest request, String clientIp) {
         try {
             var authentication = authenticationManager.authenticate(

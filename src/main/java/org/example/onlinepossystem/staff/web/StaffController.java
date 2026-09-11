@@ -69,7 +69,7 @@ public class StaffController {
         var staff = staffOperations.createStaff(name, branch, pin, null);
         return ResponseEntity.ok(Map.of(
                 "success", true,
-                "staffId", staff.getId()
+                "staffId", staff.id()
         ));
     }
 }

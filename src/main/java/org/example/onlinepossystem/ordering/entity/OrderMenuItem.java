@@ -11,7 +11,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
-import org.example.onlinepossystem.catalog.entity.MenuItem;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,9 +28,11 @@ public class OrderMenuItem {
     @com.fasterxml.jackson.annotation.JsonBackReference
     private Order order;
 
-    @ManyToOne
-    @JoinColumn(name = "menu_item_id", nullable = false)
-    private MenuItem menuItem;
+    @Column(name = "menu_item_id", nullable = false)
+    private Integer menuItemId;
+
+    @Column(name = "item_name_at_time")
+    private String itemNameAtTime;
 
     @Column(nullable = false)
     private Integer qty = 1;
@@ -60,8 +61,10 @@ public class OrderMenuItem {
     public void setId(Long id) { this.id = id; }
     public Order getOrder() { return order; }
     public void setOrder(Order order) { this.order = order; }
-    public MenuItem getMenuItem() { return menuItem; }
-    public void setMenuItem(MenuItem menuItem) { this.menuItem = menuItem; }
+    public Integer getMenuItemId() { return menuItemId; }
+    public void setMenuItemId(Integer menuItemId) { this.menuItemId = menuItemId; }
+    public String getItemNameAtTime() { return itemNameAtTime; }
+    public void setItemNameAtTime(String itemNameAtTime) { this.itemNameAtTime = itemNameAtTime; }
     public Integer getQty() { return qty; }
     public void setQty(Integer qty) { this.qty = qty; }
     public Double getUnitPriceAtTime() { return unitPriceAtTime; }

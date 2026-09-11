@@ -1,5 +1,7 @@
 package org.example.onlinepossystem.ordering.service;
 
+import org.example.onlinepossystem.branch.api.BranchLookup;
+import org.example.onlinepossystem.catalog.api.OrderCatalogResolver;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
 import org.example.onlinepossystem.ordering.entity.Order;
 import org.example.onlinepossystem.ordering.entity.OrderBurgerExtraComponent;
@@ -17,12 +19,20 @@ import java.util.List;
 
 @Component
 public class OrderResponseMapper {
+    private final BranchLookup branchLookup;
+    private final OrderCatalogResolver catalogResolver;
+
+    public OrderResponseMapper(BranchLookup branchLookup, OrderCatalogResolver catalogResolver) {
+        this.branchLookup = branchLookup;
+        this.catalogResolver = catalogResolver;
+    }
+
     public OrderResponseDTO toDto(Order order) {
         OrderResponseDTO dto = new OrderResponseDTO();
         dto.setId(order.getId());
-        if (order.getBranch() != null) {
-            dto.setBranchId(order.getBranch().getId());
-            dto.setBranchName(order.getBranch().getName());
+        if (order.getBranchId() != null) {
+            dto.setBranchId(order.getBranchId());
+            dto.setBranchName(branchLookup.requireById(order.getBranchId()).name());
         }
         dto.setStatus(order.getStatus());
         dto.setOrderType(order.getOrderType());
@@ -50,9 +60,13 @@ public class OrderResponseMapper {
         for (OrderMenuItem item : items) {
             OrderResponseDTO.MenuItemDTO itemDto = new OrderResponseDTO.MenuItemDTO();
             itemDto.setId(item.getId());
-            if (item.getMenuItem() != null) {
-                itemDto.setMenuItemId(item.getMenuItem().getId());
-                itemDto.setMenuItemName(item.getMenuItem().getName());
+            if (item.getMenuItemId() != null) {
+                itemDto.setMenuItemId(item.getMenuItemId());
+                itemDto.setMenuItemName(item.getItemNameAtTime());
+                if (itemDto.getMenuItemName() == null || itemDto.getMenuItemName().isBlank()) {
+                    catalogResolver.findMenuItem(item.getMenuItemId())
+                            .ifPresent(reference -> itemDto.setMenuItemName(reference.name()));
+                }
             }
             itemDto.setQty(item.getQty());
             itemDto.setUnitPriceAtTime(item.getUnitPriceAtTime());
@@ -65,21 +79,21 @@ public class OrderResponseMapper {
 
     private List<OrderResponseDTO.MenuItemExtraDTO> toMenuItemExtraDtos(OrderMenuItem item) {
         List<OrderResponseDTO.MenuItemExtraDTO> extraDtos = new ArrayList<>();
-        if (item.getBurgerProtein() != null && item.getBurgerProtein().getComponent() != null) {
+        if (item.getBurgerProtein() != null && item.getBurgerProtein().getComponentId() != null) {
             OrderBurgerProtein protein = item.getBurgerProtein();
             OrderResponseDTO.MenuItemExtraDTO proteinDto = new OrderResponseDTO.MenuItemExtraDTO();
-            proteinDto.setName("Protein: " + protein.getComponent().getName());
+            proteinDto.setName("Protein: " + componentName(protein.getComponentId()));
             proteinDto.setQty(protein.getProteinQtyPerBurger());
             proteinDto.setUnitPriceAtTime(toDouble(protein.getUnitPriceAtTime()));
             extraDtos.add(proteinDto);
         }
         if (item.getRemovedBurgerComponents() != null) {
             for (OrderBurgerRemovedComponent removedComponent : item.getRemovedBurgerComponents()) {
-                if (removedComponent.getComponent() == null) {
+                if (removedComponent.getComponentId() == null) {
                     continue;
                 }
                 OrderResponseDTO.MenuItemExtraDTO removedDto = new OrderResponseDTO.MenuItemExtraDTO();
-                removedDto.setName("No " + removedComponent.getComponent().getName());
+                removedDto.setName("No " + componentName(removedComponent.getComponentId()));
                 removedDto.setQty(1);
                 removedDto.setUnitPriceAtTime(0.0);
                 extraDtos.add(removedDto);
@@ -87,11 +101,11 @@ public class OrderResponseMapper {
         }
         if (item.getExtraBurgerComponents() != null) {
             for (OrderBurgerExtraComponent extraComponent : item.getExtraBurgerComponents()) {
-                if (extraComponent.getComponent() == null) {
+                if (extraComponent.getComponentId() == null) {
                     continue;
                 }
                 OrderResponseDTO.MenuItemExtraDTO extraDto = new OrderResponseDTO.MenuItemExtraDTO();
-                extraDto.setName("Extra " + extraComponent.getComponent().getName());
+                extraDto.setName("Extra " + componentName(extraComponent.getComponentId()));
                 extraDto.setQty(extraComponent.getQty());
                 extraDto.setUnitPriceAtTime(toDouble(extraComponent.getUnitPriceAtTime()));
                 extraDtos.add(extraDto);
@@ -119,13 +133,15 @@ public class OrderResponseMapper {
         for (OrderPizzaItem item : items) {
             OrderResponseDTO.PizzaItemDTO itemDto = new OrderResponseDTO.PizzaItemDTO();
             itemDto.setId(item.getId());
-            if (item.getPizza() != null) {
-                itemDto.setPizzaId(item.getPizza().getId());
-                itemDto.setPizzaName(item.getPizza().getName());
+            if (item.getPizzaId() != null) {
+                itemDto.setPizzaId(item.getPizzaId());
+                catalogResolver.findPizza(item.getPizzaId())
+                        .ifPresent(reference -> itemDto.setPizzaName(reference.name()));
             }
-            if (item.getPizzaSize() != null) {
-                itemDto.setPizzaSizeId(item.getPizzaSize().getId());
-                itemDto.setPizzaSizeCm(item.getPizzaSize().getCm());
+            if (item.getPizzaSizeId() != null) {
+                itemDto.setPizzaSizeId(item.getPizzaSizeId());
+                catalogResolver.findPizzaSize(item.getPizzaSizeId())
+                        .ifPresent(reference -> itemDto.setPizzaSizeCm(reference.cm()));
             }
             itemDto.setQty(item.getQty());
             itemDto.setBasePriceAtTime(item.getBasePriceAtTime());
@@ -145,9 +161,10 @@ public class OrderResponseMapper {
         for (OrderPizzaItemExtra extra : extras) {
             OrderResponseDTO.PizzaItemExtraDTO extraDto = new OrderResponseDTO.PizzaItemExtraDTO();
             extraDto.setId(extra.getId());
-            if (extra.getIngredient() != null) {
-                extraDto.setIngredientId(extra.getIngredient().getId());
-                extraDto.setIngredientName(extra.getIngredient().getName());
+            if (extra.getIngredientId() != null) {
+                extraDto.setIngredientId(extra.getIngredientId());
+                catalogResolver.findIngredient(extra.getIngredientId())
+                        .ifPresent(reference -> extraDto.setIngredientName(reference.name()));
             }
             extraDto.setQty(extra.getQty());
             extraDto.setUnitPriceAtTime(extra.getUnitPriceAtTime());
@@ -158,5 +175,11 @@ public class OrderResponseMapper {
 
     private Double toDouble(BigDecimal value) {
         return value == null ? 0.0 : value.doubleValue();
+    }
+
+    private String componentName(Integer componentId) {
+        return catalogResolver.findBurgerComponent(componentId)
+                .map(OrderCatalogResolver.NamedReference::name)
+                .orElse("Component " + componentId);
     }
 }

@@ -6,7 +6,6 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
-import org.example.onlinepossystem.catalog.entity.BurgerComponent;
 
 @Entity
 @Table(name = "order_burger_removed_component")
@@ -18,11 +17,6 @@ public class OrderBurgerRemovedComponent {
     @MapsId("orderMenuItemId")
     @JoinColumn(name = "order_menu_item_id")
     private OrderMenuItem orderMenuItem;
-
-    @ManyToOne
-    @MapsId("componentId")
-    @JoinColumn(name = "component_id")
-    private BurgerComponent component;
 
     public OrderBurgerRemovedComponent() {
     }
@@ -46,14 +40,11 @@ public class OrderBurgerRemovedComponent {
         }
     }
 
-    public BurgerComponent getComponent() {
-        return component;
+    public Integer getComponentId() {
+        return id == null ? null : id.getComponentId();
     }
 
-    public void setComponent(BurgerComponent component) {
-        this.component = component;
-        if (component != null) {
-            this.id.setComponentId(component.getId());
-        }
+    public void setComponentId(Integer componentId) {
+        this.id.setComponentId(componentId);
     }
 }

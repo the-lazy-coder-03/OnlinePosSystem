@@ -24,7 +24,7 @@ public interface MenuReadRepository extends JpaRepository<MenuItem, Integer> {
             from MenuItem mi
             join mi.category mc
             left join BranchMenuItemPrice bmp
-                on bmp.menuItem = mi and bmp.branch.id = :branchId
+                on bmp.menuItem = mi and bmp.id.branchId = :branchId
             where mi.active = true
               and mc.active = true
             order by mc.sortOrder, mi.sortOrder, mi.name

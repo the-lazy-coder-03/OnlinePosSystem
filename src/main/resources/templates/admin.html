@@ -75,8 +75,8 @@
                     <td>
                         <div style="font-size: 0.8em; margin-bottom: 5px;">
                             <th:block th:each="bp : ${branchPizzaPrices}"
-                                      th:if="${bp.pizza != null and bp.branch != null and bp.pizzaSize != null and bp.pizza.id == p.id}">
-                                <span th:text="${bp.branch.name + ' (' + bp.pizzaSize.cm + 'cm): R' + bp.price}"></span><br/>
+                                      th:if="${bp.pizza != null and bp.branchName != null and bp.pizzaSize != null and bp.pizza.id == p.id}">
+                                <span th:text="${bp.branchName + ' (' + bp.pizzaSize.cm + 'cm): R' + bp.price}"></span><br/>
                             </th:block>
                         </div>
                         <button class="btn btn-success" th:onclick="'openPriceModal(' + ${p.id} + ', \'pizza\')'">Set Prices</button>
@@ -125,8 +125,8 @@
                     <td>
                         <div style="font-size: 0.8em; margin-bottom: 5px;">
                             <th:block th:each="bm : ${branchMenuItemPrices}"
-                                      th:if="${bm.menuItem != null and bm.branch != null and bm.menuItem.id == m.id}">
-                                <span th:text="${bm.branch.name + ': R' + bm.price}"></span><br/>
+                                      th:if="${bm.menuItem != null and bm.branchName != null and bm.menuItem.id == m.id}">
+                                <span th:text="${bm.branchName + ': R' + bm.price}"></span><br/>
                             </th:block>
                         </div>
                         <button class="btn btn-success" th:onclick="'openPriceModal(' + ${m.id} + ', \'menuItem\')'">Set Prices</button>
@@ -156,15 +156,15 @@
             </thead>
             <tbody>
                 <tr th:each="ep : ${branchExtraPrices}">
-                    <td th:text="${ep.branch != null ? ep.branch.name : 'Missing branch'}">Branch</td>
+                    <td th:text="${ep.branchName != null ? ep.branchName : 'Missing branch'}">Branch</td>
                     <td th:text="${ep.priceCategory != null ? ep.priceCategory.name : 'Missing category'}">Category</td>
                     <td th:text="${ep.pizzaSize != null ? ep.pizzaSize.cm + 'cm' : 'Missing size'}">Size</td>
                     <td th:text="'R' + ${ep.price}">Price</td>
                     <td>
                         <button class="btn btn-success"
-                                th:if="${ep.priceCategory != null and ep.branch != null and ep.pizzaSize != null}"
-                                th:onclick="'openPriceModal(' + ${ep.priceCategory.id} + ', \'topping\', ' + ${ep.branch.id} + ', ' + ${ep.pizzaSize.id} + ', ' + ${ep.price} + ')'">Edit</button>
-                        <span th:unless="${ep.priceCategory != null and ep.branch != null and ep.pizzaSize != null}">Fix related data first</span>
+                                th:if="${ep.priceCategory != null and ep.branchId != null and ep.pizzaSize != null}"
+                                th:onclick="'openPriceModal(' + ${ep.priceCategory.id} + ', \'topping\', ' + ${ep.branchId} + ', ' + ${ep.pizzaSize.id} + ', ' + ${ep.price} + ')'">Edit</button>
+                        <span th:unless="${ep.priceCategory != null and ep.branchId != null and ep.pizzaSize != null}">Fix related data first</span>
                     </td>
                 </tr>
             </tbody>

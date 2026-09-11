@@ -3,6 +3,7 @@ package org.example.onlinepossystem.staff.service;
 import org.example.onlinepossystem.staff.entity.Staff;
 import org.example.onlinepossystem.staff.repository.StaffRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,10 +21,11 @@ class StaffServiceDependencyTest {
         when(repository.save(any(Staff.class))).thenAnswer(invocation -> invocation.getArgument(0));
         StaffService service = new StaffService(repository, encoder);
 
-        Staff staff = service.createStaff("Sam", "Kenridge", "1234", "BRANCH-CODE");
+        service.createStaff("Sam", "Kenridge", "1234", "BRANCH-CODE");
 
-        assertThat(staff.getPinHash()).isEqualTo("encoded-pin");
+        ArgumentCaptor<Staff> staffCaptor = ArgumentCaptor.forClass(Staff.class);
         verify(encoder).encode("1234");
-        verify(repository).save(staff);
+        verify(repository).save(staffCaptor.capture());
+        assertThat(staffCaptor.getValue().getPinHash()).isEqualTo("encoded-pin");
     }
 }

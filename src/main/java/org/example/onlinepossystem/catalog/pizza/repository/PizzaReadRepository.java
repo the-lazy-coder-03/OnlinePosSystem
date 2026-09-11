@@ -28,7 +28,7 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
             join bpp.pizza p
             join bpp.pizzaSize s
             join PizzaAllowedSize pas on pas.pizza = p and pas.pizzaSize = s
-            where bpp.branch.id = :branchId
+            where bpp.id.branchId = :branchId
               and p.active = true
               and s.active = true
             order by p.sortOrder, s.sortOrder
@@ -50,7 +50,7 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
             join bpp.pizza p
             join bpp.pizzaSize s
             join PizzaAllowedSize pas on pas.pizza = p and pas.pizzaSize = s
-            where bpp.branch.id = :branchId
+            where bpp.id.branchId = :branchId
               and p.category.id = :categoryId
               and p.active = true
               and s.active = true
@@ -73,7 +73,7 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
             join bpp.pizza p
             join bpp.pizzaSize s
             join PizzaAllowedSize pas on pas.pizza = p and pas.pizzaSize = s
-            where bpp.branch.id = :branchId
+            where bpp.id.branchId = :branchId
               and p.id = :pizzaId
               and p.active = true
               and s.active = true
@@ -92,7 +92,7 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
             left join PizzaDefaultIngredient pdi
                 on pdi.ingredient = i and pdi.pizza.id = :pizzaId
             join BranchExtraPrice bep
-                on bep.priceCategory = i.priceCategory and bep.branch.id = :branchId
+                on bep.priceCategory = i.priceCategory and bep.id.branchId = :branchId
             where i.active = true
               and bep.pizzaSize.cm = :sizeCm
               and bep.pizzaSize.active = true
@@ -107,7 +107,7 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
     @Query("""
             select bpp.price
             from BranchPizzaPrice bpp
-            where bpp.branch.id = :branchId
+            where bpp.id.branchId = :branchId
               and bpp.pizza.id = :pizzaId
               and bpp.pizzaSize.cm = :sizeCm
             """)
@@ -121,7 +121,7 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
             select coalesce(sum(bep.price), 0)
             from Ingredient i
             join BranchExtraPrice bep
-                on bep.priceCategory = i.priceCategory and bep.branch.id = :branchId
+                on bep.priceCategory = i.priceCategory and bep.id.branchId = :branchId
             where i.active = true
               and i.id in :ingredientIds
               and i.id not in (

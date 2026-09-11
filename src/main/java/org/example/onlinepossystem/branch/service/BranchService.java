@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.branch.service;
 
 import org.example.onlinepossystem.branch.api.BranchLookup;
+import org.example.onlinepossystem.branch.api.BranchView;
 import org.example.onlinepossystem.branch.entity.Branch;
 import org.example.onlinepossystem.branch.repository.BranchRepository;
 import org.springframework.stereotype.Service;
@@ -17,25 +18,26 @@ public class BranchService implements BranchLookup {
     }
 
     @Override
-    public Optional<Branch> findByName(String name) {
-        return branchRepository.findByName(name);
+    public Optional<BranchView> findByName(String name) {
+        return branchRepository.findByName(name).map(this::toView);
     }
 
     @Override
-    public Branch requireByName(String name) {
+    public BranchView requireByName(String name) {
         return findByName(name)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Branch not found: " + name));
     }
 
     @Override
-    public Branch requireById(Integer id) {
+    public BranchView requireById(Integer id) {
         return branchRepository.findById(id)
+                .map(this::toView)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Branch not found with ID: " + id));
     }
 
     @Override
-    public List<Branch> findAll() {
-        return branchRepository.findAll();
+    public List<BranchView> findAll() {
+        return branchRepository.findAll().stream().map(this::toView).toList();
     }
 
     @Override
@@ -44,8 +46,13 @@ public class BranchService implements BranchLookup {
     }
 
     @Override
-    public Branch ensureBranch(Integer id, String name) {
+    public BranchView ensureBranch(Integer id, String name) {
         return branchRepository.findByName(name)
-                .orElseGet(() -> branchRepository.save(new Branch(id, name)));
+                .map(this::toView)
+                .orElseGet(() -> toView(branchRepository.save(new Branch(id, name))));
+    }
+
+    private BranchView toView(Branch branch) {
+        return new BranchView(branch.getId(), branch.getName());
     }
 }

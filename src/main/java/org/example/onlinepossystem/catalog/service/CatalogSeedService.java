@@ -1,8 +1,8 @@
 package org.example.onlinepossystem.catalog.service;
 
 import org.example.onlinepossystem.branch.api.BranchLookup;
+import org.example.onlinepossystem.branch.api.BranchView;
 import org.example.onlinepossystem.catalog.api.CatalogSeeder;
-import org.example.onlinepossystem.branch.entity.Branch;
 import org.example.onlinepossystem.catalog.entity.BranchExtraPrice;
 import org.example.onlinepossystem.catalog.entity.BranchMenuItemPrice;
 import org.example.onlinepossystem.catalog.entity.BranchPizzaPrice;
@@ -86,8 +86,8 @@ public class CatalogSeedService implements CatalogSeeder {
 
         System.out.println("Seeding pizza data...");
 
-        Branch branchKenridge = branchLookup.ensureBranch(1, "Kenridge");
-        Branch branchUitzicht = branchLookup.ensureBranch(2, "Uitzicht");
+        BranchView branchKenridge = branchLookup.ensureBranch(1, "Kenridge");
+        BranchView branchUitzicht = branchLookup.ensureBranch(2, "Uitzicht");
 
         PizzaSize size19 = pizzaSizeRepository.save(new PizzaSize(1, 19, 1));
         PizzaSize size23 = pizzaSizeRepository.save(new PizzaSize(2, 23, 2));
@@ -123,14 +123,14 @@ public class CatalogSeedService implements CatalogSeeder {
         pizzaDefaultIngredientRepository.save(new PizzaDefaultIngredient(p103, i28, true, 1, 1));
         pizzaDefaultIngredientRepository.save(new PizzaDefaultIngredient(p103, i15, true, 1, 2));
 
-        branchMenuItemPriceRepository.save(new BranchMenuItemPrice(branchKenridge, m101, 18.0));
-        branchMenuItemPriceRepository.save(new BranchMenuItemPrice(branchUitzicht, m101, 16.0));
+        branchMenuItemPriceRepository.save(new BranchMenuItemPrice(branchKenridge.id(), m101, 18.0));
+        branchMenuItemPriceRepository.save(new BranchMenuItemPrice(branchUitzicht.id(), m101, 16.0));
 
-        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge, p101, size23, 59.0));
-        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge, p101, size30, 78.0));
-        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge, p103, size19, 58.0));
-        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge, p103, size23, 92.0));
-        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge, p103, size30, 112.0));
+        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge.id(), p101, size23, 59.0));
+        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge.id(), p101, size30, 78.0));
+        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge.id(), p103, size19, 58.0));
+        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge.id(), p103, size23, 92.0));
+        branchPizzaPriceRepository.save(new BranchPizzaPrice(branchKenridge.id(), p103, size30, 112.0));
 
         saveExtraPrices(branchKenridge, pc1, pc2, pc3, pc4, size19, size23, size30);
         saveExtraPrices(branchUitzicht, pc1, pc2, pc3, pc4, size19, size23, size30);
@@ -138,22 +138,22 @@ public class CatalogSeedService implements CatalogSeeder {
         System.out.println("✅ Database seeded with minimal set for testing!");
     }
 
-    private void saveExtraPrices(Branch branch, PriceCategory pc1, PriceCategory pc2, PriceCategory pc3, PriceCategory pc4,
+    private void saveExtraPrices(BranchView branch, PriceCategory pc1, PriceCategory pc2, PriceCategory pc3, PriceCategory pc4,
                                  PizzaSize s19, PizzaSize s23, PizzaSize s30) {
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc1, s19, 7.0));
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc1, s23, 8.0));
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc1, s30, 9.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc1, s19, 7.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc1, s23, 8.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc1, s30, 9.0));
 
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc2, s19, 14.0));
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc2, s23, 17.0));
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc2, s30, 18.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc2, s19, 14.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc2, s23, 17.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc2, s30, 18.0));
 
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc3, s19, 16.0));
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc3, s23, 20.0));
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc3, s30, 22.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc3, s19, 16.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc3, s23, 20.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc3, s30, 22.0));
 
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc4, s19, 17.0));
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc4, s23, 22.0));
-        branchExtraPriceRepository.save(new BranchExtraPrice(branch, pc4, s30, 25.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc4, s19, 17.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc4, s23, 22.0));
+        branchExtraPriceRepository.save(new BranchExtraPrice(branch.id(), pc4, s30, 25.0));
     }
 }

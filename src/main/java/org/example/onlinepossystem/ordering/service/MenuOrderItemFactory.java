@@ -28,7 +28,8 @@ public class MenuOrderItemFactory {
         );
 
         OrderMenuItem orderItem = new OrderMenuItem();
-        orderItem.setMenuItem(resolvedItem.menuItem());
+        orderItem.setMenuItemId(resolvedItem.menuItemId());
+        orderItem.setItemNameAtTime(resolvedItem.menuItemName());
         orderItem.setQty(request.getQuantity());
         orderItem.setUnitPriceAtTime(resolvedItem.unitPrice());
         orderItem.setNotes(request.getNotes());
@@ -54,20 +55,20 @@ public class MenuOrderItemFactory {
 
         OrderCatalogResolver.ResolvedBurgerProtein resolvedProtein = burgerSelection.protein();
         OrderBurgerProtein protein = new OrderBurgerProtein();
-        protein.setComponent(resolvedProtein.component());
+        protein.setComponentId(resolvedProtein.componentId());
         protein.setProteinQtyPerBurger(resolvedProtein.quantity());
         protein.setUnitPriceAtTime(resolvedProtein.unitPrice());
         orderItem.setBurgerProtein(protein);
 
         for (OrderCatalogResolver.ResolvedBurgerComponent resolvedComponent : burgerSelection.removedComponents()) {
             OrderBurgerRemovedComponent removedComponent = new OrderBurgerRemovedComponent();
-            removedComponent.setComponent(resolvedComponent.component());
+            removedComponent.setComponentId(resolvedComponent.componentId());
             orderItem.addRemovedBurgerComponent(removedComponent);
         }
 
         for (OrderCatalogResolver.ResolvedBurgerComponent resolvedComponent : burgerSelection.extraComponents()) {
             OrderBurgerExtraComponent extraComponent = new OrderBurgerExtraComponent();
-            extraComponent.setComponent(resolvedComponent.component());
+            extraComponent.setComponentId(resolvedComponent.componentId());
             extraComponent.setQty(resolvedComponent.quantity());
             extraComponent.setUnitPriceAtTime(resolvedComponent.unitPrice());
             orderItem.addExtraBurgerComponent(extraComponent);

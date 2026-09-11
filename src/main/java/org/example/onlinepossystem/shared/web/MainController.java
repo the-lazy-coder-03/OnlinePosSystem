@@ -23,7 +23,7 @@ public class MainController {
         if (authentication != null && authentication.isAuthenticated()) {
             String email = authentication.getName();
             customerAccountReader.findByEmail(email).ifPresent(customer -> {
-                model.addAttribute("customerName", customer.getFirstName());
+                model.addAttribute("customerName", customer.firstName());
                 model.addAttribute("user", customer);
             });
         }
@@ -61,7 +61,7 @@ public class MainController {
         if (authentication != null && authentication.isAuthenticated()) {
             String email = authentication.getName();
             customerAccountReader.findByEmail(email).ifPresent(customer -> {
-                model.addAttribute("customerName", customer.getFirstName());
+                model.addAttribute("customerName", customer.firstName());
                 model.addAttribute("user", customer);
             });
         }

@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.staff.service;
 
 import org.example.onlinepossystem.staff.api.StaffDirectory;
+import org.example.onlinepossystem.staff.api.StaffAccount;
 import org.example.onlinepossystem.staff.api.StaffOperations;
 import org.example.onlinepossystem.staff.entity.Staff;
 import org.example.onlinepossystem.staff.repository.StaffRepository;
@@ -76,13 +77,13 @@ public class StaffService implements StaffDirectory, StaffOperations {
      * Create a new staff member with a hashed PIN and optional branch code.
      */
     @Override
-    public Staff createStaff(String name, String branch, String plainPin, String branchCode) {
+    public StaffAccount createStaff(String name, String branch, String plainPin, String branchCode) {
         String hashedPin = plainPin != null ? passwordEncoder.encode(plainPin) : null;
         Staff staff = new Staff(name, branch, hashedPin, branchCode);
-        return staffRepository.save(staff);
+        return toAccount(staffRepository.save(staff));
     }
 
-    public Staff createStaff(String name, String branch, String plainPin) {
+    public StaffAccount createStaff(String name, String branch, String plainPin) {
         return createStaff(name, branch, plainPin, null);
     }
 
@@ -91,8 +92,8 @@ public class StaffService implements StaffDirectory, StaffOperations {
      * If a staff member with the same branch already exists, update their details.
      */
     @Override
-    public Staff updateOrCreateStaff(String name, String branch, String plainPin, String branchCode) {
-        return staffRepository.findByBranch(branch)
+    public void updateOrCreateStaff(String name, String branch, String plainPin, String branchCode) {
+        staffRepository.findByBranch(branch)
                 .map(existingStaff -> {
                     existingStaff.setName(name);
                     if (plainPin != null && !plainPin.isEmpty()) {
@@ -101,7 +102,10 @@ public class StaffService implements StaffDirectory, StaffOperations {
                     existingStaff.setBranchCode(branchCode);
                     return staffRepository.save(existingStaff);
                 })
-                .orElseGet(() -> createStaff(name, branch, plainPin, branchCode));
+                .orElseGet(() -> {
+                    String hashedPin = plainPin != null ? passwordEncoder.encode(plainPin) : null;
+                    return staffRepository.save(new Staff(name, branch, hashedPin, branchCode));
+                });
     }
 
     /**
@@ -109,5 +113,9 @@ public class StaffService implements StaffDirectory, StaffOperations {
      */
     public List<Staff> getAllStaff() {
         return staffRepository.findAll();
+    }
+
+    private StaffAccount toAccount(Staff staff) {
+        return new StaffAccount(staff.getId(), staff.getName(), staff.getBranch(), staff.getBranchCode());
     }
 }
