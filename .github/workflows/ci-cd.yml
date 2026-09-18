@@ -162,4 +162,4 @@ jobs:
           ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
             "test -x /usr/local/sbin/deploy-online-pos-system && sudo /usr/local/sbin/deploy-online-pos-system '${remote_dir}/app.jar' '${remote_dir}/staff-config.json' '${remote_dir}/online-pos-system.env'"
           ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
-            "curl -fsS 'http://127.0.0.1:${SERVER_PORT:-8081}/' >/dev/null"
+            "for i in {1..60}; do curl -fsS 'http://127.0.0.1:${SERVER_PORT:-8081}/' >/dev/null && exit 0; sleep 2; done; systemctl status online-pos-system --no-pager -l || true; sudo journalctl -u online-pos-system -n 120 --no-pager; exit 1"
