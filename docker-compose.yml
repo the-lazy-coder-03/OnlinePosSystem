@@ -31,7 +31,7 @@ services:
       SERVER_ADDRESS: ${SERVER_ADDRESS:-0.0.0.0}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
       RUN_MIGRATION_SQL: ${RUN_MIGRATION_SQL:-true}
-      APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
+      APP_BASE_URL: ${APP_BASE_URL:-https://crowdcam.co.za}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_API: ${MAIL_API:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@your-verified-domain.com}
