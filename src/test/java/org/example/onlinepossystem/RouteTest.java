@@ -86,6 +86,14 @@ public class RouteTest {
     }
 
     @Test
+    public void testResetPasswordPageWithoutTokenShowsCleanError() throws Exception {
+        mockMvc.perform(get("/reset-password"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("reset-password"))
+                .andExpect(model().attribute("error", "Reset link is invalid or has expired."));
+    }
+
+    @Test
     public void testOrderPageUnauthenticatedRedirectsToLogin() throws Exception {
         mockMvc.perform(get("/order"))
                 .andExpect(status().is3xxRedirection());

@@ -7,6 +7,7 @@ import org.example.onlinepossystem.customer.service.PasswordResetService;
 import org.example.onlinepossystem.security.api.RequestClientIp;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,19 +39,25 @@ public class PasswordResetController {
     }
 
     @GetMapping("/reset-password")
-    public String resetPasswordPage(@RequestParam String token, Model model) {
+    public String resetPasswordPage(@RequestParam(required = false) String token, Model model) {
         model.addAttribute("token", token);
+        if (!StringUtils.hasText(token)) {
+            model.addAttribute("error", "Reset link is invalid or has expired.");
+        }
         return "reset-password";
     }
 
     @PostMapping("/reset-password")
     public String resetPassword(
-            @RequestParam @NotBlank String token,
+            @RequestParam(required = false) String token,
             @RequestParam @NotBlank String password,
             @RequestParam @NotBlank String confirmPassword,
             Model model
     ) {
         try {
+            if (!StringUtils.hasText(token)) {
+                throw new IllegalArgumentException("Reset link is invalid or has expired.");
+            }
             passwordResetService.resetPassword(token, password, confirmPassword);
             return "redirect:/login?reset";
         } catch (IllegalArgumentException ex) {

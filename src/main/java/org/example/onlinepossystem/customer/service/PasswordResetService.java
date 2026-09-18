@@ -6,6 +6,7 @@ import org.example.onlinepossystem.customer.api.PasswordResetOperations;
 import org.example.onlinepossystem.customer.notification.PasswordResetNotifier;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
 import org.example.onlinepossystem.customer.repository.PasswordResetTokenRepository;
+import org.example.onlinepossystem.notification.email.NotificationDeliveryException;
 import org.example.onlinepossystem.security.api.PasswordPolicy;
 import org.example.onlinepossystem.security.api.RateLimiter;
 import org.slf4j.Logger;
@@ -82,7 +83,12 @@ public class PasswordResetService implements PasswordResetOperations {
             resetToken.setExpiresAt(LocalDateTime.now().plus(RESET_EXPIRY));
             tokenRepository.save(resetToken);
 
-            passwordResetNotifier.sendResetLink(customer.getEmail(), rawToken);
+            try {
+                passwordResetNotifier.sendResetLink(customer.getEmail(), rawToken);
+            } catch (NotificationDeliveryException ex) {
+                tokenRepository.deleteByCustomerAndUsedFalse(customer);
+                logger.warn("Password reset email could not be delivered for customer ID {}", customer.getId());
+            }
         });
 
         return GENERIC_RESET_MESSAGE;

@@ -5,6 +5,7 @@ import org.example.onlinepossystem.customer.entity.PasswordResetToken;
 import org.example.onlinepossystem.customer.notification.PasswordResetNotifier;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
 import org.example.onlinepossystem.customer.repository.PasswordResetTokenRepository;
+import org.example.onlinepossystem.notification.email.NotificationDeliveryException;
 import org.example.onlinepossystem.security.SimpleRateLimiter;
 import org.example.onlinepossystem.security.DefaultPasswordPolicy;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -85,6 +87,33 @@ class PasswordResetServiceTest {
         assertThat(message).isEqualTo(PasswordResetService.GENERIC_RESET_MESSAGE);
         verify(tokens, never()).save(any());
         verify(notifier, never()).sendResetLink(any(), any());
+    }
+
+    @Test
+    void resetRequestReturnsGenericMessageWhenNotificationDeliveryFails() {
+        CustomerRepository customers = mock(CustomerRepository.class);
+        PasswordResetTokenRepository tokens = mock(PasswordResetTokenRepository.class);
+        PasswordResetNotifier notifier = mock(PasswordResetNotifier.class);
+        PasswordResetService service = new PasswordResetService(
+                customers,
+                tokens,
+                mock(PasswordEncoder.class),
+                notifier,
+                new SimpleRateLimiter(),
+                new SecureRandom(),
+                new DefaultPasswordPolicy()
+        );
+        Customer customer = new Customer();
+        customer.setEmail("customer@example.com");
+        when(customers.findByEmail("customer@example.com")).thenReturn(Optional.of(customer));
+        doThrow(new NotificationDeliveryException("Email delivery is not configured."))
+                .when(notifier).sendResetLink(org.mockito.Mockito.eq("customer@example.com"), any());
+
+        String message = service.requestReset("customer@example.com", "127.0.0.1");
+
+        assertThat(message).isEqualTo(PasswordResetService.GENERIC_RESET_MESSAGE);
+        verify(tokens).save(any(PasswordResetToken.class));
+        verify(tokens, org.mockito.Mockito.times(2)).deleteByCustomerAndUsedFalse(customer);
     }
 
     @Test

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.validation.BindException;
@@ -35,6 +36,15 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String handleValidationExceptions(Exception ex, Model model) {
         logger.error("Validation error: {}", ex.getMessage());
+        model.addAttribute("status", 400);
+        model.addAttribute("message", "Please check your input and try again.");
+        return "error";
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public String handleMissingRequestParameter(MissingServletRequestParameterException ex, Model model) {
+        logger.error("Missing request parameter: {}", ex.getParameterName());
         model.addAttribute("status", 400);
         model.addAttribute("message", "Please check your input and try again.");
         return "error";

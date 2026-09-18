@@ -76,6 +76,8 @@ SERVER_PORT=8081
 APP_BASE_URL=http://192.168.1.32:8081
 SESSION_COOKIE_SECURE=false
 RUN_MIGRATION_SQL=true
+RESEND_API_KEY=<Resend API key>
+RESEND_FROM_EMAIL=noreply@your-verified-domain.com
 ```
 
 Optional app secrets:
@@ -84,6 +86,7 @@ Optional app secrets:
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<admin password>
 GOOGLE_MAPS_API_KEY=<key if maps are enabled>
+MAIL_API=<legacy Resend API key fallback if RESEND_API_KEY is not set>
 ```
 
 No `EC2_*` SSH secrets are needed for this private-network deployment.
@@ -118,3 +121,23 @@ RUN_MIGRATION_SQL=false
 ```
 
 The app stores the last applied SQL checksum in `app_migration_state`.
+
+## Password Reset Email
+
+Password reset uses Resend to send a one-time link to
+`/reset-password?token=...`. The token expires after 30 minutes, is stored only
+as a SHA-256 hash, and is invalidated after a successful reset.
+
+Required environment values:
+
+```text
+APP_BASE_URL=<the exact URL users open in the browser>
+RESEND_API_KEY=<Resend API key>
+RESEND_FROM_EMAIL=<verified Resend sender address>
+RUN_MIGRATION_SQL=true
+```
+
+`MAIL_API` is still supported as a fallback for the Resend API key, but
+`RESEND_API_KEY` is preferred. `RESEND_FROM_EMAIL` must be an address or domain
+verified in Resend; otherwise Resend will reject the email request and no reset
+email will be delivered.
