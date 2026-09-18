@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS public.customers (
                                                 postal_code     varchar(255),
                                                 first_name      varchar(255),
                                                 last_name       varchar(255),
+                                                role            varchar(255) DEFAULT 'USER',
+                                                zitadel_subject varchar(255),
 
                                                 CONSTRAINT customers_pkey PRIMARY KEY (id),
                                                 CONSTRAINT customers_email_key UNIQUE (email),
@@ -79,6 +81,23 @@ ALTER SEQUENCE public.customers_id_seq OWNED BY public.customers.id;
 CREATE INDEX IF NOT EXISTS idx_customers_email  ON public.customers (email);
 CREATE INDEX IF NOT EXISTS idx_customers_phone1 ON public.customers (phone1);
 CREATE INDEX IF NOT EXISTS idx_customers_phone2 ON public.customers (phone2);
+
+ALTER TABLE public.customers
+    ADD COLUMN IF NOT EXISTS role varchar(255) DEFAULT 'USER';
+
+ALTER TABLE public.customers
+    ADD COLUMN IF NOT EXISTS zitadel_subject varchar(255);
+
+UPDATE public.customers
+SET role = 'USER'
+WHERE role IS NULL OR btrim(role) = '';
+
+ALTER TABLE public.customers
+    ALTER COLUMN role SET DEFAULT 'USER';
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customers_zitadel_subject
+    ON public.customers (zitadel_subject)
+    WHERE zitadel_subject IS NOT NULL;
 
 -- =========================================================
 -- 4) CORE TABLES

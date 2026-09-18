@@ -93,6 +93,20 @@
             border: 2px solid #7a9ac5;
         }
 
+        .oauth-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            margin-top: 14px;
+            background-color: #111827;
+        }
+
+        .oauth-btn:hover {
+            color: #111827;
+            border-color: #111827;
+        }
+
         .error {
             color: red;
             font-size: 0.95em;
@@ -146,6 +160,10 @@
 
             <div th:if="${param.error}" class="error">Invalid admin username or password</div>
         </form>
+
+        <a th:if="${zitadelLoginEnabled}" th:href="@{/oauth2/authorization/zitadel}" class="login-btn oauth-btn">
+            Sign in with Zitadel
+        </a>
 
         <div class="extra-links">
             <p><a th:href="@{/login}">User login</a></p>

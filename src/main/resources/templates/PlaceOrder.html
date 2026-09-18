@@ -583,8 +583,11 @@
 
         /* Sticky bottom add bar */
         .stickybar{
-            position: sticky;
+            position: fixed;
             bottom: 0;
+            left: 332px;
+            right: 16px;
+            width: auto;
             z-index: 8;
             background: rgba(244,248,255,.92);
             backdrop-filter: blur(10px);
@@ -598,9 +601,9 @@
         .stickybar-inner{
             width: 100%;
             max-width: 980px;
-            display:flex;
+            display:grid;
+            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
             align-items:center;
-            justify-content: space-between;
             gap: 12px;
             padding: 10px;
             border-radius: 999px;
@@ -612,6 +615,8 @@
         .sticky-left{
             font-weight: 950;
             padding-left: 10px;
+            justify-self: start;
+            min-width: 0;
             white-space: nowrap;
         }
         .sticky-center{
@@ -624,6 +629,8 @@
         .sticky-right{
             font-weight: 950;
             padding-right: 10px;
+            justify-self: end;
+            min-width: 0;
             white-space: nowrap;
         }
         .sticky-action{
@@ -634,6 +641,14 @@
             cursor:pointer;
             font-weight: 950;
             padding: 10px 14px;
+            width: 150px;
+            min-width: 150px;
+            height: 44px;
+            flex: 0 0 150px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            justify-self: center;
             border-radius: 999px;
             transition: background .12s ease, transform .12s ease;
         }
@@ -787,12 +802,21 @@
             }
             .brand .sub{ max-width: 45vw; }
             .search{ width: 100%; min-width: 0; max-width: none; }
+            .stickybar{ left: 16px; right: 16px; }
+        }
+        @media (min-width: 1200px){
+            .stickybar{
+                left: calc((100vw - 1200px) / 2 + 332px);
+                right: calc((100vw - 1200px) / 2 + 16px);
+            }
         }
         @media (max-width: 520px){
             .topbar-inner{ flex-wrap: wrap; }
             .brand{ width: 100%; justify-content: space-between; }
             .brand .sub{ max-width: 100%; }
-            .top-actions{ width: 100%; justify-content: space-between; }
+            .top-actions{ width: 100%; justify-content: stretch; gap: 6px; }
+            .top-actions .pill{ min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+            .top-actions .btn{ min-width: 0; flex: 0 1 auto; }
             .sticky-center{ display:none; }
         }
     </style>
@@ -1472,7 +1496,6 @@
             } else {
                 for (const t of defaults){
                     const id = `def_${t.toppingId}`;
-                    const price = getExtraPrice(d, t.toppingId);
                     const wrap = document.createElement("div");
                     wrap.className = "opt";
                     wrap.innerHTML = `
@@ -1480,7 +1503,6 @@
                           <input type="checkbox" id="${id}" ${state.customize.selectedToppingIds.has(t.toppingId) ? "checked" : ""} />
                           <label for="${id}">${escapeHtml(t.name)}</label>
                         </div>
-                        <div class="opt-price">${price > 0 ? ("+" + money(price)) : money(0)}</div>
                     `;
                     wrap.querySelector("input").addEventListener("change", (e) => {
                         actions.toggleTopping(t.toppingId, e.target.checked);
@@ -2145,6 +2167,9 @@
             state.selection.branchId = branchId;
             state.selection.branchName = branchName;
             ui.showBranchOverlay(false);
+            if (state.ui.view === "summary") {
+                renderSummary();
+            }
 
             try {
                 const [pizzaPayload, menuPayload] = await Promise.all([
@@ -3338,15 +3363,16 @@
     }
 
     function buildOrderPayload(){
+        const isDeliveryOrder = state.orderType === "delivery";
         return {
             customerName: state.customer.name || "Guest",
             phone: state.customer.phone || "",
-            houseNumber: state.customer.houseNumber || "",
-            street: state.customer.street || "",
-            area: state.customer.area || "",
-            city: state.customer.city || "",
-            postalCode: state.customer.postalCode || "",
-            complexName: state.customer.complexName || "",
+            houseNumber: isDeliveryOrder ? (state.customer.houseNumber || "") : "",
+            street: isDeliveryOrder ? (state.customer.street || "") : "",
+            area: isDeliveryOrder ? (state.customer.area || "") : "",
+            city: isDeliveryOrder ? (state.customer.city || "") : "",
+            postalCode: isDeliveryOrder ? (state.customer.postalCode || "") : "",
+            complexName: isDeliveryOrder ? (state.customer.complexName || "") : "",
             branchName: state.branch.name,
             orderType: state.orderType,
             items: state.cart.items.map(it => {
@@ -3496,25 +3522,30 @@
 
         const customerCard = document.createElement("div");
         customerCard.className = "sum-card";
+        const addressSection = state.orderType === "delivery" ? `
+            <div class="customer-address-fields" id="customerAddressFields">
+                <div style="margin-top:8px;font-weight:850;color:var(--muted);">Address</div>
+                <div class="formrow">
+                    <input type="text" id="custHouseInput" placeholder="House / Unit #" />
+                    <input type="text" id="custStreetInput" placeholder="Street" />
+                </div>
+                <div class="formrow">
+                    <input type="text" id="custAreaInput" placeholder="Area / Suburb" />
+                    <input type="text" id="custCityInput" placeholder="City" />
+                </div>
+                <div class="formrow">
+                    <input type="text" id="custPostalInput" placeholder="Postal code" />
+                    <input type="text" id="custComplexInput" placeholder="Complex / Building (optional)" />
+                </div>
+            </div>
+        ` : "";
         customerCard.innerHTML = `
             <div style="font-weight:900;color:var(--blue-800);margin-bottom:8px;">Customer Details</div>
             <div class="formrow" style="margin-top:0;">
                 <input type="text" id="custNameInput" placeholder="Customer name" />
                 <input type="tel" id="custPhoneInput" placeholder="Phone (optional)" />
             </div>
-            <div style="margin-top:8px;font-weight:850;color:var(--muted);">Address</div>
-            <div class="formrow">
-                <input type="text" id="custHouseInput" placeholder="House / Unit #" />
-                <input type="text" id="custStreetInput" placeholder="Street" />
-            </div>
-            <div class="formrow">
-                <input type="text" id="custAreaInput" placeholder="Area / Suburb" />
-                <input type="text" id="custCityInput" placeholder="City" />
-            </div>
-            <div class="formrow">
-                <input type="text" id="custPostalInput" placeholder="Postal code" />
-                <input type="text" id="custComplexInput" placeholder="Complex / Building (optional)" />
-            </div>
+            ${addressSection}
         `;
         body.appendChild(customerCard);
 
@@ -3528,36 +3559,27 @@
         const complexInput = customerCard.querySelector("#custComplexInput");
         nameInput.value = state.customer.name || "";
         phoneInput.value = state.customer.phone || "";
-        houseInput.value = state.customer.houseNumber || "";
-        streetInput.value = state.customer.street || "";
-        areaInput.value = state.customer.area || "";
-        cityInput.value = state.customer.city || "";
-        postalInput.value = state.customer.postalCode || "";
-        complexInput.value = state.customer.complexName || "";
         nameInput.addEventListener("input", (e) => {
             state.customer.name = safeText(e.target.value).trim();
         });
         phoneInput.addEventListener("input", (e) => {
             state.customer.phone = safeText(e.target.value).trim();
         });
-        houseInput.addEventListener("input", (e) => {
-            state.customer.houseNumber = safeText(e.target.value).trim();
-        });
-        streetInput.addEventListener("input", (e) => {
-            state.customer.street = safeText(e.target.value).trim();
-        });
-        areaInput.addEventListener("input", (e) => {
-            state.customer.area = safeText(e.target.value).trim();
-        });
-        cityInput.addEventListener("input", (e) => {
-            state.customer.city = safeText(e.target.value).trim();
-        });
-        postalInput.addEventListener("input", (e) => {
-            state.customer.postalCode = safeText(e.target.value).trim();
-        });
-        complexInput.addEventListener("input", (e) => {
-            state.customer.complexName = safeText(e.target.value).trim();
-        });
+        const addressInputs = [
+            [houseInput, "houseNumber"],
+            [streetInput, "street"],
+            [areaInput, "area"],
+            [cityInput, "city"],
+            [postalInput, "postalCode"],
+            [complexInput, "complexName"]
+        ];
+        for (const [input, stateKey] of addressInputs) {
+            if (!input) continue;
+            input.value = state.customer[stateKey] || "";
+            input.addEventListener("input", (e) => {
+                state.customer[stateKey] = safeText(e.target.value).trim();
+            });
+        }
 
         const actionsRow = document.createElement("div");
         actionsRow.className = "sum-card";

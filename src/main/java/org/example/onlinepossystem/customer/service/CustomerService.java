@@ -10,10 +10,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
-public class CustomerService implements CustomerAccountReader, CustomerOrderRecorder {
+public class CustomerService implements CustomerAccountReader, CustomerOrderRecorder, ZitadelCustomerSynchronizer {
 
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
@@ -95,6 +96,40 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         return customerRepository.findByPhone1(phone).isPresent();
     }
 
+    @Override
+    public Customer syncZitadelCustomer(String zitadelSubject,
+                                        String email,
+                                        String firstName,
+                                        String lastName) {
+        String normalizedSubject = requireText(zitadelSubject, "Zitadel subject");
+        String normalizedEmail = normalizeEmail(email);
+
+        Optional<Customer> customerBySubject = customerRepository.findByZitadelSubject(normalizedSubject);
+        Optional<Customer> customerByEmail = customerRepository.findByEmail(normalizedEmail);
+
+        Customer customer;
+        if (customerBySubject.isPresent()) {
+            customer = customerBySubject.get();
+            if (customerByEmail.isPresent() && !customerByEmail.get().getId().equals(customer.getId())) {
+                throw new IllegalStateException("Zitadel email is already linked to another customer.");
+            }
+        } else {
+            customer = customerByEmail.orElseGet(Customer::new);
+            customer.setZitadelSubject(normalizedSubject);
+        }
+
+        customer.setEmail(normalizedEmail);
+        updateName(customer, firstName, lastName);
+        if (customer.getRole() == null || customer.getRole().isBlank()) {
+            customer.setRole("USER");
+        }
+        if (customer.getLastOrderedAt() == null) {
+            customer.setLastOrderedAt(LocalDateTime.now());
+        }
+
+        return customerRepository.save(customer);
+    }
+
     public Customer updateProfile(String email,
                                   String firstName,
                                   String lastName,
@@ -129,6 +164,26 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         }
 
         return customerRepository.save(customer);
+    }
+
+    private String requireText(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label + " is required.");
+        }
+        return value.trim();
+    }
+
+    private String normalizeEmail(String email) {
+        return requireText(email, "Email").toLowerCase(Locale.ROOT);
+    }
+
+    private void updateName(Customer customer, String firstName, String lastName) {
+        if (firstName != null && !firstName.isBlank()) {
+            customer.setFirstName(firstName.trim());
+        }
+        if (lastName != null && !lastName.isBlank()) {
+            customer.setLastName(lastName.trim());
+        }
     }
 
     private CustomerAccount toAccount(Customer customer) {

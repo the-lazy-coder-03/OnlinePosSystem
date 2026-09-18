@@ -61,6 +61,9 @@ public class Customer {
     @Column(name = "role")
     private String role = "USER";
 
+    @Column(name = "zitadel_subject", unique = true)
+    private String zitadelSubject;
+
     // Default constructor
     public Customer() {}
 
@@ -114,4 +117,7 @@ public class Customer {
 
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+
+    public String getZitadelSubject() { return zitadelSubject; }
+    public void setZitadelSubject(String zitadelSubject) { this.zitadelSubject = zitadelSubject; }
 }

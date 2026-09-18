@@ -1,8 +1,11 @@
 # CI/CD Deployment
 
-This project deploys to the EC2 instance with GitHub Actions.
+This project deploys to the Ubuntu server at `192.168.1.32` with GitHub Actions.
+Because that address is private to the local network, deployment uses a GitHub
+self-hosted runner installed on the server instead of SSH from GitHub-hosted
+runners.
 
-## Server
+## Server Layout
 
 The app runs as a systemd service:
 
@@ -11,17 +14,48 @@ sudo systemctl status online-pos-system
 sudo journalctl -u online-pos-system -f
 ```
 
-Runtime environment lives at:
+Runtime files:
 
-```bash
+```text
 /etc/online-pos-system/online-pos-system.env
-```
-
-The deployed jar and staff file live at:
-
-```bash
 /opt/online-pos-system/app.jar
 /opt/online-pos-system/staff-config.json
+/usr/local/sbin/deploy-online-pos-system
+```
+
+## One-Time Server Setup
+
+SSH into the server and install the deploy helper:
+
+```bash
+ssh matthew@192.168.1.32
+cd /path/to/OnlinePosSystem
+DEPLOY_USER=matthew ./scripts/install-server-deploy-helper.sh
+```
+
+If the repository is not checked out on the server yet, copy the script there or
+run the equivalent version from this repository.
+
+Then add the GitHub Actions runner:
+
+1. Open the GitHub repository.
+2. Go to **Settings > Actions > Runners > New self-hosted runner**.
+3. Choose **Linux** and **x64**.
+4. Run GitHub's download/configure commands on `192.168.1.32`.
+5. When prompted for labels, include `online-pos-system`.
+6. Install and start the runner service:
+
+```bash
+sudo ./svc.sh install matthew
+sudo ./svc.sh start
+```
+
+The workflow deploy job targets:
+
+```yaml
+runs-on:
+  - self-hosted
+  - online-pos-system
 ```
 
 ## GitHub Secrets
@@ -29,41 +63,30 @@ The deployed jar and staff file live at:
 Add these secrets in GitHub under **Settings > Secrets and variables > Actions**:
 
 ```text
-EC2_HOST=44.251.232.187
-EC2_USER=ubuntu
-EC2_SSH_KEY=<contents of your MACBOOK.pem private key>
-SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/online_pos_system
-SPRING_DATASOURCE_USERNAME=pos_app
 SPRING_DATASOURCE_PASSWORD=<database password>
-JWT_SECRET=<long random secret>
+JWT_SECRET=<long random secret, at least 32 characters>
 ```
 
-Optional secrets:
+Recommended secrets:
 
 ```text
-EC2_PORT=22
+SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/online_pos_system
+SPRING_DATASOURCE_USERNAME=pos_app
 SERVER_PORT=8081
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin
-APP_BASE_URL=http://44.251.232.187:8081
+APP_BASE_URL=http://192.168.1.32:8081
 SESSION_COOKIE_SECURE=false
-GOOGLE_MAPS_API_KEY=<key if maps are enabled>
 RUN_MIGRATION_SQL=true
 ```
 
-## Startup SQL Migration
-
-`src/main/resources/migration.sql` can run automatically on app startup. It updates the food/menu catalog while preserving customers and customer order history.
-
-This is enabled by default for the normal PostgreSQL app profile. If `migration.sql` changed in the commit, the app detects the new file checksum on startup and applies it once.
-
-To disable this behavior outside GitHub Actions, set:
+Optional app secrets:
 
 ```text
-RUN_MIGRATION_SQL=false
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=<admin password>
+GOOGLE_MAPS_API_KEY=<key if maps are enabled>
 ```
 
-The app stores the last applied SQL checksum in `app_migration_state`. To disable automatic SQL updates on deploy, set the GitHub secret `RUN_MIGRATION_SQL=false`.
+No `EC2_*` SSH secrets are needed for this private-network deployment.
 
 ## Flow
 
@@ -71,8 +94,27 @@ On each push to `master` or `main`, GitHub Actions:
 
 1. Runs the test suite with the `dev` profile.
 2. Builds the Spring Boot jar.
-3. Copies the jar and `staff-config.json` to EC2.
-4. Writes the runtime env file from GitHub Secrets.
-5. Restarts `online-pos-system`.
+3. Uploads the jar and `staff-config.json` as a workflow artifact.
+4. Runs the deploy job on the self-hosted runner at `192.168.1.32`.
+5. Writes `/etc/online-pos-system/online-pos-system.env` from GitHub Secrets.
+6. Installs the new jar and restarts `online-pos-system`.
 
 You can also deploy manually from the GitHub Actions tab with **Run workflow**.
+
+## Startup SQL Migration
+
+`src/main/resources/migration.sql` can run automatically on app startup. It
+updates the food/menu catalog while preserving customers and customer order
+history.
+
+This is enabled by default for the normal PostgreSQL app profile. If
+`migration.sql` changed in the commit, the app detects the new file checksum on
+startup and applies it once.
+
+To disable this behavior, set the GitHub secret:
+
+```text
+RUN_MIGRATION_SQL=false
+```
+
+The app stores the last applied SQL checksum in `app_migration_state`.

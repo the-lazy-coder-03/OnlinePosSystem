@@ -3,7 +3,9 @@ package org.example.onlinepossystem.security.config;
 import org.example.onlinepossystem.security.JwtAuthenticationFilter;
 import org.example.onlinepossystem.security.LoggingAuthenticationFailureHandler;
 import org.example.onlinepossystem.security.LoginRateLimitFilter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -17,6 +19,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
@@ -32,17 +37,23 @@ public class SecurityConfig {
     private final LoginRateLimitFilter loginRateLimitFilter;
     private final LoggingAuthenticationFailureHandler authenticationFailureHandler;
     private final AuthenticationSuccessHandler authenticationSuccessHandler;
+    private final ObjectProvider<OAuth2UserService<OidcUserRequest, OidcUser>> oidcUserServiceProvider;
+    private final boolean zitadelEnabled;
 
     public SecurityConfig(UserDetailsService userDetailsService,
                           JwtAuthenticationFilter jwtAuthenticationFilter,
                           LoginRateLimitFilter loginRateLimitFilter,
                           LoggingAuthenticationFailureHandler authenticationFailureHandler,
-                          @Qualifier("roleAwareAuthenticationSuccessHandler") AuthenticationSuccessHandler authenticationSuccessHandler) {
+                          @Qualifier("roleAwareAuthenticationSuccessHandler") AuthenticationSuccessHandler authenticationSuccessHandler,
+                          ObjectProvider<OAuth2UserService<OidcUserRequest, OidcUser>> oidcUserService,
+                          @Value("${app.zitadel.enabled:false}") boolean zitadelEnabled) {
         this.userDetailsService = userDetailsService;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.loginRateLimitFilter = loginRateLimitFilter;
         this.authenticationFailureHandler = authenticationFailureHandler;
         this.authenticationSuccessHandler = authenticationSuccessHandler;
+        this.oidcUserServiceProvider = oidcUserService;
+        this.zitadelEnabled = zitadelEnabled;
     }
 
     @Bean
@@ -109,6 +120,8 @@ public class SecurityConfig {
                                 "/menu/**",
                                 "/login",
                                 "/admin/login",
+                                "/oauth2/**",
+                                "/login/oauth2/**",
                                 "/register",
                                 "/forgot-password",
                                 "/reset-password",
@@ -140,8 +153,21 @@ public class SecurityConfig {
                         .successHandler(authenticationSuccessHandler)
                         .defaultSuccessUrl("/", false)
                         .permitAll()
-                )
-                .logout(logout -> logout
+                );
+
+        if (zitadelEnabled) {
+            OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService = oidcUserServiceProvider.getIfAvailable();
+            if (oidcUserService == null) {
+                throw new IllegalStateException("Zitadel OIDC user service is not available.");
+            }
+            http.oauth2Login(oauth -> oauth
+                    .loginPage("/login")
+                    .userInfoEndpoint(userInfo -> userInfo.oidcUserService(oidcUserService))
+                    .successHandler(authenticationSuccessHandler)
+            );
+        }
+
+        http.logout(logout -> logout
                         .logoutSuccessUrl("/")
                         .permitAll()
                 );
