@@ -615,6 +615,16 @@ CREATE TRIGGER trg_validate_extra_burger_component
     FOR EACH ROW
 EXECUTE FUNCTION validate_extra_burger_component();
 
+-- Hibernate creates existing tables without the SQL defaults above when the app
+-- starts against a fresh database, so ensure seed inserts can rely on them.
+ALTER TABLE menu_category ALTER COLUMN active SET DEFAULT TRUE;
+ALTER TABLE menu_item ALTER COLUMN active SET DEFAULT TRUE;
+ALTER TABLE ingredient ALTER COLUMN active SET DEFAULT TRUE;
+ALTER TABLE pizza_category ALTER COLUMN active SET DEFAULT TRUE;
+ALTER TABLE pizza ALTER COLUMN active SET DEFAULT TRUE;
+ALTER TABLE pizza_size ALTER COLUMN active SET DEFAULT TRUE;
+ALTER TABLE price_category ALTER COLUMN active SET DEFAULT TRUE;
+
 -- =========================================================
 -- 8) SEED DATA (FIXED IDs)
 -- =========================================================
@@ -1391,4 +1401,3 @@ WHERE pizza_category_id <> 2
   AND LOWER(name) IN ('supreme', 'supremes');
 
 COMMIT;
-

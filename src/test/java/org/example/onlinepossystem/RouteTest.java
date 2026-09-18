@@ -11,9 +11,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+import static org.hamcrest.Matchers.containsString;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -75,14 +77,24 @@ public class RouteTest {
     public void testForgotPasswordPage() throws Exception {
         mockMvc.perform(get("/forgot-password"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("forgot-password"));
+                .andExpect(view().name("forgot-password"))
+                .andExpect(content().string(containsString("Reset your password")))
+                .andExpect(content().string(containsString("action=\"/forgot-password\"")))
+                .andExpect(content().string(containsString("name=\"_csrf\"")))
+                .andExpect(content().string(containsString("Send reset link")));
     }
 
     @Test
     public void testResetPasswordPage() throws Exception {
         mockMvc.perform(get("/reset-password").param("token", "test-token"))
                 .andExpect(status().isOk())
-                .andExpect(view().name("reset-password"));
+                .andExpect(view().name("reset-password"))
+                .andExpect(content().string(containsString("Create a new password")))
+                .andExpect(content().string(containsString("action=\"/reset-password\"")))
+                .andExpect(content().string(containsString("name=\"_csrf\"")))
+                .andExpect(content().string(containsString("name=\"token\"")))
+                .andExpect(content().string(containsString("passwordRequirements")))
+                .andExpect(content().string(containsString("Show")));
     }
 
     @Test

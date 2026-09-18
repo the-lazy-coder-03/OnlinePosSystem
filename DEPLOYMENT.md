@@ -1,9 +1,8 @@
 # CI/CD Deployment
 
-This project deploys to the Ubuntu server at `192.168.1.32` with GitHub Actions.
-Because that address is private to the local network, deployment uses a GitHub
-self-hosted runner installed on the server instead of SSH from GitHub-hosted
-runners.
+This project deploys to the Azure Ubuntu VM at `40.76.227.74` with GitHub Actions.
+The workflow builds on a GitHub-hosted runner, uploads the release over SSH, and
+restarts the `online-pos-system` systemd service on the VM.
 
 ## Server Layout
 
@@ -23,39 +22,24 @@ Runtime files:
 /usr/local/sbin/deploy-online-pos-system
 ```
 
+The Azure VM has PostgreSQL installed locally. The app database is:
+
+```text
+Database: online_pos_system
+User: pos_app
+Host: 127.0.0.1
+Port: 5432
+```
+
 ## One-Time Server Setup
 
-SSH into the server and install the deploy helper:
+The VM needs Java, PostgreSQL, the `online-pos-system` service, and the deploy
+helper. From this repository, run:
 
 ```bash
-ssh matthew@192.168.1.32
-cd /path/to/OnlinePosSystem
-DEPLOY_USER=matthew ./scripts/install-server-deploy-helper.sh
-```
-
-If the repository is not checked out on the server yet, copy the script there or
-run the equivalent version from this repository.
-
-Then add the GitHub Actions runner:
-
-1. Open the GitHub repository.
-2. Go to **Settings > Actions > Runners > New self-hosted runner**.
-3. Choose **Linux** and **x64**.
-4. Run GitHub's download/configure commands on `192.168.1.32`.
-5. When prompted for labels, include `online-pos-system`.
-6. Install and start the runner service:
-
-```bash
-sudo ./svc.sh install matthew
-sudo ./svc.sh start
-```
-
-The workflow deploy job targets:
-
-```yaml
-runs-on:
-  - self-hosted
-  - online-pos-system
+scp -i ~/Downloads/teszt_key.pem scripts/install-server-deploy-helper.sh azureuser@40.76.227.74:/tmp/install-server-deploy-helper.sh
+ssh -i ~/Downloads/teszt_key.pem azureuser@40.76.227.74 \
+  'chmod +x /tmp/install-server-deploy-helper.sh && DEPLOY_USER=azureuser /tmp/install-server-deploy-helper.sh'
 ```
 
 ## GitHub Secrets
@@ -63,21 +47,18 @@ runs-on:
 Add these secrets in GitHub under **Settings > Secrets and variables > Actions**:
 
 ```text
-SPRING_DATASOURCE_PASSWORD=<database password>
-JWT_SECRET=<long random secret, at least 32 characters>
-```
-
-Recommended secrets:
-
-```text
+AZURE_VM_HOST=40.76.227.74
+AZURE_VM_USER=azureuser
+AZURE_VM_PORT=22
+AZURE_VM_SSH_KEY=<private deploy key for GitHub Actions>
 SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/online_pos_system
 SPRING_DATASOURCE_USERNAME=pos_app
+SPRING_DATASOURCE_PASSWORD=<database password>
+JWT_SECRET=<long random secret, at least 32 characters>
 SERVER_PORT=8081
-APP_BASE_URL=http://192.168.1.32:8081
+APP_BASE_URL=http://40.76.227.74:8081
 SESSION_COOKIE_SECURE=false
 RUN_MIGRATION_SQL=true
-RESEND_API_KEY=<Resend API key>
-RESEND_FROM_EMAIL=noreply@your-verified-domain.com
 ```
 
 Optional app secrets:
@@ -86,10 +67,10 @@ Optional app secrets:
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<admin password>
 GOOGLE_MAPS_API_KEY=<key if maps are enabled>
-MAIL_API=<legacy Resend API key fallback if RESEND_API_KEY is not set>
+RESEND_API_KEY=<Resend API key>
+RESEND_FROM_EMAIL=noreply@your-verified-domain.com
+RESEND_ENDPOINT=https://api.resend.com/emails
 ```
-
-No `EC2_*` SSH secrets are needed for this private-network deployment.
 
 ## Flow
 
@@ -98,9 +79,10 @@ On each push to `master` or `main`, GitHub Actions:
 1. Runs the test suite with the `dev` profile.
 2. Builds the Spring Boot jar.
 3. Uploads the jar and `staff-config.json` as a workflow artifact.
-4. Runs the deploy job on the self-hosted runner at `192.168.1.32`.
+4. Connects to `azureuser@40.76.227.74` over SSH.
 5. Writes `/etc/online-pos-system/online-pos-system.env` from GitHub Secrets.
 6. Installs the new jar and restarts `online-pos-system`.
+7. Runs a local health check against `http://127.0.0.1:8081/` on the VM.
 
 You can also deploy manually from the GitHub Actions tab with **Run workflow**.
 
@@ -136,8 +118,3 @@ RESEND_API_KEY=<Resend API key>
 RESEND_FROM_EMAIL=<verified Resend sender address>
 RUN_MIGRATION_SQL=true
 ```
-
-`MAIL_API` is still supported as a fallback for the Resend API key, but
-`RESEND_API_KEY` is preferred. `RESEND_FROM_EMAIL` must be an address or domain
-verified in Resend; otherwise Resend will reject the email request and no reset
-email will be delivered.
