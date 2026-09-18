@@ -1584,7 +1584,10 @@
             const burgerToppings = getBurgerToppingsForMenuItem(item);
             const proteins = burgerToppings.filter(isBurgerProtein);
             const defaults = burgerToppings.filter(t => !isBurgerProtein(t) && t.defaultSelected);
-            const extras = burgerToppings.filter(t => !isBurgerProtein(t) && !t.defaultSelected);
+            const extras = sortOptionalToppingsByPrice(
+                burgerToppings.filter(t => !isBurgerProtein(t) && !t.defaultSelected),
+                topping => topping.priceSortValue
+            );
             const groups = getVisibleMenuModifierGroups(item);
             const proteinQty = burgerProteinQtyRequired(item);
 
@@ -1910,7 +1913,10 @@
             if (burgerToppings.length){
                 const proteins = burgerToppings.filter(isBurgerProtein);
                 const defaults = burgerToppings.filter(t => !isBurgerProtein(t) && t.defaultSelected);
-                const extras = burgerToppings.filter(t => !isBurgerProtein(t) && !t.defaultSelected);
+                const extras = sortOptionalToppingsByPrice(
+                    burgerToppings.filter(t => !isBurgerProtein(t) && !t.defaultSelected),
+                    topping => topping.priceSortValue
+                );
                 const proteinQty = burgerProteinQtyRequired(item);
 
                 if (proteins.length){
@@ -3019,15 +3025,19 @@
         const burgerToppingsRaw = Array.isArray(m.burgerToppings) ? m.burgerToppings : [];
         const catId = Number.isFinite(Number(catIdRaw)) ? Number(catIdRaw) : null;
         const burgerToppings = burgerToppingsRaw
-            .map(t => ({
-                toppingId: Number(t.toppingId ?? t.id),
-                name: safeText(t.name ?? t.toppingName ?? t.topping_name ?? ""),
-                defaultSelected: Boolean(t.defaultSelected ?? t.default ?? t.isDefault),
-                price: Number(t.price || 0),
-                componentType: safeText(t.componentType ?? t.type ?? t.component_type ?? ""),
-                removable: t.removable !== false,
-                proteinQuantityRequired: Number(t.proteinQuantityRequired ?? t.protein_quantity_required ?? 1)
-            }))
+            .map(t => {
+                const rawPrice = t.price ?? t.extraPrice ?? t.extra_price;
+                return {
+                    toppingId: Number(t.toppingId ?? t.id),
+                    name: safeText(t.name ?? t.toppingName ?? t.topping_name ?? ""),
+                    defaultSelected: Boolean(t.defaultSelected ?? t.default ?? t.isDefault),
+                    price: Number(rawPrice || 0),
+                    priceSortValue: toOptionalPrice(rawPrice),
+                    componentType: safeText(t.componentType ?? t.type ?? t.component_type ?? ""),
+                    removable: t.removable !== false,
+                    proteinQuantityRequired: Number(t.proteinQuantityRequired ?? t.protein_quantity_required ?? 1)
+                };
+            })
             .filter(t => Number.isFinite(t.toppingId) && t.name);
         return {
             type: "menu",
@@ -3079,6 +3089,29 @@
             .filter(t => Number.isFinite(t.toppingId) && t.name);
     }
 
+    function toOptionalPrice(value){
+        if (value === null || value === undefined || value === "") return null;
+        const price = Number(value);
+        return Number.isFinite(price) ? price : null;
+    }
+
+    function sortOptionalToppingsByPrice(toppings, getPrice){
+        return [...toppings].sort((a, b) => {
+            const aPrice = toOptionalPrice(getPrice(a));
+            const bPrice = toOptionalPrice(getPrice(b));
+
+            if (aPrice === null && bPrice !== null) return 1;
+            if (aPrice !== null && bPrice === null) return -1;
+            if (aPrice !== null && bPrice !== null && aPrice !== bPrice){
+                return aPrice - bPrice;
+            }
+
+            const byName = safeText(a.name).localeCompare(safeText(b.name));
+            if (byName !== 0) return byName;
+            return Number(a.toppingId ?? a.id) - Number(b.toppingId ?? b.id);
+        });
+    }
+
     function normalizeExtraToppingGroups(detail, defaultIdsSet){
         const out = [];
 
@@ -3099,7 +3132,10 @@
                     out.push({
                         groupKey: groupName.toLowerCase().replace(/\s+/g,"_"),
                         groupName,
-                        toppings: normalized
+                        toppings: sortOptionalToppingsByPrice(
+                            normalized,
+                            topping => getExtraPriceForSort(detail, topping.toppingId)
+                        )
                     });
                 }
             }
@@ -3123,7 +3159,10 @@
                 out.push({
                     groupKey: groupName.toLowerCase().replace(/\s+/g,"_"),
                     groupName,
-                    toppings: toppings.sort((a,b)=>a.name.localeCompare(b.name))
+                    toppings: sortOptionalToppingsByPrice(
+                        toppings,
+                        topping => getExtraPriceForSort(detail, topping.toppingId)
+                    )
                 });
             }
             out.sort((a,b)=>a.groupName.localeCompare(b.groupName));
@@ -3142,7 +3181,10 @@
             out.push({
                 groupKey: groupName.toLowerCase().replace(/\s+/g,"_"),
                 groupName,
-                toppings: toppings.sort((a,b)=>a.name.localeCompare(b.name))
+                toppings: sortOptionalToppingsByPrice(
+                    toppings,
+                    topping => getExtraPriceForSort(detail, topping.toppingId)
+                )
             });
         }
         out.sort((a,b)=>a.groupName.localeCompare(b.groupName));
@@ -3156,6 +3198,15 @@
         const found = raw.find(x => Number(x.toppingId ?? x.id ?? x.topping_id) === id);
         const price = found ? (found.extraPrice ?? found.price ?? found.extra_price ?? 0) : 0;
         return Number(price || 0);
+    }
+
+    function getExtraPriceForSort(detail, toppingId){
+        const raw = detail.extraPrices ?? detail.prices ?? detail.extra_prices ?? [];
+        if (!Array.isArray(raw)) return null;
+        const id = Number(toppingId);
+        const found = raw.find(x => Number(x.toppingId ?? x.id ?? x.topping_id) === id);
+        if (!found) return null;
+        return toOptionalPrice(found.extraPrice ?? found.price ?? found.extra_price);
     }
 
     function calcMenuItemPricing(item, selectedByGroup, qty){
