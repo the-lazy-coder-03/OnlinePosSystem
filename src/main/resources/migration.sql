@@ -619,11 +619,15 @@ EXECUTE FUNCTION validate_extra_burger_component();
 -- starts against a fresh database, so ensure seed inserts can rely on them.
 ALTER TABLE menu_category ALTER COLUMN active SET DEFAULT TRUE;
 ALTER TABLE menu_item ALTER COLUMN active SET DEFAULT TRUE;
+ALTER TABLE menu_item ALTER COLUMN sort_order SET DEFAULT 0;
 ALTER TABLE ingredient ALTER COLUMN active SET DEFAULT TRUE;
 ALTER TABLE pizza_category ALTER COLUMN active SET DEFAULT TRUE;
 ALTER TABLE pizza ALTER COLUMN active SET DEFAULT TRUE;
 ALTER TABLE pizza_size ALTER COLUMN active SET DEFAULT TRUE;
 ALTER TABLE price_category ALTER COLUMN active SET DEFAULT TRUE;
+ALTER TABLE pizza_default_ingredient ALTER COLUMN default_qty SET DEFAULT 1;
+ALTER TABLE pizza_default_ingredient ALTER COLUMN is_removable SET DEFAULT TRUE;
+ALTER TABLE pizza_default_ingredient ALTER COLUMN sort_order SET DEFAULT 0;
 
 -- =========================================================
 -- 8) SEED DATA (FIXED IDs)
