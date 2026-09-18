@@ -96,10 +96,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()
                         .requestMatchers("/api/orders/**").permitAll() // Needed for POS frontend
                         .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers("/api/auth/forgot-password").permitAll()
+                        .requestMatchers("/api/auth/reset-password").permitAll()
                         .requestMatchers("/api/staff/login").permitAll()
-
-                        // All other api endpoints
-                        .requestMatchers("/api/**").permitAll()
+                        .requestMatchers("/api/branches/**").permitAll()
+                        .requestMatchers("/api/full-address").permitAll()
 
                         // Public pages + static resources
                         .requestMatchers(
