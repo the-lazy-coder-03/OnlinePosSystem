@@ -56,7 +56,7 @@ SPRING_DATASOURCE_USERNAME=pos_app
 SPRING_DATASOURCE_PASSWORD=<database password>
 JWT_SECRET=<long random secret, at least 32 characters>
 SERVER_PORT=8081
-APP_BASE_URL=http://40.76.227.74:8081
+APP_BASE_URL=https://email.crowdcam.co.za
 SESSION_COOKIE_SECURE=false
 RUN_MIGRATION_SQL=true
 ```
@@ -113,7 +113,7 @@ as a SHA-256 hash, and is invalidated after a successful reset.
 Required environment values:
 
 ```text
-APP_BASE_URL=<the exact URL users open in the browser>
+APP_BASE_URL=https://email.crowdcam.co.za
 RESEND_API_KEY=<Resend API key>
 RESEND_FROM_EMAIL=<verified Resend sender address>
 RUN_MIGRATION_SQL=true
