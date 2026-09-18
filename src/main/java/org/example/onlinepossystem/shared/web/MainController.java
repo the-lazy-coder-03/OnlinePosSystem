@@ -1,7 +1,6 @@
 package org.example.onlinepossystem.shared.web;
 
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -12,12 +11,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class MainController {
 
     private final CustomerAccountReader customerAccountReader;
-    private final boolean zitadelLoginEnabled;
 
-    public MainController(CustomerAccountReader customerAccountReader,
-                          @Value("${app.zitadel.enabled:false}") boolean zitadelLoginEnabled) {
+    public MainController(CustomerAccountReader customerAccountReader) {
         this.customerAccountReader = customerAccountReader;
-        this.zitadelLoginEnabled = zitadelLoginEnabled;
     }
 
     // ====== Public Pages ======
@@ -77,14 +73,12 @@ public class MainController {
     }
 
     @GetMapping("/login")
-    public String loginPage(Model model) {
-        model.addAttribute("zitadelLoginEnabled", zitadelLoginEnabled);
+    public String loginPage() {
         return "login";
     }
 
     @GetMapping("/admin/login")
-    public String adminLoginPage(Model model) {
-        model.addAttribute("zitadelLoginEnabled", zitadelLoginEnabled);
+    public String adminLoginPage() {
         return "admin-login";
     }
 

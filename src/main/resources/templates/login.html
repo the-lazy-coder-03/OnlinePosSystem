@@ -111,20 +111,6 @@
             transform: scale(1.03);
         }
 
-        .oauth-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-decoration: none;
-            margin-top: 14px;
-            background-color: #111827;
-        }
-
-        .oauth-btn:hover {
-            color: #111827;
-            border-color: #111827;
-        }
-
         /* =========================
            ERROR & LOGOUT MESSAGES
         ========================= */
@@ -203,10 +189,6 @@
             <div th:if="${param.logout}" class="logout">You have been logged out</div>
             <div th:if="${param.reset}" class="logout">Your password has been reset. Please log in.</div>
         </form>
-
-        <a th:if="${zitadelLoginEnabled}" th:href="@{/oauth2/authorization/zitadel}" class="login-btn oauth-btn">
-            Sign in with Zitadel
-        </a>
 
         <!-- =========================
              EXTRA LINKS

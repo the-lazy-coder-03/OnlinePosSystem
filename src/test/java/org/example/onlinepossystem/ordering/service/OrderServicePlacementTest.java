@@ -374,8 +374,6 @@ class OrderServicePlacementTest {
     }
 
     private BurgerFixture createBurgerFixture() {
-        ensureBurgerCatalogTables();
-
         String suffix = suffix();
         Branch branch = createBranch("Burger Branch " + suffix);
         MenuCategory category = menuCategoryRepository.saveAndFlush(new MenuCategory(
@@ -436,49 +434,6 @@ class OrderServicePlacementTest {
         );
 
         return new BurgerFixture(branch, burger, proteinId, defaultId, extraId, proteinName, defaultName, extraName);
-    }
-
-    private void ensureBurgerCatalogTables() {
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS burger_recipe (
-                    recipe_id INT PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL UNIQUE,
-                    active BOOLEAN NOT NULL DEFAULT TRUE
-                )
-                """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS burger_recipe_component (
-                    recipe_id INT NOT NULL,
-                    component_id INT NOT NULL,
-                    is_removable BOOLEAN NOT NULL DEFAULT TRUE,
-                    sort_order INT NOT NULL DEFAULT 0,
-                    PRIMARY KEY (recipe_id, component_id)
-                )
-                """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS burger_recipe_assignment (
-                    burger_id INT PRIMARY KEY,
-                    recipe_id INT NOT NULL,
-                    protein_quantity_required INT NOT NULL DEFAULT 1
-                )
-                """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS burger_item_default_component (
-                    burger_id INT NOT NULL,
-                    component_id INT NOT NULL,
-                    is_removable BOOLEAN NOT NULL DEFAULT TRUE,
-                    sort_order INT NOT NULL DEFAULT 100,
-                    PRIMARY KEY (burger_id, component_id)
-                )
-                """);
-        jdbcTemplate.execute("""
-                CREATE TABLE IF NOT EXISTS branch_burger_component_price (
-                    branch_id INT NOT NULL,
-                    component_id INT NOT NULL,
-                    price NUMERIC(10,2) NOT NULL DEFAULT 0,
-                    PRIMARY KEY (branch_id, component_id)
-                )
-                """);
     }
 
     private void insertBurgerComponent(int id, String name, String type) {
