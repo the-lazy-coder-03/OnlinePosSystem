@@ -49,16 +49,18 @@ public class MenuOrderItemFactory {
             OrderMenuItem orderItem,
             OrderCatalogResolver.ResolvedBurgerSelection burgerSelection
     ) {
-        if (burgerSelection == null || burgerSelection.protein() == null) {
+        if (burgerSelection == null) {
             return;
         }
 
-        OrderCatalogResolver.ResolvedBurgerProtein resolvedProtein = burgerSelection.protein();
-        OrderBurgerProtein protein = new OrderBurgerProtein();
-        protein.setComponentId(resolvedProtein.componentId());
-        protein.setProteinQtyPerBurger(resolvedProtein.quantity());
-        protein.setUnitPriceAtTime(resolvedProtein.unitPrice());
-        orderItem.setBurgerProtein(protein);
+        if (burgerSelection.protein() != null) {
+            OrderCatalogResolver.ResolvedBurgerProtein resolvedProtein = burgerSelection.protein();
+            OrderBurgerProtein protein = new OrderBurgerProtein();
+            protein.setComponentId(resolvedProtein.componentId());
+            protein.setProteinQtyPerBurger(resolvedProtein.quantity());
+            protein.setUnitPriceAtTime(resolvedProtein.unitPrice());
+            orderItem.setBurgerProtein(protein);
+        }
 
         for (OrderCatalogResolver.ResolvedBurgerComponent resolvedComponent : burgerSelection.removedComponents()) {
             OrderBurgerRemovedComponent removedComponent = new OrderBurgerRemovedComponent();

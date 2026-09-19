@@ -15,10 +15,11 @@
 -- - Default Burger: Standard Burger recipe
 -- - Cheese Burger: Standard Burger recipe + Cheese
 -- - Mega Burger: Standard Burger recipe + two portions of one selected protein
--- - Steak Burger: Standard Burger recipe
+-- - Steak Burger: Standard Burger recipe + required steak doneness choice
 -- - Bacon and Cheese Burger: Standard Burger recipe + Bacon + Cheese
 -- - Bacon and Egg Burger: Standard Burger recipe + Bacon + Egg
 -- - Dagwood: Standard Burger recipe + Bacon + Egg + Cheese
+-- - Hawaiian Burger: Standard Burger recipe + Pineapple + Cheese
 -- - Every burger has a matching burger combo product
 --
 -- WARNING:
@@ -252,14 +253,18 @@ CREATE TABLE IF NOT EXISTS burger_recipe_component (
                                                        PRIMARY KEY (recipe_id, component_id)
 );
 
--- Assigns a reusable recipe and protein quantity rule to each burger.
--- Exactly one protein type is selected. The quantity defines how many
--- portions of that same protein are included in each burger.
+-- Assigns a reusable recipe and optional protein rule to each burger.
+-- Most burgers require exactly one protein type. Steak burgers instead use a
+-- required steak doneness modifier group.
 CREATE TABLE IF NOT EXISTS burger_recipe_assignment (
                                                         burger_id                   INT PRIMARY KEY REFERENCES menu_item(id) ON DELETE CASCADE,
                                                         recipe_id                   INT NOT NULL REFERENCES burger_recipe(recipe_id) ON DELETE RESTRICT,
-                                                        protein_quantity_required   INT NOT NULL DEFAULT 1 CHECK (protein_quantity_required > 0)
+                                                        protein_quantity_required   INT NOT NULL DEFAULT 1 CHECK (protein_quantity_required > 0),
+                                                        protein_required            BOOLEAN NOT NULL DEFAULT TRUE
 );
+
+ALTER TABLE burger_recipe_assignment
+    ADD COLUMN IF NOT EXISTS protein_required BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- Product-specific default additions.
 -- This stores only differences from the shared Standard Burger recipe.
@@ -679,7 +684,7 @@ INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALU
                                                                                 (202, 1, 'Mega Burger',
                                                                                  'Standard burger with two portions of the same selected protein', FALSE, FALSE),
                                                                                 (203, 1, 'Steak Burger',
-                                                                                 'Standard burger with one selected protein', FALSE, FALSE),
+                                                                                 'Steak burger with your chosen steak doneness', FALSE, FALSE),
                                                                                 (204, 1, 'Default Burger',
                                                                                  'Standard burger with one selected protein', FALSE, FALSE),
                                                                                 (205, 1, 'Bacon and Cheese Burger',
@@ -688,15 +693,18 @@ INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALU
                                                                                  'Standard burger with bacon, egg and one selected protein', FALSE, FALSE),
                                                                                 (207, 1, 'Dagwood',
                                                                                  'Standard burger with bacon, egg, cheese and one selected protein', FALSE, FALSE),
+                                                                                (208, 1, 'Hawaiian Burger',
+                                                                                 'Standard burger with pineapple, cheese and one selected protein', FALSE, FALSE),
 
                                                                                 -- Burger Combos
                                                                                 (301, 2, 'Cheese Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
                                                                                 (302, 2, 'Mega Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
-                                                                                (303, 2, 'Steak Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
+                                                                                (303, 2, 'Steak Burger Combo', 'Combo with 300ml drink, combo chips and your chosen steak doneness', FALSE, FALSE),
                                                                                 (304, 2, 'Default Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
                                                                                 (305, 2, 'Bacon and Cheese Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
                                                                                 (306, 2, 'Bacon and Egg Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
                                                                                 (307, 2, 'Dagwood Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
+                                                                                (308, 2, 'Hawaiian Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
 
                                                                                 -- Pastas
                                                                                 (401, 3, 'Chicken Alfredo Medium', 'Medium portion with protein and sauce', FALSE, FALSE),
@@ -745,7 +753,46 @@ INSERT INTO branch_menu_item_price (branch_id, menu_item_id, price) VALUES
                                                                         (1, 112, 18.00),
                                                                         (2, 112, 16.00),
                                                                         (1, 113, 18.00),
-                                                                        (2, 113, 16.00)
+                                                                        (2, 113, 16.00),
+
+                                                                        -- Kenridge burger-only prices
+                                                                        (1, 201, 82.00),
+                                                                        (1, 202, 115.00),
+                                                                        (1, 203, 120.00),
+                                                                        (1, 204, 71.00),
+                                                                        (1, 205, 92.00),
+                                                                        (1, 206, 92.00),
+                                                                        (1, 207, 105.00),
+                                                                        (1, 208, 92.00),
+
+                                                                        -- Kenridge burger combo prices
+                                                                        (1, 301, 116.00),
+                                                                        (1, 302, 138.00),
+                                                                        (1, 303, 145.00),
+                                                                        (1, 304, 107.00),
+                                                                        (1, 305, 125.00),
+                                                                        (1, 306, 125.00),
+                                                                        (1, 307, 125.00),
+                                                                        (1, 308, 123.00),
+
+                                                                        -- Uitzicht burger-only prices
+                                                                        (2, 201, 80.00),
+                                                                        (2, 202, 114.00),
+                                                                        (2, 203, 116.00),
+                                                                        (2, 204, 68.00),
+                                                                        (2, 205, 90.00),
+                                                                        (2, 206, 90.00),
+                                                                        (2, 207, 103.00),
+                                                                        (2, 208, 90.00),
+
+                                                                        -- Uitzicht burger combo prices
+                                                                        (2, 301, 113.00),
+                                                                        (2, 302, 136.00),
+                                                                        (2, 303, 138.00),
+                                                                        (2, 304, 105.00),
+                                                                        (2, 305, 120.00),
+                                                                        (2, 307, 123.00),
+                                                                        (2, 308, 120.00)
 ON CONFLICT (branch_id, menu_item_id) DO UPDATE
     SET price = EXCLUDED.price;
 
@@ -813,29 +860,33 @@ ON CONFLICT (recipe_id, component_id) DO UPDATE
 
 -- All burger products reuse the Standard Burger recipe.
 -- Mega Burger and Mega Burger Combo require two portions of the same
--- selected protein. Other burgers require one portion.
+-- selected protein. Steak Burger products use steak doneness instead of protein.
 INSERT INTO burger_recipe_assignment (
     burger_id,
     recipe_id,
-    protein_quantity_required
+    protein_quantity_required,
+    protein_required
 ) VALUES
-      (201, 1, 1), -- Cheese Burger
-      (202, 1, 2), -- Mega Burger
-      (203, 1, 1), -- Steak Burger
-      (204, 1, 1), -- Default Burger
-      (205, 1, 1), -- Bacon and Cheese Burger
-      (206, 1, 1), -- Bacon and Egg Burger
-      (207, 1, 1), -- Dagwood
-      (301, 1, 1), -- Cheese Burger Combo
-      (302, 1, 2), -- Mega Burger Combo
-      (303, 1, 1), -- Steak Burger Combo
-      (304, 1, 1), -- Default Burger Combo
-      (305, 1, 1), -- Bacon and Cheese Burger Combo
-      (306, 1, 1), -- Bacon and Egg Burger Combo
-      (307, 1, 1)  -- Dagwood Combo
+      (201, 1, 1, TRUE),  -- Cheese Burger
+      (202, 1, 2, TRUE),  -- Mega Burger
+      (203, 1, 1, FALSE), -- Steak Burger
+      (204, 1, 1, TRUE),  -- Default Burger
+      (205, 1, 1, TRUE),  -- Bacon and Cheese Burger
+      (206, 1, 1, TRUE),  -- Bacon and Egg Burger
+      (207, 1, 1, TRUE),  -- Dagwood
+      (208, 1, 1, TRUE),  -- Hawaiian Burger
+      (301, 1, 1, TRUE),  -- Cheese Burger Combo
+      (302, 1, 2, TRUE),  -- Mega Burger Combo
+      (303, 1, 1, FALSE), -- Steak Burger Combo
+      (304, 1, 1, TRUE),  -- Default Burger Combo
+      (305, 1, 1, TRUE),  -- Bacon and Cheese Burger Combo
+      (306, 1, 1, TRUE),  -- Bacon and Egg Burger Combo
+      (307, 1, 1, TRUE),  -- Dagwood Combo
+      (308, 1, 1, TRUE)   -- Hawaiian Burger Combo
 ON CONFLICT (burger_id) DO UPDATE
     SET recipe_id = EXCLUDED.recipe_id,
-        protein_quantity_required = EXCLUDED.protein_quantity_required;
+        protein_quantity_required = EXCLUDED.protein_quantity_required,
+        protein_required = EXCLUDED.protein_required;
 
 -- Store only product-specific default additions.
 -- The full Standard Burger recipe remains stored once.
@@ -853,6 +904,8 @@ INSERT INTO burger_item_default_component (
       (207, 201, TRUE, 101), -- Dagwood: Cheese
       (207, 202, TRUE, 102), -- Dagwood: Bacon
       (207, 204, TRUE, 103), -- Dagwood: Egg
+      (208, 201, TRUE, 101), -- Hawaiian Burger: Cheese
+      (208, 203, TRUE, 102), -- Hawaiian Burger: Pineapple
       (301, 201, TRUE, 101), -- Cheese Burger Combo: Cheese
       (305, 201, TRUE, 101), -- Bacon and Cheese Burger Combo: Cheese
       (305, 202, TRUE, 102), -- Bacon and Cheese Burger Combo: Bacon
@@ -860,7 +913,9 @@ INSERT INTO burger_item_default_component (
       (306, 204, TRUE, 102), -- Bacon and Egg Burger Combo: Egg
       (307, 201, TRUE, 101), -- Dagwood Combo: Cheese
       (307, 202, TRUE, 102), -- Dagwood Combo: Bacon
-      (307, 204, TRUE, 103)  -- Dagwood Combo: Egg
+      (307, 204, TRUE, 103), -- Dagwood Combo: Egg
+      (308, 201, TRUE, 101), -- Hawaiian Burger Combo: Cheese
+      (308, 203, TRUE, 102)  -- Hawaiian Burger Combo: Pineapple
 ON CONFLICT (burger_id, component_id) DO UPDATE
     SET is_removable = EXCLUDED.is_removable,
         sort_order = EXCLUDED.sort_order;
@@ -895,7 +950,8 @@ INSERT INTO modifier_group (id, name, required, min_select, max_select) VALUES
                                                                             (1, 'Choose your drink', TRUE, 1, 1),
                                                                             (2, 'Choose your side', TRUE, 1, 1),
                                                                             (3, 'Rib extras', FALSE, 0, 1),
-                                                                            (4, 'Chip extras', FALSE, 0, 2)
+                                                                            (4, 'Chip extras', FALSE, 0, 2),
+                                                                            (5, 'Steak doneness', TRUE, 1, 1)
 ON CONFLICT (id) DO UPDATE
     SET name = EXCLUDED.name,
         required = EXCLUDED.required,
@@ -916,7 +972,12 @@ INSERT INTO modifier_option (id, group_id, name, menu_item_id, additional_price)
                                                                                      (11, 2, 'Salad', 605, 0.00),
                                                                                      (12, 3, 'Extra Rib Sauce', NULL, 0.00),
                                                                                      (13, 4, 'Extra Chip Sauce', NULL, 0.00),
-                                                                                     (14, 4, 'Extra Rib Sauce', NULL, 0.00)
+                                                                                     (14, 4, 'Extra Rib Sauce', NULL, 0.00),
+                                                                                     (15, 5, 'Rare', NULL, 0.00),
+                                                                                     (16, 5, 'Medium Rare', NULL, 0.00),
+                                                                                     (17, 5, 'Medium', NULL, 0.00),
+                                                                                     (18, 5, 'Medium Well', NULL, 0.00),
+                                                                                     (19, 5, 'Well Done', NULL, 0.00)
 ON CONFLICT (id) DO UPDATE
     SET group_id = EXCLUDED.group_id,
         name = EXCLUDED.name,
@@ -924,13 +985,24 @@ ON CONFLICT (id) DO UPDATE
         additional_price = EXCLUDED.additional_price;
 
 INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES
+                                                                  (203, 5),
                                                                   (301, 1),
+                                                                  (301, 2),
                                                                   (302, 1),
+                                                                  (302, 2),
                                                                   (303, 1),
+                                                                  (303, 2),
+                                                                  (303, 5),
                                                                   (304, 1),
+                                                                  (304, 2),
                                                                   (305, 1),
+                                                                  (305, 2),
                                                                   (306, 1),
+                                                                  (306, 2),
                                                                   (307, 1),
+                                                                  (307, 2),
+                                                                  (308, 1),
+                                                                  (308, 2),
                                                                   (501, 2),
                                                                   (501, 3),
                                                                   (501, 4),
@@ -1302,7 +1374,8 @@ FROM burger_recipe_assignment assignment
                    ON price.branch_id = branch.branch_id
                        AND price.component_id = component.component_id
 WHERE component.component_type = 'protein'
-  AND component.active = TRUE;
+  AND component.active = TRUE
+  AND assignment.protein_required = TRUE;
 
 -- Shared additional topping choices.
 CREATE OR REPLACE VIEW v_burger_builder_extras AS

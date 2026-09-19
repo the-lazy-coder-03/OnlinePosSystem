@@ -57,7 +57,9 @@ public interface MenuReadRepository extends JpaRepository<MenuItem, Integer> {
             )
             from ModifierOption mo
             where mo.groupId in :groupIds
-            order by mo.name
+            order by mo.groupId,
+                case when mo.groupId = 5 then mo.id else 0 end,
+                mo.name
             """)
     List<ModifierOptionRow> findModifierOptionsForGroups(@Param("groupIds") List<Integer> groupIds);
 }

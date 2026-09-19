@@ -49,7 +49,8 @@ public class BurgerComponentReadRepository {
                         COALESCE(price.price, 0) AS price,
                         recipe_component.is_removable AS removable,
                         recipe_component.sort_order,
-                        assignment.protein_quantity_required
+                        assignment.protein_quantity_required,
+                        assignment.protein_required
                     FROM burger_recipe_assignment assignment
                     JOIN burger_recipe_component recipe_component
                         ON recipe_component.recipe_id = assignment.recipe_id
@@ -72,7 +73,8 @@ public class BurgerComponentReadRepository {
                         COALESCE(price.price, 0) AS price,
                         item_component.is_removable AS removable,
                         item_component.sort_order,
-                        assignment.protein_quantity_required
+                        assignment.protein_quantity_required,
+                        assignment.protein_required
                     FROM burger_recipe_assignment assignment
                     JOIN burger_item_default_component item_component
                         ON item_component.burger_id = assignment.burger_id
@@ -95,7 +97,8 @@ public class BurgerComponentReadRepository {
                         COALESCE(price.price, 0) AS price,
                         TRUE AS removable,
                         2000 + component.component_id AS sort_order,
-                        assignment.protein_quantity_required
+                        assignment.protein_quantity_required,
+                        assignment.protein_required
                     FROM burger_recipe_assignment assignment
                     JOIN burger_component component
                         ON component.active = TRUE
@@ -103,6 +106,10 @@ public class BurgerComponentReadRepository {
                         ON price.component_id = component.component_id
                        AND price.branch_id = :branchId
                     WHERE assignment.burger_id IN (:menuItemIds)
+                      AND (
+                          component.component_type <> 'protein'
+                          OR assignment.protein_required = TRUE
+                      )
                 ) burger_components
                 ORDER BY
                     burger_id,
@@ -143,7 +150,7 @@ public class BurgerComponentReadRepository {
         }
 
         String sql = """
-                SELECT burger_id, protein_quantity_required
+                SELECT burger_id, protein_quantity_required, protein_required
                 FROM burger_recipe_assignment
                 WHERE burger_id = :burgerId
                 """;
@@ -153,7 +160,8 @@ public class BurgerComponentReadRepository {
                 new MapSqlParameterSource("burgerId", burgerId),
                 (rs, rowNum) -> new BurgerConfig(
                         rs.getInt("burger_id"),
-                        rs.getInt("protein_quantity_required")
+                        rs.getInt("protein_quantity_required"),
+                        rs.getBoolean("protein_required")
                 )
         );
         return rows.stream().findFirst();
@@ -172,7 +180,7 @@ public class BurgerComponentReadRepository {
         return rows.stream().findFirst();
     }
 
-    public record BurgerConfig(Integer burgerId, Integer proteinQuantityRequired) {
+    public record BurgerConfig(Integer burgerId, Integer proteinQuantityRequired, Boolean proteinRequired) {
     }
 
     private boolean normalizedBurgerTablesExist() {

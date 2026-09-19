@@ -50,7 +50,11 @@ public class RouteTest {
         mockMvc.perform(get("/menu"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("PlaceOrder"))
-                .andExpect(model().attribute("menuOnly", true));
+                .andExpect(model().attribute("menuOnly", true))
+                .andExpect(content().string(containsString("actions.selectCategory(cat)")))
+                .andExpect(content().string(containsString(
+                        "Discard this customization and view this category?"
+                )));
     }
 
     @Test

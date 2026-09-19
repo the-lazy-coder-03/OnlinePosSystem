@@ -8,7 +8,9 @@ import org.example.onlinepossystem.catalog.entity.BranchExtraPrice;
 import org.example.onlinepossystem.catalog.entity.BranchMenuItemPrice;
 import org.example.onlinepossystem.catalog.entity.BranchPizzaPrice;
 import org.example.onlinepossystem.catalog.entity.Ingredient;
+import org.example.onlinepossystem.catalog.entity.MenuItemModifierGroup;
 import org.example.onlinepossystem.catalog.entity.MenuItem;
+import org.example.onlinepossystem.catalog.entity.ModifierGroup;
 import org.example.onlinepossystem.catalog.entity.ModifierOption;
 import org.example.onlinepossystem.catalog.entity.Pizza;
 import org.example.onlinepossystem.catalog.entity.PizzaSize;
@@ -19,7 +21,9 @@ import org.example.onlinepossystem.catalog.repository.BranchExtraPriceRepository
 import org.example.onlinepossystem.catalog.repository.BranchMenuItemPriceRepository;
 import org.example.onlinepossystem.catalog.repository.BranchPizzaPriceRepository;
 import org.example.onlinepossystem.catalog.repository.IngredientRepository;
+import org.example.onlinepossystem.catalog.repository.MenuItemModifierGroupRepository;
 import org.example.onlinepossystem.catalog.repository.MenuItemRepository;
+import org.example.onlinepossystem.catalog.repository.ModifierGroupRepository;
 import org.example.onlinepossystem.catalog.repository.ModifierOptionRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaSizeRepository;
@@ -50,6 +54,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
     private final PizzaRepository pizzaRepository;
     private final BranchExtraPriceRepository branchExtraPriceRepository;
     private final ModifierOptionRepository modifierOptionRepository;
+    private final MenuItemModifierGroupRepository menuItemModifierGroupRepository;
+    private final ModifierGroupRepository modifierGroupRepository;
 
     public CatalogOrderResolver(BranchLookup branchLookup,
                                 MenuItemRepository menuItemRepository,
@@ -61,7 +67,9 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                                 BranchPizzaPriceRepository branchPizzaPriceRepository,
                                 PizzaRepository pizzaRepository,
                                 BranchExtraPriceRepository branchExtraPriceRepository,
-                                ModifierOptionRepository modifierOptionRepository) {
+                                ModifierOptionRepository modifierOptionRepository,
+                                MenuItemModifierGroupRepository menuItemModifierGroupRepository,
+                                ModifierGroupRepository modifierGroupRepository) {
         this.branchLookup = branchLookup;
         this.menuItemRepository = menuItemRepository;
         this.branchMenuItemPriceRepository = branchMenuItemPriceRepository;
@@ -73,6 +81,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
         this.pizzaRepository = pizzaRepository;
         this.branchExtraPriceRepository = branchExtraPriceRepository;
         this.modifierOptionRepository = modifierOptionRepository;
+        this.menuItemModifierGroupRepository = menuItemModifierGroupRepository;
+        this.modifierGroupRepository = modifierGroupRepository;
     }
 
     @Override
@@ -274,6 +284,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
             burgerSelection = burgerResolution.selection();
         }
 
+        validateRequiredModifierGroups(menuItem, customizations, burgerComponentIds);
+
         return new MenuCustomizations(
                 burgerSelection,
                 resolveGenericMenuItemExtras(customizations, burgerComponentIds)
@@ -320,17 +332,24 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                 .map(componentId -> findBurgerComponent(componentsById, componentId, "protein").orElse(null))
                 .filter(component -> component != null)
                 .toList();
-        if (selectedProteins.size() != 1) {
+        boolean proteinRequired = Boolean.TRUE.equals(burgerConfig.proteinRequired());
+        if (proteinRequired && selectedProteins.size() != 1) {
             throw new IllegalArgumentException(menuItem.getName() + " requires exactly one protein choice.");
         }
+        if (!proteinRequired && !selectedProteins.isEmpty()) {
+            throw new IllegalArgumentException(menuItem.getName() + " does not accept a protein choice.");
+        }
 
-        BurgerComponentRow protein = selectedProteins.get(0);
-        ResolvedBurgerProtein resolvedProtein = new ResolvedBurgerProtein(
-                protein.componentId(),
-                protein.name(),
-                burgerConfig.proteinQuantityRequired(),
-                toMoney(protein.price())
-        );
+        ResolvedBurgerProtein resolvedProtein = null;
+        if (proteinRequired) {
+            BurgerComponentRow protein = selectedProteins.get(0);
+            resolvedProtein = new ResolvedBurgerProtein(
+                    protein.componentId(),
+                    protein.name(),
+                    burgerConfig.proteinQuantityRequired(),
+                    toMoney(protein.price())
+            );
+        }
 
         List<ResolvedBurgerComponent> removedComponents = new ArrayList<>();
         for (BurgerComponentRow component : components) {
@@ -388,6 +407,60 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                 componentsById.keySet(),
                 new ResolvedBurgerSelection(resolvedProtein, removedComponents, extraComponents)
         );
+    }
+
+    private void validateRequiredModifierGroups(
+            MenuItem menuItem,
+            List<CatalogCustomizationRequest> customizations,
+            Set<Integer> burgerComponentIds
+    ) {
+        List<MenuItemModifierGroup> linkedGroups = menuItemModifierGroupRepository.findByMenuItemId(menuItem.getId());
+        if (linkedGroups.isEmpty()) {
+            return;
+        }
+
+        Set<Integer> linkedGroupIds = linkedGroups.stream()
+                .map(MenuItemModifierGroup::getGroupId)
+                .collect(Collectors.toSet());
+        Map<Integer, Integer> selectedCountsByGroup = selectedModifierOptionCounts(customizations, burgerComponentIds, linkedGroupIds);
+
+        for (Integer groupId : linkedGroupIds) {
+            ModifierGroup group = modifierGroupRepository.findById(groupId).orElse(null);
+            if (group == null) {
+                continue;
+            }
+            int minimum = Math.max(nullToZero(group.getMinSelect()), Boolean.TRUE.equals(group.getRequired()) ? 1 : 0);
+            int maximum = nullToZero(group.getMaxSelect());
+            int selectedCount = selectedCountsByGroup.getOrDefault(groupId, 0);
+
+            if (minimum > 0 && selectedCount < minimum) {
+                throw new IllegalArgumentException(menuItem.getName() + " requires at least "
+                        + minimum + " option(s) for " + group.getName() + ".");
+            }
+            if (maximum > 0 && selectedCount > maximum) {
+                throw new IllegalArgumentException(menuItem.getName() + " allows no more than "
+                        + maximum + " option(s) for " + group.getName() + ".");
+            }
+        }
+    }
+
+    private Map<Integer, Integer> selectedModifierOptionCounts(
+            List<CatalogCustomizationRequest> customizations,
+            Set<Integer> burgerComponentIds,
+            Set<Integer> linkedGroupIds
+    ) {
+        Map<Integer, Integer> selectedCountsByGroup = new HashMap<>();
+        for (CatalogCustomizationRequest customization : safeCustomizations(customizations)) {
+            if (customization == null || isBurgerComponentCustomization(customization, burgerComponentIds)) {
+                continue;
+            }
+            Optional<ModifierOption> option = modifierOptionRepository.findById(customization.id());
+            if (option.isEmpty() || !linkedGroupIds.contains(option.get().getGroupId())) {
+                continue;
+            }
+            selectedCountsByGroup.merge(option.get().getGroupId(), 1, Integer::sum);
+        }
+        return selectedCountsByGroup;
     }
 
     private List<ResolvedGenericMenuExtra> resolveGenericMenuItemExtras(
@@ -504,6 +577,10 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
 
     private Integer safeQuantity(Integer quantity) {
         return quantity == null || quantity < 1 ? 1 : quantity;
+    }
+
+    private int nullToZero(Integer value) {
+        return value == null ? 0 : value;
     }
 
     private Double toDouble(Double value) {

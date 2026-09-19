@@ -204,6 +204,62 @@ class OrderServicePlacementTest {
     }
 
     @Test
+    void placesSteakBurgerWithDonenessRemovedDefaultAndExtraComponentsWithoutProtein() {
+        SteakBurgerFixture fixture = createSteakBurgerFixture();
+
+        OrderResponseDTO response = orderOperations.placeOrder(request(
+                fixture.branch().getName(),
+                menuItem(
+                        fixture.burger().getId(),
+                        1,
+                        customization(fixture.extraId(), 2, "burgerExtraComponent"),
+                        customization(fixture.donenessOption().getId(), 1, "modifierOption")
+                )
+        ));
+        entityManager.flush();
+
+        assertThat(response.getMenuItems()).hasSize(1);
+        OrderResponseDTO.MenuItemDTO item = response.getMenuItems().get(0);
+        assertThat(item.getMenuItemId()).isEqualTo(fixture.burger().getId());
+        assertThat(item.getExtras()).extracting(OrderResponseDTO.MenuItemExtraDTO::getName)
+                .containsExactly(
+                        "No " + fixture.defaultName(),
+                        "Extra " + fixture.extraName(),
+                        fixture.donenessOption().getName()
+                );
+        assertThat(item.getExtras()).extracting(OrderResponseDTO.MenuItemExtraDTO::getQty)
+                .containsExactly(1, 2, 1);
+    }
+
+    @Test
+    void rejectsSteakBurgerWithoutRequiredDoneness() {
+        SteakBurgerFixture fixture = createSteakBurgerFixture();
+
+        assertThatThrownBy(() -> orderOperations.placeOrder(request(
+                fixture.branch().getName(),
+                menuItem(fixture.burger().getId(), 1)
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Steak doneness");
+    }
+
+    @Test
+    void stillRejectsNormalBurgerWithoutProteinChoice() {
+        BurgerFixture fixture = createBurgerFixture();
+
+        assertThatThrownBy(() -> orderOperations.placeOrder(request(
+                fixture.branch().getName(),
+                menuItem(
+                        fixture.burger().getId(),
+                        1,
+                        customization(fixture.extraId(), 1, "burgerExtraComponent")
+                )
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("requires exactly one protein choice");
+    }
+
+    @Test
     void rejectsOrdersForInvalidBranch() {
         OrderRequestDTO request = request(
                 "Missing Branch " + suffix(),
@@ -438,6 +494,83 @@ class OrderServicePlacementTest {
         return new BurgerFixture(branch, burger, proteinId, defaultId, extraId, proteinName, defaultName, extraName);
     }
 
+    private SteakBurgerFixture createSteakBurgerFixture() {
+        ensureBurgerCatalogTables();
+
+        String suffix = suffix();
+        Branch branch = createBranch("Steak Burger Branch " + suffix);
+        MenuCategory category = menuCategoryRepository.saveAndFlush(new MenuCategory(
+                nextId("menu_category", "id"),
+                "Steak Burger Category " + suffix,
+                1
+        ));
+        MenuItem burger = menuItemRepository.saveAndFlush(new MenuItem(
+                nextId("menu_item", "id"),
+                category,
+                "Placement Steak Burger " + suffix,
+                "Test steak burger",
+                1,
+                false,
+                false
+        ));
+        branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch.getId(), burger, 120.00));
+        entityManager.flush();
+
+        int componentBaseId = nextId("burger_component", "component_id");
+        int defaultId = componentBaseId;
+        int extraId = componentBaseId + 1;
+        int recipeId = nextId("burger_recipe", "recipe_id");
+        String defaultName = "Lettuce " + suffix;
+        String extraName = "Cheese " + suffix;
+
+        insertBurgerComponent(defaultId, defaultName, "default_topping");
+        insertBurgerComponent(extraId, extraName, "extra_topping");
+        jdbcTemplate.update(
+                "INSERT INTO burger_recipe (recipe_id, name, active) VALUES (?, ?, TRUE)",
+                recipeId,
+                "Standard Test Steak Burger " + suffix
+        );
+        jdbcTemplate.update(
+                "INSERT INTO burger_recipe_component (recipe_id, component_id, is_removable, sort_order) VALUES (?, ?, TRUE, 1)",
+                recipeId,
+                defaultId
+        );
+        jdbcTemplate.update(
+                "INSERT INTO burger_recipe_assignment (burger_id, recipe_id, protein_quantity_required, protein_required) VALUES (?, ?, 1, FALSE)",
+                burger.getId(),
+                recipeId
+        );
+        jdbcTemplate.update(
+                "INSERT INTO branch_burger_component_price (branch_id, component_id, price) VALUES (?, ?, ?)",
+                branch.getId(),
+                extraId,
+                new BigDecimal("4.50")
+        );
+
+        ModifierGroup donenessGroup = modifierGroupRepository.saveAndFlush(new ModifierGroup(
+                nextId("modifier_group", "id"),
+                "Steak doneness " + suffix,
+                true,
+                1,
+                1
+        ));
+        ModifierOption medium = new ModifierOption(
+                nextId("modifier_option", "id"),
+                donenessGroup.getId(),
+                "Medium " + suffix,
+                null
+        );
+        medium.setAdditionalPrice(BigDecimal.ZERO);
+        modifierOptionRepository.saveAndFlush(medium);
+        jdbcTemplate.update(
+                "INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES (?, ?)",
+                burger.getId(),
+                donenessGroup.getId()
+        );
+
+        return new SteakBurgerFixture(branch, burger, defaultId, extraId, defaultName, extraName, medium);
+    }
+
     private void ensureBurgerCatalogTables() {
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS burger_recipe (
@@ -459,8 +592,13 @@ class OrderServicePlacementTest {
                 CREATE TABLE IF NOT EXISTS burger_recipe_assignment (
                     burger_id INT PRIMARY KEY,
                     recipe_id INT NOT NULL,
-                    protein_quantity_required INT NOT NULL DEFAULT 1
+                    protein_quantity_required INT NOT NULL DEFAULT 1,
+                    protein_required BOOLEAN NOT NULL DEFAULT TRUE
                 )
+                """);
+        jdbcTemplate.execute("""
+                ALTER TABLE burger_recipe_assignment
+                    ADD COLUMN IF NOT EXISTS protein_required BOOLEAN NOT NULL DEFAULT TRUE
                 """);
         jdbcTemplate.execute("""
                 CREATE TABLE IF NOT EXISTS burger_item_default_component (
@@ -594,6 +732,17 @@ class OrderServicePlacementTest {
             String proteinName,
             String defaultName,
             String extraName
+    ) {
+    }
+
+    private record SteakBurgerFixture(
+            Branch branch,
+            MenuItem burger,
+            int defaultId,
+            int extraId,
+            String defaultName,
+            String extraName,
+            ModifierOption donenessOption
     ) {
     }
 }

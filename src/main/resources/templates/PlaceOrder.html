@@ -1122,6 +1122,7 @@
 
         // Customize view selection
         customize: {
+            sessionId: 0,                  // invalidates delayed detail and quote responses
             kind: null,                    // "pizza" | "burger" | "menu"
             pizzaId: null,
             detail: null,                  // loaded from /pizzas/{pizzaId}
@@ -1323,12 +1324,7 @@
                 btn.type = "button";
                 btn.dataset.category = cat.key;
                 btn.innerHTML = `<span>${cat.label}</span><span class="count">${counts.get(cat.key) ?? 0}</span>`;
-                btn.addEventListener("click", () => {
-                    state.ui.activeCategory = cat.key;
-                    $("activeCategoryLabel").textContent = cat.label;
-                    render.sidebar();
-                    render.list();
-                });
+                btn.addEventListener("click", () => actions.selectCategory(cat));
                 wrap.appendChild(btn);
             }
 
@@ -1589,6 +1585,8 @@
                 topping => topping.priceSortValue
             );
             const groups = getVisibleMenuModifierGroups(item);
+            const steakDonenessGroups = groups.filter(isSteakDonenessGroup);
+            const otherModifierGroups = groups.filter(group => !isSteakDonenessGroup(group));
             const proteinQty = burgerProteinQtyRequired(item);
 
             setCustomizeCardHeader("cardSizes", "Burger Option", "Choose burger only or combo.");
@@ -1640,7 +1638,7 @@
                     $("defaultToppings").appendChild(wrap);
                 }
             } else {
-                $("defaultToppings").innerHTML = `<div class="empty">No protein options available.</div>`;
+                $("cardDefaults").style.display = "none";
             }
 
             setCustomizeCardHeader("cardExtras", "Burger Toppings", "Included toppings and optional extras.");
@@ -1652,6 +1650,39 @@
                 title.className = "group-title";
                 title.textContent = text;
                 groupsEl.appendChild(title);
+            };
+
+            const appendModifierGroups = (modifierGroups) => {
+                for (const g of modifierGroups){
+                    const groupId = Number(g.groupId);
+                    const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
+                    const max = Number(g.maxSelect || 0);
+                    const hint = min > 0 ? `Required • Choose ${min}${max ? "–" + max : ""}` : (max ? `Choose up to ${max}` : "");
+                    const groupName = safeText(g.name || "Options");
+
+                    appendTitle(hint ? `${groupName} • ${hint}` : groupName);
+
+                    const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
+                    const opts = Array.isArray(g.options) ? g.options : [];
+                    for (const opt of opts){
+                        const optionId = Number(opt.optionId ?? opt.id);
+                        const id = `burger_page_mod_${groupId}_${optionId}`;
+                        const isRadio = max === 1 && min >= 1;
+                        const wrap = document.createElement("div");
+                        wrap.className = "opt";
+                        wrap.innerHTML = `
+                            <div class="opt-left">
+                              <input type="${isRadio ? "radio" : "checkbox"}" name="burger_page_group_${groupId}" id="${id}" ${selected.has(optionId) ? "checked" : ""} />
+                              <label for="${id}">${escapeHtml(opt.name)}</label>
+                            </div>
+                            <div class="opt-price">${modifierOptionPriceLabel(g, opt)}</div>
+                        `;
+                        wrap.querySelector("input").addEventListener("change", (e) => {
+                            actions.toggleMenuOption(g, opt, e.target);
+                        });
+                        groupsEl.appendChild(wrap);
+                    }
+                }
             };
 
             if (defaults.length){
@@ -1676,6 +1707,8 @@
                 }
             }
 
+            appendModifierGroups(steakDonenessGroups);
+
             if (extras.length){
                 appendTitle("Extra Toppings");
                 for (const topping of extras){
@@ -1697,38 +1730,7 @@
                 }
             }
 
-            if (groups.length){
-                for (const g of groups){
-                    const groupId = Number(g.groupId);
-                    const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
-                    const max = Number(g.maxSelect || 0);
-                    const hint = min > 0 ? `Required • Choose ${min}${max ? "–" + max : ""}` : (max ? `Choose up to ${max}` : "");
-                    const groupName = safeText(g.name || "Options");
-
-                    appendTitle(hint ? `${groupName} • ${hint}` : groupName);
-
-                    const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
-                    const opts = Array.isArray(g.options) ? g.options : [];
-                    for (const opt of opts){
-                        const optionId = Number(opt.optionId ?? opt.id);
-                        const id = `burger_page_mod_${groupId}_${optionId}`;
-                        const isRadio = max === 1 && min >= 1;
-                        const wrap = document.createElement("div");
-                        wrap.className = "opt";
-                        wrap.innerHTML = `
-                            <div class="opt-left">
-                              <input type="${isRadio ? "radio" : "checkbox"}" name="burger_page_group_${groupId}" id="${id}" ${selected.has(optionId) ? "checked" : ""} />
-                              <label for="${id}">${escapeHtml(opt.name)}</label>
-                            </div>
-                            <div class="opt-price">${Number(opt.price || 0) > 0 ? ("+" + money(opt.price)) : money(0)}</div>
-                        `;
-                        wrap.querySelector("input").addEventListener("change", (e) => {
-                            actions.toggleMenuOption(g, opt, e.target);
-                        });
-                        groupsEl.appendChild(wrap);
-                    }
-                }
-            }
+            appendModifierGroups(otherModifierGroups);
 
             if (!defaults.length && !extras.length && !groups.length){
                 groupsEl.innerHTML = `<div class="empty">No topping options available.</div>`;
@@ -1878,6 +1880,8 @@
             const groupsEl = $("menuItemGroups");
             groupsEl.innerHTML = "";
             const groups = getVisibleMenuModifierGroups(item);
+            const steakDonenessGroups = groups.filter(isSteakDonenessGroup);
+            const otherModifierGroups = groups.filter(group => !isSteakDonenessGroup(group));
             const burgerToppings = getBurgerToppingsForMenuItem(item);
             const burgerVariants = getBurgerVariantFamily(item);
 
@@ -1970,6 +1974,8 @@
                     }
                 }
 
+                appendMenuModifierGroups(groupsEl, steakDonenessGroups, "mod", "group");
+
                 if (extras.length){
                     const title = document.createElement("div");
                     title.className = "group-title";
@@ -1996,41 +2002,7 @@
                 }
             }
 
-            if (groups.length){
-                for (const g of groups){
-                    const groupId = Number(g.groupId);
-                    const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
-                    const max = Number(g.maxSelect || 0);
-                    const hint = min > 0 ? `Required • Choose ${min}${max ? "–" + max : ""}` : (max ? `Choose up to ${max}` : "");
-
-                    const title = document.createElement("div");
-                    title.className = "group-title";
-                    const groupName = safeText(g.name || "Options");
-                    title.textContent = hint ? `${groupName} • ${hint}` : groupName;
-                    groupsEl.appendChild(title);
-
-                    const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
-                    const opts = Array.isArray(g.options) ? g.options : [];
-                    for (const opt of opts){
-                        const optionId = Number(opt.optionId ?? opt.id);
-                        const id = `mod_${groupId}_${optionId}`;
-                        const isRadio = max === 1 && min >= 1;
-                        const wrap = document.createElement("div");
-                        wrap.className = "opt";
-                        wrap.innerHTML = `
-                            <div class="opt-left">
-                              <input type="${isRadio ? "radio" : "checkbox"}" name="group_${groupId}" id="${id}" ${selected.has(optionId) ? "checked" : ""} />
-                              <label for="${id}">${escapeHtml(opt.name)}</label>
-                            </div>
-                            <div class="opt-price">${Number(opt.price || 0) > 0 ? ("+" + money(opt.price)) : money(0)}</div>
-                        `;
-                        wrap.querySelector("input").addEventListener("change", (e) => {
-                            actions.toggleMenuOption(g, opt, e.target);
-                        });
-                        groupsEl.appendChild(wrap);
-                    }
-                }
-            }
+            appendMenuModifierGroups(groupsEl, otherModifierGroups, "mod", "group");
 
             $("menuQtyValue").textContent = String(state.menuCustomize.qty);
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
@@ -2130,6 +2102,19 @@
             }
         },
 
+        selectCategory(category){
+            if (!category?.key) return;
+
+            if (state.ui.view === "customize"){
+                const shouldDiscard = confirm("Discard this customization and view this category?");
+                if (!shouldDiscard) return;
+                discardCustomization();
+            }
+
+            state.ui.activeCategory = category.key;
+            view.show("list");
+        },
+
         selectBranch(branchId, branchName){
             state.selection.branchId = branchId;
             state.selection.branchName = branchName;
@@ -2224,6 +2209,7 @@
             if (!state.branch.id) throw new Error("Branch not selected.");
             const id = Number(pizzaId);
             if (!Number.isFinite(id)) throw new Error("Invalid pizzaId.");
+            const sessionId = ++state.customize.sessionId;
 
             state.customize.kind = "pizza";
             state.customize.pizzaId = id;
@@ -2239,7 +2225,14 @@
             view.show("customize");
             render.customize();
 
-            const detail = await api.getPizzaDetail(state.branch.id, id, null);
+            let detail;
+            try{
+                detail = await api.getPizzaDetail(state.branch.id, id, null);
+            } catch (e){
+                if (sessionId !== state.customize.sessionId) return;
+                throw e;
+            }
+            if (sessionId !== state.customize.sessionId) return;
             state.customize.detail = detail;
 
             const sizes = normalizeSizes(detail);
@@ -2265,11 +2258,13 @@
         async setSize(sizeCm){
             const d = state.customize.detail;
             if (!d) return;
+            const sessionId = state.customize.sessionId;
 
             state.customize.sizeCm = Number(sizeCm);
 
             try{
                 const detail = await api.getPizzaDetail(state.branch.id, state.customize.pizzaId, state.customize.sizeCm);
+                if (sessionId !== state.customize.sessionId) return;
                 state.customize.detail = detail;
 
                 const all = normalizeAllToppings(detail);
@@ -2297,6 +2292,7 @@
                 render.customize();
                 await actions.quoteNow();
             } catch (e){
+                if (sessionId !== state.customize.sessionId) return;
                 render.customize();
                 await actions.quoteNow();
             }
@@ -2325,6 +2321,7 @@
             const branchId = state.branch.id;
             const pizzaId = state.customize.pizzaId;
             const sizeCm = state.customize.sizeCm;
+            const sessionId = state.customize.sessionId;
 
             if (!branchId || !pizzaId || !sizeCm) return;
 
@@ -2338,10 +2335,12 @@
             state.customize.isQuoting = true;
             try{
                 const q = await api.quotePizza(branchId, pizzaId, payload);
+                if (sessionId !== state.customize.sessionId) return;
                 state.customize.lastQuote = q;
                 state.customize.isQuoting = false;
                 render.quote();
             } catch (e){
+                if (sessionId !== state.customize.sessionId) return;
                 state.customize.isQuoting = false;
                 state.customize.lastQuote = null;
                 render.quote();
@@ -2418,6 +2417,7 @@
             const id = Number(menuItemId);
             const item = state.data.menuItems.find(m => Number(m.menuItemId) === id);
             if (!item) return;
+            state.customize.sessionId += 1;
 
             state.customize.kind = "burger";
             state.customize.pizzaId = null;
@@ -2459,6 +2459,7 @@
                 actions.addMenuItemDirect(item);
                 return;
             }
+            state.customize.sessionId += 1;
 
             state.customize.kind = "menu";
             state.customize.pizzaId = null;
@@ -2856,6 +2857,53 @@
         return groupId === 4 || name.includes("chip extras");
     }
 
+    function isSteakDonenessGroup(group){
+        const name = safeText(group?.name).toLowerCase();
+        return name.includes("steak doneness");
+    }
+
+    function modifierOptionPriceLabel(group, option){
+        if (isSteakDonenessGroup(group)) return "";
+        const price = Number(option?.price || 0);
+        return price > 0 ? ("+" + money(price)) : money(0);
+    }
+
+    function appendMenuModifierGroups(groupsEl, groups, idPrefix, namePrefix){
+        for (const g of groups){
+            const groupId = Number(g.groupId);
+            const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
+            const max = Number(g.maxSelect || 0);
+            const hint = min > 0 ? `Required • Choose ${min}${max ? "–" + max : ""}` : (max ? `Choose up to ${max}` : "");
+
+            const title = document.createElement("div");
+            title.className = "group-title";
+            const groupName = safeText(g.name || "Options");
+            title.textContent = hint ? `${groupName} • ${hint}` : groupName;
+            groupsEl.appendChild(title);
+
+            const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
+            const opts = Array.isArray(g.options) ? g.options : [];
+            for (const opt of opts){
+                const optionId = Number(opt.optionId ?? opt.id);
+                const id = `${idPrefix}_${groupId}_${optionId}`;
+                const isRadio = max === 1 && min >= 1;
+                const wrap = document.createElement("div");
+                wrap.className = "opt";
+                wrap.innerHTML = `
+                    <div class="opt-left">
+                      <input type="${isRadio ? "radio" : "checkbox"}" name="${namePrefix}_${groupId}" id="${id}" ${selected.has(optionId) ? "checked" : ""} />
+                      <label for="${id}">${escapeHtml(opt.name)}</label>
+                    </div>
+                    <div class="opt-price">${modifierOptionPriceLabel(g, opt)}</div>
+                `;
+                wrap.querySelector("input").addEventListener("change", (e) => {
+                    actions.toggleMenuOption(g, opt, e.target);
+                });
+                groupsEl.appendChild(wrap);
+            }
+        }
+    }
+
     function isRibSideGroup(group){
         const groupId = Number(group?.groupId ?? group?.id);
         const name = safeText(group?.name).toLowerCase();
@@ -2896,6 +2944,27 @@
         const burgerToppings = getBurgerToppingsForMenuItem(item);
         const burgerVariants = getBurgerVariantFamily(item);
         return groups.length > 0 || burgerToppings.length > 0 || burgerVariants.length > 1 || isBurgerMenuItem(item);
+    }
+
+    function discardCustomization(){
+        state.customize.sessionId += 1;
+        state.customize.kind = null;
+        state.customize.pizzaId = null;
+        state.customize.detail = null;
+        state.customize.sizeCm = null;
+        state.customize.selectedToppingIds = new Set();
+        state.customize.defaultToppingIds = new Set();
+        state.customize.extraToppingIds = new Set();
+        state.customize.qty = 1;
+        state.customize.lastQuote = null;
+        state.customize.isQuoting = false;
+
+        state.menuCustomize.menuItem = null;
+        state.menuCustomize.qty = 1;
+        state.menuCustomize.selectedByGroup = new Map();
+        state.menuCustomize.selectedBurgerToppingIds = new Set();
+        state.menuCustomize.selectedBurgerExtraToppingIds = new Set();
+        state.menuCustomize.selectedBurgerVariantId = null;
     }
 
     function isDirectAddCooldrink(item){
