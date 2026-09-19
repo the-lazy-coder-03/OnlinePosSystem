@@ -1,7 +1,6 @@
 package org.example.onlinepossystem.notification.email.resend;
 
 import com.resend.core.exception.ResendException;
-import com.resend.services.emails.Emails;
 import com.resend.services.emails.model.CreateEmailOptions;
 import com.resend.services.emails.model.CreateEmailResponse;
 import org.example.onlinepossystem.notification.email.EmailMessage;
@@ -20,11 +19,11 @@ import java.util.Locale;
 public class ResendEmailSender implements EmailSender {
     private static final Logger logger = LoggerFactory.getLogger(ResendEmailSender.class);
 
-    private final Emails emails;
+    private final ResendClient resendClient;
     private final ResendProperties properties;
 
-    public ResendEmailSender(Emails emails, ResendProperties properties) {
-        this.emails = emails;
+    public ResendEmailSender(ResendClient resendClient, ResendProperties properties) {
+        this.resendClient = resendClient;
         this.properties = properties;
     }
 
@@ -48,7 +47,7 @@ public class ResendEmailSender implements EmailSender {
                 .build();
 
         try {
-            CreateEmailResponse response = emails.send(request);
+            CreateEmailResponse response = resendClient.send(request);
             if (response == null || !StringUtils.hasText(response.getId())) {
                 logger.warn("Resend returned no email ID for the email request.");
                 throw new NotificationDeliveryException(Reason.PROVIDER_ERROR);

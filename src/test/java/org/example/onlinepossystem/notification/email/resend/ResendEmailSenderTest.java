@@ -1,18 +1,8 @@
 package org.example.onlinepossystem.notification.email.resend;
 
-import com.resend.Resend;
 import com.resend.core.exception.ResendException;
-import com.resend.services.emails.Emails;
 import com.resend.services.emails.model.CreateEmailOptions;
 import com.resend.services.emails.model.CreateEmailResponse;
-import okhttp3.Call;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Protocol;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
-import okio.Buffer;
 import org.example.onlinepossystem.notification.email.EmailMessage;
 import org.example.onlinepossystem.notification.email.NotificationDeliveryException;
 import org.example.onlinepossystem.notification.email.NotificationDeliveryException.Reason;
@@ -21,8 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.MockedConstruction;
-import org.skyscreamer.jsonassert.JSONAssert;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
@@ -41,38 +29,26 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(OutputCaptureExtension.class)
 class ResendEmailSenderTest {
-    private final Emails emails = mock(Emails.class);
+    private final ResendClient resendClient = mock(ResendClient.class);
     private final ResendProperties properties = configuredProperties();
-    private final ResendEmailSender sender = new ResendEmailSender(emails, properties);
+    private final ResendEmailSender sender = new ResendEmailSender(resendClient, properties);
     private final EmailMessage message = new EmailMessage(
             "customer@example.com", "Reset your password", "<p>private-reset-token</p>", "private-reset-token");
 
     @Test
-    void sdkSendsOnlyPostEmailsWithBearerAuthAndJson(CapturedOutput output) throws Exception {
-        Call call = mock(Call.class);
-        when(call.execute()).thenReturn(new Response.Builder()
-                .request(new Request.Builder().url("https://api.resend.com/emails").build())
-                .protocol(Protocol.HTTP_1_1).code(200).message("OK")
-                .body(ResponseBody.create("{\"id\":\"email_123\"}", MediaType.get("application/json"))).build());
-        try (MockedConstruction<OkHttpClient> clients = mockConstruction(OkHttpClient.class,
-                (client, context) -> when(client.newCall(any(Request.class))).thenReturn(call))) {
-            Emails sdk = new Resend(properties.getApiKey()).emails();
-            new ResendEmailSender(sdk, properties).send(message);
-            assertThat(clients.constructed()).hasSize(1);
-            ArgumentCaptor<Request> request = ArgumentCaptor.forClass(Request.class);
-            verify(clients.constructed().get(0)).newCall(request.capture());
-            assertThat(request.getValue().url().toString()).isEqualTo("https://api.resend.com/emails");
-            assertThat(request.getValue().method()).isEqualTo("POST");
-            assertThat(request.getValue().header("Authorization")).isEqualTo("Bearer re_test_key");
-            assertThat(request.getValue().body().contentType().toString()).startsWith("application/json");
-            Buffer buffer = new Buffer();
-            request.getValue().body().writeTo(buffer);
-            JSONAssert.assertEquals("""
-                    {"from":"noreply@email.crowdcam.co.za","to":["customer@example.com"],
-                     "subject":"Reset your password","html":"<p>private-reset-token</p>",
-                     "text":"private-reset-token"}
-                    """, buffer.readUtf8(), true);
-        }
+    void buildsProviderRequestWithoutDeliveringRealEmail(CapturedOutput output) throws Exception {
+        when(resendClient.send(any(CreateEmailOptions.class)))
+                .thenReturn(new CreateEmailResponse("email_123"));
+
+        sender.send(message);
+
+        ArgumentCaptor<CreateEmailOptions> request = ArgumentCaptor.forClass(CreateEmailOptions.class);
+        verify(resendClient).send(request.capture());
+        assertThat(request.getValue().getFrom()).isEqualTo("noreply@email.crowdcam.co.za");
+        assertThat(request.getValue().getTo()).containsExactly("customer@example.com");
+        assertThat(request.getValue().getSubject()).isEqualTo("Reset your password");
+        assertThat(request.getValue().getHtml()).isEqualTo("<p>private-reset-token</p>");
+        assertThat(request.getValue().getText()).isEqualTo("private-reset-token");
         assertThat(output).contains("Resend accepted email", "email_123")
                 .doesNotContain("private-reset-token", properties.getApiKey(), message.recipient());
     }
@@ -81,7 +57,7 @@ class ResendEmailSenderTest {
     void missingKeyStopsBeforeSdkCall(CapturedOutput output) {
         properties.setApiKey(" ");
         assertFailure(Reason.MISSING_API_KEY);
-        verifyNoInteractions(emails);
+        verifyNoInteractions(resendClient);
         assertThat(output).contains("set RESEND_API_KEY");
     }
 
@@ -89,7 +65,7 @@ class ResendEmailSenderTest {
     void missingSenderStopsBeforeSdkCall() {
         properties.setFromEmail("");
         assertFailure(Reason.MISSING_SENDER);
-        verifyNoInteractions(emails);
+        verifyNoInteractions(resendClient);
     }
 
     @ParameterizedTest
@@ -105,7 +81,7 @@ class ResendEmailSenderTest {
                                                             Reason expected, CapturedOutput output) throws Exception {
         ResendException failure = new ResendException(status,
                 "{\"name\":\"" + name + "\",\"message\":\"" + detail + " re_test_key\"}");
-        when(emails.send(any(CreateEmailOptions.class))).thenThrow(failure);
+        when(resendClient.send(any(CreateEmailOptions.class))).thenThrow(failure);
         assertThatThrownBy(() -> sender.send(message)).isInstanceOfSatisfying(NotificationDeliveryException.class, ex -> {
             assertThat(ex.getReason()).isEqualTo(expected);
             StringWriter trace = new StringWriter();
@@ -117,14 +93,14 @@ class ResendEmailSenderTest {
 
     @Test
     void wrapsNetworkFailureForResetServiceTokenCleanup() throws Exception {
-        when(emails.send(any(CreateEmailOptions.class)))
+        when(resendClient.send(any(CreateEmailOptions.class)))
                 .thenThrow(new RuntimeException(new IOException("Network failed re_test_key")));
         assertFailure(Reason.NETWORK_ERROR);
     }
 
     @Test
     void rejectsEmptyProviderResponse() throws Exception {
-        when(emails.send(any(CreateEmailOptions.class))).thenReturn(null, new CreateEmailResponse());
+        when(resendClient.send(any(CreateEmailOptions.class))).thenReturn(null, new CreateEmailResponse());
         assertFailure(Reason.PROVIDER_ERROR);
         assertFailure(Reason.PROVIDER_ERROR);
     }

@@ -31,9 +31,9 @@ CREATE TABLE orders (
 
 ### Managing Staff Accounts
 
-The easiest way to manage staff accounts and their PINs is through the `staff-config.json` file in the project root.
+The easiest way to manage staff accounts and their PINs is through `Misc/staff-config.json`.
 
-**Example `staff-config.json`:**
+**Example `Misc/staff-config.json`:**
 ```json
 [
   {
@@ -52,7 +52,7 @@ The easiest way to manage staff accounts and their PINs is through the `staff-co
 ```
 
 To update a PIN or add a new staff member:
-1. Edit `staff-config.json`.
+1. Edit `Misc/staff-config.json`.
 2. Restart the Spring Boot application.
 3. The application will automatically synchronize the database with the file content.
 
@@ -114,7 +114,7 @@ curl -X POST http://192.168.1.31:8081/api/orders \
 
 ## Accessing the POS Frontend
 
-1. Start your Spring Boot application: `./mvnw spring-boot:run`
+1. Start your Spring Boot application: `Misc/mvnw spring-boot:run`
 2. Open browser to: `http://192.168.1.31:8081/orders`
 3. Login with 16-character Code:
    - `KENRIDGE_1234567` for Kenridge branch

@@ -40,7 +40,7 @@
 @SET __MVNW_ARG0_NAME__=
 @SET MVNW_USERNAME=
 @SET MVNW_PASSWORD=
-@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
+@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" -f "%~dp0pom.xml" %*)
 @echo Cannot start maven from wrapper >&2 && exit /b 1
 @GOTO :EOF
 : end batch / begin powershell #>
@@ -51,9 +51,10 @@ if ($env:MVNW_VERBOSE -eq "true") {
 }
 
 # calculate distributionUrl, requires .mvn/wrapper/maven-wrapper.properties
-$distributionUrl = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionUrl
+$wrapperProperties = Join-Path $scriptDir "../.mvn/wrapper/maven-wrapper.properties"
+$distributionUrl = (Get-Content -Raw $wrapperProperties | ConvertFrom-StringData).distributionUrl
 if (!$distributionUrl) {
-  Write-Error "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+  Write-Error "cannot read distributionUrl property in $wrapperProperties"
 }
 
 switch -wildcard -casesensitive ( $($distributionUrl -replace '^.*/','') ) {
@@ -135,7 +136,7 @@ if ($env:MVNW_USERNAME -and $env:MVNW_PASSWORD) {
 $webclient.DownloadFile($distributionUrl, "$TMP_DOWNLOAD_DIR/$distributionUrlName") | Out-Null
 
 # If specified, validate the SHA-256 sum of the Maven distribution zip file
-$distributionSha256Sum = (Get-Content -Raw "$scriptDir/.mvn/wrapper/maven-wrapper.properties" | ConvertFrom-StringData).distributionSha256Sum
+$distributionSha256Sum = (Get-Content -Raw $wrapperProperties | ConvertFrom-StringData).distributionSha256Sum
 if ($distributionSha256Sum) {
   if ($USE_MVND) {
     Write-Error "Checksum validation is not supported for maven-mvnd. `nPlease disable validation by removing 'distributionSha256Sum' from your maven-wrapper.properties."

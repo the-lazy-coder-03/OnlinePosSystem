@@ -33,18 +33,19 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
+          cache-dependency-path: Misc/pom.xml
 
       - name: Run tests
-        run: ./mvnw -B test
+        run: Misc/mvnw -B test
 
       - name: Build jar
-        run: ./mvnw -B package -DskipTests
+        run: Misc/mvnw -B package -DskipTests
 
       - name: Prepare deployment artifact
         run: |
           mkdir -p deploy
           cp target/*.jar deploy/app.jar
-          cp staff-config.json deploy/staff-config.json
+          cp Misc/staff-config.json deploy/staff-config.json
 
       - name: Upload deployment artifact
         uses: actions/upload-artifact@v4
@@ -74,12 +75,19 @@ jobs:
           AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
           SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          MAIL_API: ${{ secrets.MAIL_API }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
         run: |
           test -n "$AZURE_VM_HOST" || (echo "Missing AZURE_VM_HOST secret" && exit 1)
           test -n "$AZURE_VM_USER" || (echo "Missing AZURE_VM_USER secret" && exit 1)
           test -n "$AZURE_VM_SSH_KEY" || (echo "Missing AZURE_VM_SSH_KEY secret" && exit 1)
           test -n "$SPRING_DATASOURCE_PASSWORD" || (echo "Missing SPRING_DATASOURCE_PASSWORD secret" && exit 1)
           test -n "$JWT_SECRET" || (echo "Missing JWT_SECRET secret" && exit 1)
+          test -n "$ADMIN_PASSWORD" || (echo "Missing ADMIN_PASSWORD secret" && exit 1)
+          test -n "${RESEND_API_KEY:-${MAIL_API:-}}" || (echo "Missing RESEND_API_KEY or MAIL_API secret" && exit 1)
+          test -n "$RESEND_FROM_EMAIL" || (echo "Missing RESEND_FROM_EMAIL secret" && exit 1)
 
       - name: Build runtime environment file
         env:
@@ -108,15 +116,16 @@ jobs:
             echo "SERVER_PORT=${SERVER_PORT:-8081}"
             echo "SPRING_PROFILES_ACTIVE=default"
             echo "ADMIN_USERNAME=${ADMIN_USERNAME:-admin}"
-            echo "ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}"
+            echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
             echo "JWT_SECRET=${JWT_SECRET}"
             echo "JWT_EXPIRATION_SECONDS=7200"
-            echo "SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-false}"
-            echo "APP_BASE_URL=${APP_BASE_URL:-http://${AZURE_VM_HOST}:${SERVER_PORT:-8081}}"
+            echo "SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}"
+            echo "APP_BASE_URL=${APP_BASE_URL:-https://email.crowdcam.co.za}"
             echo "RESEND_API_KEY=${RESEND_API_KEY:-${MAIL_API:-}}"
-            echo "RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-}"
+            echo "RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-noreply@email.crowdcam.co.za}"
             echo "GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}"
             echo "RUN_MIGRATION_SQL=${RUN_MIGRATION_SQL:-true}"
+            echo "STAFF_CONFIG_PATH=/opt/online-pos-system/staff-config.json"
           } > runtime/online-pos-system.env
 
       - name: Configure SSH

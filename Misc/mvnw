@@ -105,8 +105,10 @@ trim() {
   printf "%s" "${1}" | tr -d '[:space:]'
 }
 
-scriptDir="$(dirname "$0")"
+scriptDir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 scriptName="$(basename "$0")"
+projectPom="$scriptDir/pom.xml"
+wrapperProperties="$scriptDir/../.mvn/wrapper/maven-wrapper.properties"
 
 # parse distributionUrl and optional distributionSha256Sum, requires .mvn/wrapper/maven-wrapper.properties
 while IFS="=" read -r key value; do
@@ -114,8 +116,8 @@ while IFS="=" read -r key value; do
   distributionUrl) distributionUrl=$(trim "${value-}") ;;
   distributionSha256Sum) distributionSha256Sum=$(trim "${value-}") ;;
   esac
-done <"$scriptDir/.mvn/wrapper/maven-wrapper.properties"
-[ -n "${distributionUrl-}" ] || die "cannot read distributionUrl property in $scriptDir/.mvn/wrapper/maven-wrapper.properties"
+done <"$wrapperProperties"
+[ -n "${distributionUrl-}" ] || die "cannot read distributionUrl property in $wrapperProperties"
 
 case "${distributionUrl##*/}" in
 maven-mvnd-*bin.*)
@@ -147,7 +149,7 @@ MAVEN_HOME="${MAVEN_USER_HOME}/wrapper/dists/${distributionUrlNameMain-}/$(hash_
 
 exec_maven() {
   unset MVNW_VERBOSE MVNW_USERNAME MVNW_PASSWORD MVNW_REPOURL || :
-  exec "$MAVEN_HOME/bin/$MVN_CMD" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
+  exec "$MAVEN_HOME/bin/$MVN_CMD" -f "$projectPom" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
 }
 
 if [ -d "$MAVEN_HOME" ]; then

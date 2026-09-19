@@ -1,12 +1,11 @@
 package org.example.onlinepossystem.notification.email.resend;
 
-import com.resend.services.emails.Emails;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
-import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.support.ResourcePropertySource;
 
 import java.util.Map;
@@ -20,7 +19,7 @@ class ResendConfigurationTest {
     @MethodSource("keyConfigurations")
     void bindsEffectiveKeyFromEnvironmentNames(Map<String, Object> variables, String expected) throws IOException {
         ResourcePropertySource applicationProperties = new ResourcePropertySource(
-                new FileSystemResource("src/main/resources/application.properties"));
+                new ClassPathResource("application.properties"));
         new ApplicationContextRunner()
                 .withUserConfiguration(ResendConfiguration.class)
                 .withInitializer(context -> {
@@ -29,7 +28,7 @@ class ResendConfigurationTest {
                             new SystemEnvironmentPropertySource("testEnvironment", variables));
                 })
                 .run(context -> {
-                    assertThat(context).hasNotFailed().hasSingleBean(Emails.class);
+                    assertThat(context).hasNotFailed().hasSingleBean(ResendClient.class);
                     assertThat(context.getBean(ResendProperties.class).getApiKey()).isEqualTo(expected);
                 });
     }

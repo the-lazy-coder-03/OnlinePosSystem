@@ -1,11 +1,12 @@
-HELP.md
-target/
-.DS_Store
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+/SupportConfigFiles/.env
+/.idea/
+/target/
+/.DS_Store
+**/.DS_Store
+/docker/certbot/
+/.mvn/wrapper/maven-wrapper.jar
 
-### STS ###
+# IDE and editor metadata
 .apt_generated
 .classpath
 .factorypath
@@ -13,25 +14,17 @@ target/
 .settings
 .springBeans
 .sts4-cache
-
-### IntelliJ IDEA ###
-.idea
 *.iws
 *.iml
 *.ipr
-
-### NetBeans ###
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
+/.vscode/
+
+# Generated build directories
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
-
-### VS Code ###
-.vscode/
-
-### Environment Variables ###
-.env

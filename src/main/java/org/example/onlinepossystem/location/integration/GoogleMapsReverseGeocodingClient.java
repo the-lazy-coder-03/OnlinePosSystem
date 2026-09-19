@@ -4,6 +4,7 @@ import org.example.onlinepossystem.location.api.ReverseGeocodingClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -16,7 +17,7 @@ public class GoogleMapsReverseGeocodingClient implements ReverseGeocodingClient 
 
     public GoogleMapsReverseGeocodingClient(
             RestTemplate restTemplate,
-            @Value("${GOOGLE_MAPS_API_KEY}") String apiKey
+            @Value("${GOOGLE_MAPS_API_KEY:}") String apiKey
     ) {
         this.restTemplate = restTemplate;
         this.apiKey = apiKey;
@@ -25,6 +26,10 @@ public class GoogleMapsReverseGeocodingClient implements ReverseGeocodingClient 
     @Override
     @SuppressWarnings("unchecked")
     public String findAddress(double latitude, double longitude) {
+        if (!StringUtils.hasText(apiKey)) {
+            return "Address service unavailable";
+        }
+
         String url = "https://maps.googleapis.com/maps/api/geocode/json?latlng="
                 + latitude + "," + longitude + "&key=" + apiKey;
 

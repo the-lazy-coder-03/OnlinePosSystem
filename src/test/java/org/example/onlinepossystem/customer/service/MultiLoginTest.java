@@ -12,11 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.junit.jupiter.api.Assertions.*;
 
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -88,6 +91,36 @@ public class MultiLoginTest {
                 .andExpect(status().isFound())
                 .andExpect(redirectedUrl("/"));
     }
+
+    @Test
+    public void testRegistrationSignsCustomerIn() throws Exception {
+        String email = "new-customer@example.com";
+
+        MvcResult registration = mockMvc.perform(MockMvcRequestBuilders.post("/register")
+                        .with(csrf())
+                        .param("firstName", "New")
+                        .param("lastName", "Customer")
+                        .param("email", email)
+                        .param("password", "Password1!")
+                        .param("house_number", "12")
+                        .param("street", "Main Street")
+                        .param("area", "Kenridge")
+                        .param("postalCode", "7550")
+                        .param("phone", "0712345678")
+                        .param("preferred_store", "Kenridge Branch"))
+                .andExpect(status().isFound())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(authenticated().withUsername(email))
+                .andReturn();
+
+        MockHttpSession session = (MockHttpSession) registration.getRequest().getSession(false);
+        assertNotNull(session);
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/order").session(session))
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(email));
+    }
+
     @Test
     public void testFailedLogin() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.post("/login")

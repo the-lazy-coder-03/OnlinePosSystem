@@ -111,11 +111,27 @@
     </dependencies>
 
     <build>
+        <directory>${project.basedir}/../target</directory>
+        <sourceDirectory>${project.basedir}/../src/main/java</sourceDirectory>
+        <testSourceDirectory>${project.basedir}/../src/test/java</testSourceDirectory>
+        <resources>
+            <resource>
+                <directory>${project.basedir}/../src/main/resources</directory>
+            </resource>
+        </resources>
+        <testResources>
+            <testResource>
+                <directory>${project.basedir}/../src/test/resources</directory>
+            </testResource>
+        </testResources>
         <plugins>
             <!-- Spring Boot Maven Plugin -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <workingDirectory>${project.basedir}/..</workingDirectory>
+                </configuration>
             </plugin>
 
             <!-- Compiler Plugin -->
@@ -125,6 +141,14 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-Dnet.bytebuddy.experimental=true</argLine>
                 </configuration>
             </plugin>
         </plugins>

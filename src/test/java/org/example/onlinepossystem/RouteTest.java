@@ -79,6 +79,8 @@ public class RouteTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("forgot-password"))
                 .andExpect(content().string(containsString("Reset your password")))
+                .andExpect(content().string(containsString("Kenridge &amp; Uitzicht Branch")))
+                .andExpect(content().string(containsString("Sign Up")))
                 .andExpect(content().string(containsString("action=\"/forgot-password\"")))
                 .andExpect(content().string(containsString("name=\"_csrf\"")))
                 .andExpect(content().string(containsString("Send reset link")));

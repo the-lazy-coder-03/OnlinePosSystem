@@ -2,7 +2,7 @@
 
 The live `crowdcam.co.za` website runs with Docker Compose on `130.131.162.110`
 in `/home/azureuser/OnlinePosSystem`. Its runtime settings come from that
-directory's `.env`. The proxy on `40.76.227.74` forwards website traffic there.
+directory's `SupportConfigFiles/.env`. The proxy on `40.76.227.74` forwards website traffic there.
 The systemd deployment described below is separate from this live Docker app.
 
 This project deploys to the Azure Ubuntu VM at `40.76.227.74` with GitHub Actions.
@@ -61,8 +61,8 @@ SPRING_DATASOURCE_USERNAME=pos_app
 SPRING_DATASOURCE_PASSWORD=<database password>
 JWT_SECRET=<long random secret, at least 32 characters>
 SERVER_PORT=8081
-APP_BASE_URL=https://crowdcam.co.za
-SESSION_COOKIE_SECURE=false
+APP_BASE_URL=https://email.crowdcam.co.za
+SESSION_COOKIE_SECURE=true
 RUN_MIGRATION_SQL=true
 ```
 
@@ -117,14 +117,15 @@ as a SHA-256 hash, and is invalidated after a successful reset.
 Required environment values:
 
 ```text
-APP_BASE_URL=https://crowdcam.co.za
+APP_BASE_URL=https://email.crowdcam.co.za
 RESEND_API_KEY=<Resend sending_access API key>
 RESEND_FROM_EMAIL=noreply@email.crowdcam.co.za
 RUN_MIGRATION_SQL=true
 ```
 
-`APP_BASE_URL` is the website customers visit; the verified sending domain
-`email.crowdcam.co.za` belongs in `RESEND_FROM_EMAIL`.
+The main application remains at `https://crowdcam.co.za`. `APP_BASE_URL` uses
+`https://email.crowdcam.co.za` so emailed reset links open on the dedicated
+reset hostname. The same verified domain belongs in `RESEND_FROM_EMAIL`.
 
 The SDK sends through `https://api.resend.com`; the former `RESEND_ENDPOINT`
 override is no longer used. Accepted emails log their Resend email ID, while
@@ -140,5 +141,23 @@ allowed to send from that domain.
 After changing the live `.env`, recreate the app container to apply it:
 
 ```bash
-docker compose up -d --no-deps --force-recreate app
+docker compose --env-file SupportConfigFiles/.env \
+  -f SupportConfigFiles/docker-compose.yml up -d --no-deps --force-recreate app
 ```
+
+## Docker Compose and HTTPS
+
+Set `CERTBOT_EMAIL` in `SupportConfigFiles/.env`, point `crowdcam.co.za`,
+`www.crowdcam.co.za`, and `email.crowdcam.co.za` at the Compose server, and
+open inbound ports 80 and 443. PostgreSQL port 5432 remains internal.
+
+Issue the initial certificate and start the stack with:
+
+```bash
+scripts/init-letsencrypt.sh
+```
+
+The certificate includes all three hostnames. The renewal container checks
+twice daily and Nginx reloads certificates periodically. The main host proxies
+the full application; the email host serves password-reset and static asset
+requests and redirects other paths to `https://crowdcam.co.za`.
