@@ -5,8 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "resend")
 public class ResendProperties {
     private String apiKey = "";
-    private String fromEmail = "noreply@example.com";
-    private String endpoint = "https://api.resend.com/emails";
+    private String fromEmail = "";
 
     public String getApiKey() {
         return apiKey;
@@ -24,11 +23,4 @@ public class ResendProperties {
         this.fromEmail = fromEmail;
     }
 
-    public String getEndpoint() {
-        return endpoint;
-    }
-
-    public void setEndpoint(String endpoint) {
-        this.endpoint = endpoint;
-    }
 }

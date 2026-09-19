@@ -96,6 +96,14 @@ class ModularArchitectureTest {
     void externalSdkTypesStayInsideAdaptersAndConfiguration() {
         noClasses()
                 .that()
+                .resideOutsideOfPackage("..notification.email.resend..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("com.resend..")
+                .check(classes);
+
+        noClasses()
+                .that()
                 .resideOutsideOfPackages("..location.integration..", "..shared.config..")
                 .should()
                 .dependOnClassesThat()

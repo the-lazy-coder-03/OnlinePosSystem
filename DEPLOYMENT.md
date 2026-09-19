@@ -1,5 +1,10 @@
 # CI/CD Deployment
 
+The live `crowdcam.co.za` website runs with Docker Compose on `130.131.162.110`
+in `/home/azureuser/OnlinePosSystem`. Its runtime settings come from that
+directory's `.env`. The proxy on `40.76.227.74` forwards website traffic there.
+The systemd deployment described below is separate from this live Docker app.
+
 This project deploys to the Azure Ubuntu VM at `40.76.227.74` with GitHub Actions.
 The workflow builds on a GitHub-hosted runner, uploads the release over SSH, and
 restarts the `online-pos-system` systemd service on the VM.
@@ -56,7 +61,7 @@ SPRING_DATASOURCE_USERNAME=pos_app
 SPRING_DATASOURCE_PASSWORD=<database password>
 JWT_SECRET=<long random secret, at least 32 characters>
 SERVER_PORT=8081
-APP_BASE_URL=https://email.crowdcam.co.za
+APP_BASE_URL=https://crowdcam.co.za
 SESSION_COOKIE_SECURE=false
 RUN_MIGRATION_SQL=true
 ```
@@ -67,9 +72,8 @@ Optional app secrets:
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<admin password>
 GOOGLE_MAPS_API_KEY=<key if maps are enabled>
-RESEND_API_KEY=<Resend API key>
-RESEND_FROM_EMAIL=noreply@your-verified-domain.com
-RESEND_ENDPOINT=https://api.resend.com/emails
+RESEND_API_KEY=<Resend sending_access API key>
+RESEND_FROM_EMAIL=noreply@email.crowdcam.co.za
 ```
 
 ## Flow
@@ -106,15 +110,35 @@ The app stores the last applied SQL checksum in `app_migration_state`.
 
 ## Password Reset Email
 
-Password reset uses Resend to send a one-time link to
+Password reset uses the official `com.resend:resend-java` SDK to send a one-time link to
 `/reset-password?token=...`. The token expires after 30 minutes, is stored only
 as a SHA-256 hash, and is invalidated after a successful reset.
 
 Required environment values:
 
 ```text
-APP_BASE_URL=https://email.crowdcam.co.za
-RESEND_API_KEY=<Resend API key>
-RESEND_FROM_EMAIL=<verified Resend sender address>
+APP_BASE_URL=https://crowdcam.co.za
+RESEND_API_KEY=<Resend sending_access API key>
+RESEND_FROM_EMAIL=noreply@email.crowdcam.co.za
 RUN_MIGRATION_SQL=true
+```
+
+`APP_BASE_URL` is the website customers visit; the verified sending domain
+`email.crowdcam.co.za` belongs in `RESEND_FROM_EMAIL`.
+
+The SDK sends through `https://api.resend.com`; the former `RESEND_ENDPOINT`
+override is no longer used. Accepted emails log their Resend email ID, while
+rejections log the provider status and error type without credentials or reset links.
+
+Use `RESEND_API_KEY`; `MAIL_API` remains a fallback for older installations.
+A `sending_access` key is sufficient. The application does not list domains
+or validate credentials through account-management endpoints. Actuator's
+`resend` health component checks configuration presence only; it does not
+verify key validity, domain status, delivery, or send test emails.
+Ensure `email.crowdcam.co.za` is verified in Resend and the sending key is
+allowed to send from that domain.
+After changing the live `.env`, recreate the app container to apply it:
+
+```bash
+docker compose up -d --no-deps --force-recreate app
 ```

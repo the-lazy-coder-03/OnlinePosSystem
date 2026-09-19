@@ -32,10 +32,8 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
       RUN_MIGRATION_SQL: ${RUN_MIGRATION_SQL:-true}
       APP_BASE_URL: ${APP_BASE_URL:-https://crowdcam.co.za}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      MAIL_API: ${MAIL_API:-}
-      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@your-verified-domain.com}
-      RESEND_ENDPOINT: ${RESEND_ENDPOINT:-https://api.resend.com/emails}
+      RESEND_API_KEY: ${RESEND_API_KEY:-${MAIL_API:-}}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       JWT_SECRET: ${JWT_SECRET}
