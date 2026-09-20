@@ -1387,21 +1387,21 @@
                     const hasBurgerToppings = Array.isArray(m.burgerToppings) && m.burgerToppings.length > 0;
                     const burgerVariants = getBurgerVariantFamily(m);
                     const hasBurgerVariants = burgerVariants.length > 1;
-                    const directAddCooldrink = isDirectAddCooldrink(m);
+                    const directAddItem = !MENU_ONLY && isDirectAddMenuItem(m);
                     const variantBasePrice = hasBurgerVariants
                         ? Math.min(...burgerVariants.map(v => Number(v.basePrice || 0)).filter(Number.isFinite))
                         : Number(m.basePrice || 0);
-                    if (directAddCooldrink) row.classList.add("row-direct-add");
+                    if (directAddItem) row.classList.add("row-direct-add");
                     row.innerHTML = `
                         <div class="row-top">
                           <div class="row-title">${escapeHtml(m.name)}</div>
                           <div class="row-actions">
                             <div class="row-price">${hasBurgerVariants ? ("From " + money(variantBasePrice)) : money(m.basePrice || 0)}</div>
-                            ${directAddCooldrink && !MENU_ONLY ? `<button type="button" class="row-add-btn" data-menu-add="${Number(m.menuItemId)}">Add to cart</button>` : ""}
+                            ${directAddItem ? `<button type="button" class="row-add-btn" data-menu-add="${Number(m.menuItemId)}">Add to cart</button>` : ""}
                           </div>
                         </div>
                         <div class="row-sub">${escapeHtml(m.shortDescription || m.description || (isBurger ? "Tap to customize burger options." : (MENU_ONLY ? "View item details." : "Tap to add to your order.")))}</div>
-                        ${directAddCooldrink ? "" : `<div class="row-cta">${MENU_ONLY ? ((hasModifiers || isBurger || hasBurgerToppings || hasBurgerVariants) ? "View options" : "View details") : (isBurger ? "Click to customize" : (hasModifiers ? "Click to choose options" : "Click to add"))}</div>`}
+                        ${directAddItem ? "" : `<div class="row-cta">${MENU_ONLY ? ((hasModifiers || isBurger || hasBurgerToppings || hasBurgerVariants) ? "View options" : "View details") : (isBurger ? "Click to customize" : (hasModifiers ? "Click to choose options" : "Click to add"))}</div>`}
                     `;
                     const addButton = row.querySelector("[data-menu-add]");
                     if (addButton){
@@ -1409,7 +1409,7 @@
                             event.stopPropagation();
                             actions.addMenuItemDirect(m);
                         });
-                    } else if (!directAddCooldrink) {
+                    } else {
                         row.addEventListener("click", () => actions.openMenuItem(m.menuItemId));
                     }
                     body.appendChild(row);
@@ -2967,8 +2967,8 @@
         state.menuCustomize.selectedBurgerVariantId = null;
     }
 
-    function isDirectAddCooldrink(item){
-        return isCooldrinkMenuItem(item) && !hasMenuCustomizations(item);
+    function isDirectAddMenuItem(item){
+        return !hasMenuCustomizations(item);
     }
 
     const debouncedQuote = debounce(() => actions.quoteNow(), 220);
@@ -3419,8 +3419,6 @@
             map.get(id).items.push(m);
         }
         const out = Array.from(map.values());
-        out.forEach(g => g.items.sort((a,b) => (a.name || "").localeCompare(b.name || "")));
-        out.sort((a,b) => a.categoryName.localeCompare(b.categoryName));
         return out;
     }
 

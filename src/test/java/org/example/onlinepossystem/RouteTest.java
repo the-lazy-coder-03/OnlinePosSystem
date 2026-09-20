@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -52,6 +53,13 @@ public class RouteTest {
                 .andExpect(view().name("PlaceOrder"))
                 .andExpect(model().attribute("menuOnly", true))
                 .andExpect(content().string(containsString("actions.selectCategory(cat)")))
+                .andExpect(content().string(containsString("function isDirectAddMenuItem(item)")))
+                .andExpect(content().string(containsString("const directAddItem = !MENU_ONLY && isDirectAddMenuItem(m);")))
+                .andExpect(content().string(containsString("row-add-btn")))
+                .andExpect(content().string(containsString("function hasSelectedRibChipSide(item)")))
+                .andExpect(content().string(containsString("if (!isChipExtrasGroup(group)) return true;")))
+                .andExpect(content().string(not(containsString("isDirectAddCooldrink"))))
+                .andExpect(content().string(not(containsString("out.sort((a,b) => a.categoryName.localeCompare"))))
                 .andExpect(content().string(containsString(
                         "Discard this customization and view this category?"
                 )));

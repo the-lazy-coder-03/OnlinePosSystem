@@ -43,7 +43,7 @@ public interface MenuReadRepository extends JpaRepository<MenuItem, Integer> {
             from MenuItemModifierGroup mimg, ModifierGroup mg
             where mimg.groupId = mg.id
               and mimg.menuItemId in :menuItemIds
-            order by mg.name
+            order by mimg.menuItemId, mg.id
             """)
     List<ModifierGroupRow> findModifierGroupsForMenuItems(@Param("menuItemIds") List<Integer> menuItemIds);
 
