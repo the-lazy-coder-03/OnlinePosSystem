@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: online-pos-system-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build and test
@@ -25,10 +29,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -36,64 +40,44 @@ jobs:
           cache-dependency-path: Misc/pom.xml
 
       - name: Run tests
-        run: Misc/mvnw -B test
+        run: ./Misc/mvnw -f Misc/pom.xml -B test
 
       - name: Build jar
-        run: Misc/mvnw -B package -DskipTests
-
-      - name: Prepare deployment artifact
-        run: |
-          mkdir -p deploy
-          cp target/*.jar deploy/app.jar
-          cp Misc/staff-config.json deploy/staff-config.json
-
-      - name: Upload deployment artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: online-pos-system
-          path: deploy/
-          if-no-files-found: error
+        run: ./Misc/mvnw -f Misc/pom.xml -B package -DskipTests
 
   deploy:
     name: Deploy to Azure VM
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'workflow_dispatch' || github.ref_name == 'master' || github.ref_name == 'main'
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
-      - name: Download deployment artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: online-pos-system
-          path: deploy
-
       - name: Validate required secrets
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
           AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           MAIL_API: ${{ secrets.MAIL_API }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
         run: |
           test -n "$AZURE_VM_HOST" || (echo "Missing AZURE_VM_HOST secret" && exit 1)
           test -n "$AZURE_VM_USER" || (echo "Missing AZURE_VM_USER secret" && exit 1)
           test -n "$AZURE_VM_SSH_KEY" || (echo "Missing AZURE_VM_SSH_KEY secret" && exit 1)
-          test -n "$SPRING_DATASOURCE_PASSWORD" || (echo "Missing SPRING_DATASOURCE_PASSWORD secret" && exit 1)
+          test -n "${POSTGRES_PASSWORD:-${SPRING_DATASOURCE_PASSWORD:-}}" || (echo "Missing POSTGRES_PASSWORD or SPRING_DATASOURCE_PASSWORD secret" && exit 1)
           test -n "$JWT_SECRET" || (echo "Missing JWT_SECRET secret" && exit 1)
           test -n "$ADMIN_PASSWORD" || (echo "Missing ADMIN_PASSWORD secret" && exit 1)
           test -n "${RESEND_API_KEY:-${MAIL_API:-}}" || (echo "Missing RESEND_API_KEY or MAIL_API secret" && exit 1)
-          test -n "$RESEND_FROM_EMAIL" || (echo "Missing RESEND_FROM_EMAIL secret" && exit 1)
 
       - name: Build runtime environment file
         env:
-          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
-          SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
-          SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
@@ -103,29 +87,40 @@ jobs:
           MAIL_API: ${{ secrets.MAIL_API }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
-          SERVER_PORT: ${{ secrets.SERVER_PORT }}
           SESSION_COOKIE_SECURE: ${{ secrets.SESSION_COOKIE_SECURE }}
           RUN_MIGRATION_SQL: ${{ secrets.RUN_MIGRATION_SQL }}
+          CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
         run: |
           mkdir -p runtime
+
+          db_name="${POSTGRES_DB:-online_pos_system}"
+          db_user="${POSTGRES_USER:-pos_app}"
+          db_password="${POSTGRES_PASSWORD:-${SPRING_DATASOURCE_PASSWORD:-}}"
+
           {
-            echo "SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL:-jdbc:postgresql://127.0.0.1:5432/online_pos_system}"
-            echo "SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-pos_app}"
-            echo "SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}"
+            echo "POSTGRES_DB=${db_name}"
+            echo "POSTGRES_USER=${db_user}"
+            echo "POSTGRES_PASSWORD=${db_password}"
+            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${db_name}"
+            echo "SPRING_DATASOURCE_USERNAME=${db_user}"
+            echo "SPRING_DATASOURCE_PASSWORD=${db_password}"
             echo "SERVER_ADDRESS=0.0.0.0"
-            echo "SERVER_PORT=${SERVER_PORT:-8081}"
+            echo "SERVER_PORT=8080"
+            echo "HTTP_PORT=80"
+            echo "HTTPS_PORT=443"
             echo "SPRING_PROFILES_ACTIVE=default"
+            echo "RUN_MIGRATION_SQL=${RUN_MIGRATION_SQL:-true}"
             echo "ADMIN_USERNAME=${ADMIN_USERNAME:-admin}"
             echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
             echo "JWT_SECRET=${JWT_SECRET}"
             echo "JWT_EXPIRATION_SECONDS=7200"
             echo "SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}"
-            echo "APP_BASE_URL=${APP_BASE_URL:-https://email.crowdcam.co.za}"
+            echo "APP_BASE_URL=${APP_BASE_URL:-https://crowdcam.co.za}"
             echo "RESEND_API_KEY=${RESEND_API_KEY:-${MAIL_API:-}}"
+            echo "MAIL_API=${MAIL_API:-${RESEND_API_KEY:-}}"
             echo "RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-noreply@email.crowdcam.co.za}"
+            echo "CERTBOT_EMAIL=${CERTBOT_EMAIL:-matthewanton01@gmail.com}"
             echo "GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}"
-            echo "RUN_MIGRATION_SQL=${RUN_MIGRATION_SQL:-true}"
-            echo "STAFF_CONFIG_PATH=/opt/online-pos-system/staff-config.json"
           } > runtime/online-pos-system.env
 
       - name: Configure SSH
@@ -139,29 +134,64 @@ jobs:
           chmod 600 ~/.ssh/online-pos-azure
           ssh-keyscan -p "${AZURE_VM_PORT:-22}" "$AZURE_VM_HOST" >> ~/.ssh/known_hosts
 
-      - name: Upload release to Azure VM
+      - name: Upload runtime environment
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
           AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
         run: |
-          remote_dir="/tmp/online-pos-system-${GITHUB_SHA}"
-          ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" "rm -rf '${remote_dir}' && mkdir -p '${remote_dir}'"
+          remote_env="/tmp/online-pos-system-${GITHUB_SHA}.env"
           scp -i ~/.ssh/online-pos-azure -P "${AZURE_VM_PORT:-22}" \
-            deploy/app.jar \
-            deploy/staff-config.json \
             runtime/online-pos-system.env \
-            "${AZURE_VM_USER}@${AZURE_VM_HOST}:${remote_dir}/"
+            "${AZURE_VM_USER}@${AZURE_VM_HOST}:${remote_env}"
 
-      - name: Activate release on Azure VM
+      - name: Deploy Docker Compose stack
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
           AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
-          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
         run: |
-          remote_dir="/tmp/online-pos-system-${GITHUB_SHA}"
+          remote_env="/tmp/online-pos-system-${GITHUB_SHA}.env"
+          remote_app_dir="${REMOTE_APP_DIR:-/home/${AZURE_VM_USER}/OnlinePosSystem}"
+          quoted_remote_env="$(printf '%q' "$remote_env")"
+          quoted_remote_app_dir="$(printf '%q' "$remote_app_dir")"
+          quoted_branch="$(printf '%q' "$GITHUB_REF_NAME")"
+          quoted_sha="$(printf '%q' "$GITHUB_SHA")"
+
           ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
-            "test -x /usr/local/sbin/deploy-online-pos-system && sudo /usr/local/sbin/deploy-online-pos-system '${remote_dir}/app.jar' '${remote_dir}/staff-config.json' '${remote_dir}/online-pos-system.env'"
-          ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
-            "for i in {1..60}; do curl -fsS 'http://127.0.0.1:${SERVER_PORT:-8081}/' >/dev/null && exit 0; sleep 2; done; systemctl status online-pos-system --no-pager -l || true; sudo journalctl -u online-pos-system -n 120 --no-pager; exit 1"
+            "REMOTE_ENV=${quoted_remote_env} REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          compose() {
+            docker compose --env-file SupportConfigFiles/.env -f SupportConfigFiles/docker-compose.yml -p onlinepossystem "$@"
+          }
+
+          test -d "$REMOTE_APP_DIR/.git" || (echo "Remote app directory is not a git repository: $REMOTE_APP_DIR" && exit 1)
+          test -f "$REMOTE_ENV" || (echo "Uploaded environment file missing: $REMOTE_ENV" && exit 1)
+          command -v git >/dev/null 2>&1 || (echo "git is not installed on the server" && exit 1)
+          command -v docker >/dev/null 2>&1 || (echo "docker is not installed on the server" && exit 1)
+
+          cd "$REMOTE_APP_DIR"
+          git fetch origin "$DEPLOY_BRANCH"
+          git checkout "$DEPLOY_BRANCH"
+          git pull --ff-only origin "$DEPLOY_BRANCH"
+
+          mkdir -p SupportConfigFiles
+          mv "$REMOTE_ENV" SupportConfigFiles/.env
+          chmod 600 SupportConfigFiles/.env
+
+          compose up -d --build
+
+          for i in $(seq 1 60); do
+            if curl -kfsS https://127.0.0.1/ >/dev/null; then
+              compose ps
+              exit 0
+            fi
+            sleep 2
+          done
+
+          compose ps || true
+          compose logs --tail=160 app nginx || true
+          exit 1
+          REMOTE
