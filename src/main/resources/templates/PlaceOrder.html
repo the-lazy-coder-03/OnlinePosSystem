@@ -1171,6 +1171,11 @@
         return "R" + n.toFixed(2);
     }
 
+    function optionPriceLabel(value){
+        const price = Number(value || 0);
+        return price > 0 ? ("+" + money(price)) : "";
+    }
+
     function clamp(n, min, max){
         return Math.max(min, Math.min(max, n));
     }
@@ -1529,7 +1534,7 @@
                               <input type="checkbox" id="${id}" ${state.customize.selectedToppingIds.has(t.toppingId) ? "checked" : ""} />
                               <label for="${id}">${escapeHtml(t.name)}</label>
                             </div>
-                            <div class="opt-price">+${money(price)}</div>
+                            <div class="opt-price">${optionPriceLabel(price)}</div>
                         `;
                         wrap.querySelector("input").addEventListener("change", (e) => {
                             actions.toggleTopping(t.toppingId, e.target.checked);
@@ -1675,7 +1680,7 @@
                               <input type="${isRadio ? "radio" : "checkbox"}" name="burger_page_group_${groupId}" id="${id}" ${selected.has(optionId) ? "checked" : ""} />
                               <label for="${id}">${escapeHtml(opt.name)}</label>
                             </div>
-                            <div class="opt-price">${modifierOptionPriceLabel(g, opt)}</div>
+                            <div class="opt-price">${modifierOptionPriceLabel(opt)}</div>
                         `;
                         wrap.querySelector("input").addEventListener("change", (e) => {
                             actions.toggleMenuOption(g, opt, e.target);
@@ -1698,7 +1703,7 @@
                           <input type="checkbox" id="${id}" ${state.menuCustomize.selectedBurgerToppingIds.has(toppingId) ? "checked" : ""} ${removable ? "" : "disabled"} />
                           <label for="${id}">${escapeHtml(topping.name)}</label>
                         </div>
-                        <div class="opt-price">Included</div>
+                        <div class="opt-price"></div>
                     `;
                     wrap.querySelector("input").addEventListener("change", (e) => {
                         actions.toggleBurgerTopping(topping, e.target.checked);
@@ -1808,7 +1813,7 @@
                               <input type="${isRadio ? "radio" : "checkbox"}" name="menu_page_group_${groupId}" id="${id}" ${selected.has(optionId) ? "checked" : ""} />
                               <label for="${id}">${escapeHtml(opt.name)}</label>
                             </div>
-                            <div class="opt-price">${Number(opt.price || 0) > 0 ? ("+" + money(opt.price)) : money(0)}</div>
+                            <div class="opt-price">${optionPriceLabel(opt.price)}</div>
                         `;
                         wrap.querySelector("input").addEventListener("change", (e) => {
                             actions.toggleMenuOption(g, opt, e.target);
@@ -1965,7 +1970,7 @@
                               <input type="checkbox" id="${id}" ${state.menuCustomize.selectedBurgerToppingIds.has(toppingId) ? "checked" : ""} ${removable ? "" : "disabled"} />
                               <label for="${id}">${escapeHtml(topping.name)}</label>
                             </div>
-                            <div class="opt-price">Included</div>
+                            <div class="opt-price"></div>
                         `;
                         wrap.querySelector("input").addEventListener("change", (e) => {
                             actions.toggleBurgerTopping(topping, e.target.checked);
@@ -2833,11 +2838,7 @@
     }
 
     function burgerComponentPriceLabel(component){
-        if (component?.defaultSelected && !isBurgerProtein(component)){
-            return "Included";
-        }
-        const price = Number(component?.price || 0);
-        return price > 0 ? ("+" + money(price)) : money(0);
+        return optionPriceLabel(component?.price);
     }
 
     function isCooldrinkMenuItem(item){
@@ -2862,10 +2863,8 @@
         return name.includes("steak doneness");
     }
 
-    function modifierOptionPriceLabel(group, option){
-        if (isSteakDonenessGroup(group)) return "";
-        const price = Number(option?.price || 0);
-        return price > 0 ? ("+" + money(price)) : money(0);
+    function modifierOptionPriceLabel(option){
+        return optionPriceLabel(option?.price);
     }
 
     function appendMenuModifierGroups(groupsEl, groups, idPrefix, namePrefix){
@@ -2894,7 +2893,7 @@
                       <input type="${isRadio ? "radio" : "checkbox"}" name="${namePrefix}_${groupId}" id="${id}" ${selected.has(optionId) ? "checked" : ""} />
                       <label for="${id}">${escapeHtml(opt.name)}</label>
                     </div>
-                    <div class="opt-price">${modifierOptionPriceLabel(g, opt)}</div>
+                    <div class="opt-price">${modifierOptionPriceLabel(opt)}</div>
                 `;
                 wrap.querySelector("input").addEventListener("change", (e) => {
                     actions.toggleMenuOption(g, opt, e.target);
