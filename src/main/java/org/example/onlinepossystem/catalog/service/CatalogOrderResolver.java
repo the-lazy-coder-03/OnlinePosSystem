@@ -315,11 +315,14 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
             burgerSelection = burgerResolution.selection();
         }
 
-        validateRequiredModifierGroups(menuItem, customizations, burgerComponentIds);
+        Set<Integer> linkedModifierGroupIds = menuItemModifierGroupRepository.findByMenuItemId(menuItem.getId()).stream()
+                .map(MenuItemModifierGroup::getGroupId)
+                .collect(Collectors.toSet());
+        validateRequiredModifierGroups(menuItem, customizations, burgerComponentIds, linkedModifierGroupIds);
 
         return new MenuCustomizations(
                 burgerSelection,
-                resolveGenericMenuItemExtras(customizations, burgerComponentIds)
+                resolveGenericMenuItemExtras(customizations, burgerComponentIds, linkedModifierGroupIds)
         );
     }
 
@@ -443,16 +446,13 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
     private void validateRequiredModifierGroups(
             MenuItem menuItem,
             List<CatalogCustomizationRequest> customizations,
-            Set<Integer> burgerComponentIds
+            Set<Integer> burgerComponentIds,
+            Set<Integer> linkedGroupIds
     ) {
-        List<MenuItemModifierGroup> linkedGroups = menuItemModifierGroupRepository.findByMenuItemId(menuItem.getId());
-        if (linkedGroups.isEmpty()) {
+        if (linkedGroupIds.isEmpty()) {
             return;
         }
 
-        Set<Integer> linkedGroupIds = linkedGroups.stream()
-                .map(MenuItemModifierGroup::getGroupId)
-                .collect(Collectors.toSet());
         Map<Integer, Integer> selectedCountsByGroup = selectedModifierOptionCounts(customizations, burgerComponentIds, linkedGroupIds);
 
         for (Integer groupId : linkedGroupIds) {
@@ -496,7 +496,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
 
     private List<ResolvedGenericMenuExtra> resolveGenericMenuItemExtras(
             List<CatalogCustomizationRequest> customizations,
-            Set<Integer> burgerComponentIds
+            Set<Integer> burgerComponentIds,
+            Set<Integer> linkedGroupIds
     ) {
         List<ResolvedGenericMenuExtra> extras = new ArrayList<>();
         for (CatalogCustomizationRequest customization : customizations) {
@@ -506,17 +507,25 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
             if (isBurgerComponentCustomization(customization, burgerComponentIds)) {
                 continue;
             }
-            extras.add(resolveGenericMenuItemExtra(customization));
+            extras.add(resolveGenericMenuItemExtra(customization, linkedGroupIds));
         }
         return extras;
     }
 
-    private ResolvedGenericMenuExtra resolveGenericMenuItemExtra(CatalogCustomizationRequest customization) {
+    private ResolvedGenericMenuExtra resolveGenericMenuItemExtra(
+            CatalogCustomizationRequest customization,
+            Set<Integer> linkedGroupIds
+    ) {
         String customizationType = normalizedType(customization);
         if (customizationType.isBlank() || "modifieroption".equals(customizationType)) {
             Optional<ModifierOption> modifierOption = modifierOptionRepository.findById(customization.id());
             if (modifierOption.isPresent()) {
                 ModifierOption option = modifierOption.get();
+                if (!linkedGroupIds.contains(option.getGroupId())) {
+                    throw new IllegalArgumentException(
+                            "Modifier option is not available for the selected menu item."
+                    );
+                }
                 double extraPrice = option.getAdditionalPrice() == null ? 0.0 : option.getAdditionalPrice().doubleValue();
                 return new ResolvedGenericMenuExtra(
                         option.getName(),

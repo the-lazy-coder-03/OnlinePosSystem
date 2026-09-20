@@ -3,6 +3,7 @@ package org.example.onlinepossystem.catalog.pizza.service;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaCard;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaBaseOptionItem;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaCardRow;
+import org.example.onlinepossystem.catalog.pizza.dto.PizzaDefaultToppingRow;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaCategorySplit;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaDetail;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaSizePriceRow;
@@ -23,6 +24,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class PizzaService {
@@ -38,12 +41,23 @@ public class PizzaService {
     }
 
     public PizzaCategorySplit listPizzasByCategory(Integer branchId) {
-        List<PizzaCard> favouritePizzas = mapPizzaCards(
-                pizzaReadRepository.findPizzaCardsByBranchAndCategory(branchId, 1)
-        );
-        List<PizzaCard> supremePizzas = mapPizzaCards(
-                pizzaReadRepository.findPizzaCardsByBranchAndCategory(branchId, 2)
-        );
+        List<PizzaCardRow> favouriteRows = pizzaReadRepository.findPizzaCardsByBranchAndCategory(branchId, 1);
+        List<PizzaCardRow> supremeRows = pizzaReadRepository.findPizzaCardsByBranchAndCategory(branchId, 2);
+        List<Integer> pizzaIds = Stream.concat(favouriteRows.stream(), supremeRows.stream())
+                .map(PizzaCardRow::pizzaId)
+                .distinct()
+                .toList();
+        Map<Integer, List<String>> toppingsByPizza = pizzaIds.isEmpty()
+                ? Map.of()
+                : pizzaReadRepository.findDefaultToppingsForPizzas(pizzaIds).stream()
+                .collect(Collectors.groupingBy(
+                        PizzaDefaultToppingRow::pizzaId,
+                        LinkedHashMap::new,
+                        Collectors.mapping(PizzaDefaultToppingRow::name, Collectors.toList())
+                ));
+
+        List<PizzaCard> favouritePizzas = mapPizzaCards(favouriteRows, toppingsByPizza);
+        List<PizzaCard> supremePizzas = mapPizzaCards(supremeRows, toppingsByPizza);
         return new PizzaCategorySplit(favouritePizzas, supremePizzas);
     }
 
@@ -149,7 +163,7 @@ public class PizzaService {
         return BigDecimal.valueOf(value);
     }
 
-    private List<PizzaCard> mapPizzaCards(List<PizzaCardRow> rows) {
+    private List<PizzaCard> mapPizzaCards(List<PizzaCardRow> rows, Map<Integer, List<String>> toppingsByPizza) {
         if (rows == null || rows.isEmpty()) {
             return List.of();
         }
@@ -162,7 +176,8 @@ public class PizzaService {
                         row.pizzaCategoryId(),
                         row.pizzaCategoryName(),
                         row.sizeCm(),
-                        toBigDecimal(row.basePrice())
+                        toBigDecimal(row.basePrice()),
+                        toppingsByPizza.getOrDefault(row.pizzaId(), List.of())
                 ));
             }
         }

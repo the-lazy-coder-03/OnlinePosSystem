@@ -774,7 +774,7 @@ INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALU
                                                                                 (703, 7, 'Chicken Salad', 'Chicken strips, lettuce, tomato, cucumber and peppers', FALSE, FALSE),
 
                                                                                 -- Kiddies Meals
-                                                                                (901, 9, 'Kiddies Burger & Chips', 'Kiddies burger and chips; optional cheese available', FALSE, FALSE),
+                                                                                (901, 9, 'Kiddies Burger & Chips', 'Kiddies burger and chips; optional extras available', FALSE, FALSE),
                                                                                 (902, 9, '5 x Chicken Nuggets', 'Includes one 35ml sauce', FALSE, FALSE),
                                                                                 (903, 9, '10 x Chicken Nuggets', 'Includes one 35ml sauce', FALSE, FALSE),
                                                                                 (904, 9, '5 x Mini Cheese Grillers', 'Includes one 35ml sauce', FALSE, FALSE),
@@ -1119,10 +1119,11 @@ INSERT INTO modifier_group (id, name, required, min_select, max_select) VALUES
                                                                             (4, 'Chip extras', FALSE, 0, 2),
                                                                             (5, 'Steak doneness', TRUE, 1, 1),
                                                                             (6, 'Choose included kiddies sauce', TRUE, 1, 1),
-                                                                            (7, 'Kiddies burger extras', FALSE, 0, 1),
+                                                                            (7, 'Kiddies burger extras', FALSE, 0, 4),
                                                                             (8, 'Choose pasta type', TRUE, 1, 1),
                                                                             (9, 'Cheesy Mac Medium Extra', FALSE, 0, 1),
-                                                                            (10, 'Cheesy Mac Large Extra', FALSE, 0, 1)
+                                                                            (10, 'Cheesy Mac Large Extra', FALSE, 0, 1),
+                                                                            (11, 'Toasted sandwich extras', FALSE, 0, 4)
     ON CONFLICT (id) DO UPDATE
                             SET name = EXCLUDED.name,
                             required = EXCLUDED.required,
@@ -1168,7 +1169,7 @@ INSERT INTO modifier_option (id, group_id, name, menu_item_id, additional_price)
                                                                                      (31, 6, 'Sweet Chilli Sauce 35ml', NULL, 0.00),
                                                                                      (32, 6, 'Pink Sauce 35ml', NULL, 0.00),
 
-                                                                                     -- Kiddies burger optional cheese
+                                                                                     -- Kiddies burger extras
                                                                                      (33, 7, 'Add Cheese', NULL, 14.00),
 
                                                                                      -- Pasta shape choice
@@ -1180,12 +1181,28 @@ INSERT INTO modifier_option (id, group_id, name, menu_item_id, additional_price)
                                                                                      (43, 9, 'Add Bacon', NULL, 23.00),
                                                                                      (44, 9, 'Add Ham', NULL, 23.00),
                                                                                      (45, 10, 'Add Bacon', NULL, 26.00),
-                                                                                     (46, 10, 'Add Ham', NULL, 26.00)
+                                                                                     (46, 10, 'Add Ham', NULL, 26.00),
+
+                                                                                     -- Additional kiddies burger extras
+                                                                                     (47, 7, 'Add Bacon', NULL, 19.00),
+                                                                                     (48, 7, 'Add Egg', NULL, 14.00),
+                                                                                     (49, 7, 'Add Avo', NULL, 19.00),
+
+                                                                                     -- Toasted sandwich extras
+                                                                                     (54, 11, 'Add Cheese', NULL, 14.00),
+                                                                                     (55, 11, 'Add Bacon', NULL, 19.00),
+                                                                                     (56, 11, 'Add Egg', NULL, 14.00),
+                                                                                     (57, 11, 'Add Avo', NULL, 19.00)
     ON CONFLICT (id) DO UPDATE
                             SET group_id = EXCLUDED.group_id,
                             name = EXCLUDED.name,
                             menu_item_id = EXCLUDED.menu_item_id,
                             additional_price = EXCLUDED.additional_price;
+
+-- Remove legacy kiddies options so this group matches the four supported paid extras.
+DELETE FROM modifier_option
+WHERE group_id = 7
+  AND id IN (50, 51, 52, 53);
 
 INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES
                                                                   (203, 5),
@@ -1210,7 +1227,14 @@ INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES
                                                                   (417, 8), (418, 8),
                                                                   (421, 8), (422, 8),
                                                                   (419, 9),
-                                                                  (420, 10)
+                                                                  (420, 10),
+                                                                  (1001, 11),
+                                                                  (1002, 11),
+                                                                  (1003, 11),
+                                                                  (1004, 11),
+                                                                  (1005, 11),
+                                                                  (1006, 11),
+                                                                  (1007, 11)
     ON CONFLICT (menu_item_id, group_id) DO NOTHING;
 
 -- Remove old rib side/chip-extra mappings that do not match the current Kenridge menu.
@@ -1705,4 +1729,3 @@ WHERE pizza_category_id <> 2
   AND LOWER(name) IN ('supreme', 'supremes');
 
 COMMIT;
-

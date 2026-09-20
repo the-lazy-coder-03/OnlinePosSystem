@@ -19,11 +19,11 @@ public interface MenuReadRepository extends JpaRepository<MenuItem, Integer> {
                 mi.description,
                 mc.id,
                 mc.name,
-                coalesce(bmp.price, 0)
+                bmp.price
             )
             from MenuItem mi
             join mi.category mc
-            left join BranchMenuItemPrice bmp
+            join BranchMenuItemPrice bmp
                 on bmp.menuItem = mi and bmp.id.branchId = :branchId
             where mi.active = true
               and mc.active = true

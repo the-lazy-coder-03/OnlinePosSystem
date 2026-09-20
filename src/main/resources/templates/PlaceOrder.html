@@ -1378,7 +1378,7 @@
                           <div class="row-title">${escapeHtml(p.name)}</div>
                           <div class="row-price">${p.basePrice != null ? ("From " + money(p.basePrice)) : ""}</div>
                         </div>
-                        <div class="row-sub">${escapeHtml(p.shortDescription || p.description || p.toppingsPreview || (MENU_ONLY ? "Tap to view sizes and toppings." : "Tap to customize size and toppings."))}</div>
+                        <div class="row-sub">${escapeHtml(p.toppingsPreview || p.shortDescription || p.description || (MENU_ONLY ? "Tap to view sizes and toppings." : "Tap to customize size and toppings."))}</div>
                         <div class="row-cta">${MENU_ONLY ? "View details" : "Click to customize &amp; add"}</div>
                     `;
                     row.addEventListener("click", () => actions.openCustomize(p.pizzaId).catch(err => alert(err.message)));
@@ -1401,21 +1401,26 @@
                     const hasBurgerToppings = Array.isArray(m.burgerToppings) && m.burgerToppings.length > 0;
                     const burgerVariants = getBurgerVariantFamily(m);
                     const hasBurgerVariants = burgerVariants.length > 1;
+                    const pastaVariants = getPastaVariantFamily(m);
+                    const hasPastaVariants = pastaVariants.length > 0;
                     const directAddItem = !MENU_ONLY && isDirectAddMenuItem(m);
-                    const variantBasePrice = hasBurgerVariants
-                        ? Math.min(...burgerVariants.map(v => Number(v.basePrice || 0)).filter(Number.isFinite))
+                    const pricedVariants = hasBurgerVariants ? burgerVariants : pastaVariants;
+                    const hasMultiplePrices = pricedVariants.length > 1;
+                    const variantBasePrice = pricedVariants.length
+                        ? Math.min(...pricedVariants.map(v => Number(v.basePrice || 0)).filter(Number.isFinite))
                         : Number(m.basePrice || 0);
+                    const displayName = hasPastaVariants ? getPastaDisplayName(m) : m.name;
                     if (directAddItem) row.classList.add("row-direct-add");
                     row.innerHTML = `
                         <div class="row-top">
-                          <div class="row-title">${escapeHtml(m.name)}</div>
+                          <div class="row-title">${escapeHtml(displayName)}</div>
                           <div class="row-actions">
-                            <div class="row-price">${hasBurgerVariants ? ("From " + money(variantBasePrice)) : money(m.basePrice || 0)}</div>
+                            <div class="row-price">${hasMultiplePrices ? ("From " + money(variantBasePrice)) : money(variantBasePrice)}</div>
                             ${directAddItem ? `<button type="button" class="row-add-btn" data-menu-add="${Number(m.menuItemId)}">Add to cart</button>` : ""}
                           </div>
                         </div>
                         <div class="row-sub">${escapeHtml(m.shortDescription || m.description || (isBurger ? "Tap to customize burger options." : (MENU_ONLY ? "View item details." : "Tap to add to your order.")))}</div>
-                        ${directAddItem ? "" : `<div class="row-cta">${MENU_ONLY ? ((hasModifiers || isBurger || hasBurgerToppings || hasBurgerVariants) ? "View options" : "View details") : (isBurger ? "Click to customize" : (hasModifiers ? "Click to choose options" : "Click to add"))}</div>`}
+                        ${directAddItem ? "" : `<div class="row-cta">${MENU_ONLY ? ((hasModifiers || isBurger || hasBurgerToppings || hasBurgerVariants || hasPastaVariants) ? "View options" : "View details") : (isBurger ? "Click to customize" : (hasPastaVariants ? "Click to choose size and options" : (hasModifiers ? "Click to choose options" : "Click to add")))}</div>`}
                     `;
                     const addButton = row.querySelector("[data-menu-add]");
                     if (addButton){
@@ -1795,7 +1800,8 @@
         genericMenuCustomize(){
             const item = state.menuCustomize.menuItem;
             $("btnAddToCart").textContent = "Add to cart";
-            $("cardSizes").style.display = "none";
+            const pastaVariants = getPastaVariantFamily(item);
+            $("cardSizes").style.display = pastaVariants.length ? "" : "none";
             $("cardBaseOptions").style.display = "none";
             $("cardDefaults").style.display = "none";
             $("cardExtras").style.display = "";
@@ -1818,10 +1824,34 @@
                 return;
             }
 
-            $("customizePizzaName").textContent = item.name || "Menu Item";
+            $("customizePizzaName").textContent = getPastaDisplayName(item) || item.name || "Menu Item";
             $("customizePizzaMeta").textContent = state.branch.id
                 ? `${state.branch.name} • ${MENU_ONLY ? "Menu details" : "Customize your item"}`
                 : (MENU_ONLY ? "Menu details" : "Customize your item");
+
+            if (pastaVariants.length){
+                setCustomizeCardHeader("cardSizes", "Size", "Choose one pasta size.");
+                $("sizeOptions").innerHTML = "";
+                for (const variant of pastaVariants){
+                    const variantId = Number(variant.menuItemId);
+                    const id = `pasta_page_variant_${variantId}`;
+                    const wrap = document.createElement("div");
+                    wrap.className = "opt";
+                    wrap.innerHTML = `
+                        <div class="opt-left">
+                          <input type="radio" name="pasta_page_variant" id="${id}" ${variantId === Number(item.menuItemId) ? "checked" : ""} />
+                          <label for="${id}">${escapeHtml(getPastaVariantLabel(variant))}</label>
+                        </div>
+                        <div class="opt-price">${money(variant.basePrice || 0)}</div>
+                    `;
+                    wrap.querySelector("input").addEventListener("change", () => {
+                        actions.setPastaVariant(variantId);
+                    });
+                    $("sizeOptions").appendChild(wrap);
+                }
+            } else {
+                $("sizeOptions").innerHTML = "";
+            }
 
             setCustomizeCardHeader("cardExtras", "Options", "Choose any required or optional item options.");
             const groupsEl = $("extraToppingsGroups");
@@ -2522,11 +2552,12 @@
             const groups = getVisibleMenuModifierGroups(item);
             const burgerToppings = getBurgerToppingsForMenuItem(item);
             const burgerVariants = getBurgerVariantFamily(item);
+            const pastaVariants = getPastaVariantFamily(item);
             if (isBurgerMenuItem(item)){
                 actions.openBurgerCustomize(item.menuItemId);
                 return;
             }
-            if (!MENU_ONLY && !groups.length && !burgerToppings.length && burgerVariants.length <= 1){
+            if (!MENU_ONLY && !groups.length && !burgerToppings.length && burgerVariants.length <= 1 && !pastaVariants.length){
                 actions.addMenuItemDirect(item);
                 return;
             }
@@ -2565,6 +2596,21 @@
 
             state.menuCustomize.menuItem = item;
             resetMenuCustomizeSelections(item);
+            renderActiveMenuCustomizer();
+        },
+
+        setPastaVariant(menuItemId){
+            const id = Number(menuItemId);
+            const item = state.data.menuItems.find(m => Number(m.menuItemId) === id);
+            if (!item) return;
+
+            const selectedOptionNames = getSelectedModifierOptionNames(
+                state.menuCustomize.menuItem,
+                state.menuCustomize.selectedByGroup
+            );
+            state.menuCustomize.menuItem = item;
+            resetMenuCustomizeSelections(item);
+            preserveCompatibleMenuSelections(item, selectedOptionNames);
             renderActiveMenuCustomizer();
         },
 
@@ -2845,6 +2891,43 @@
             .trim();
     }
 
+    function getPastaVariantInfo(item){
+        if (!item) return null;
+        const categoryName = safeText(item.categoryName).trim().toLowerCase();
+        if (!categoryName.includes("pasta")) return null;
+
+        const name = safeText(item.name).trim();
+        const match = name.match(/^(.*?)\s+(Medium|Large)$/i);
+        if (!match) return null;
+        return {
+            key: match[1].trim().toLowerCase(),
+            displayName: match[1].trim(),
+            sizeLabel: match[2].toLowerCase() === "medium" ? "Medium" : "Large"
+        };
+    }
+
+    function getPastaVariantFamily(item){
+        const info = getPastaVariantInfo(item);
+        if (!info) return [];
+
+        return state.data.menuItems
+            .filter(candidate => getPastaVariantInfo(candidate)?.key === info.key)
+            .sort((a, b) => {
+                const sizeOrder = { Medium: 0, Large: 1 };
+                const aLabel = getPastaVariantInfo(a)?.sizeLabel || "";
+                const bLabel = getPastaVariantInfo(b)?.sizeLabel || "";
+                return (sizeOrder[aLabel] ?? 99) - (sizeOrder[bLabel] ?? 99);
+            });
+    }
+
+    function getPastaDisplayName(item){
+        return getPastaVariantInfo(item)?.displayName || safeText(item?.name);
+    }
+
+    function getPastaVariantLabel(item){
+        return getPastaVariantInfo(item)?.sizeLabel || safeText(item?.name);
+    }
+
     function isBurgerMenuItem(item){
         if (!item) return false;
         if (getBurgerFamilyKey(item)) return true;
@@ -3009,7 +3092,46 @@
         const groups = getVisibleMenuModifierGroups(item);
         const burgerToppings = getBurgerToppingsForMenuItem(item);
         const burgerVariants = getBurgerVariantFamily(item);
-        return groups.length > 0 || burgerToppings.length > 0 || burgerVariants.length > 1 || isBurgerMenuItem(item);
+        const pastaVariants = getPastaVariantFamily(item);
+        return groups.length > 0 || burgerToppings.length > 0 || burgerVariants.length > 1 || pastaVariants.length > 0 || isBurgerMenuItem(item);
+    }
+
+    function normalizeModifierOptionName(option){
+        return safeText(option?.name).trim().toLowerCase();
+    }
+
+    function getSelectedModifierOptionNames(item, selectedByGroup){
+        const selectedNames = new Set();
+        if (!(selectedByGroup instanceof Map)) return selectedNames;
+
+        const groups = Array.isArray(item?.modifierGroups) ? item.modifierGroups : [];
+        for (const group of groups){
+            const groupId = Number(group.groupId ?? group.id);
+            const selected = selectedByGroup.get(groupId) || new Set();
+            for (const option of (group.options || [])){
+                const optionId = Number(option.optionId ?? option.id);
+                const optionName = normalizeModifierOptionName(option);
+                if (selected.has(optionId) && optionName) selectedNames.add(optionName);
+            }
+        }
+        return selectedNames;
+    }
+
+    function preserveCompatibleMenuSelections(item, selectedOptionNames){
+        if (!(selectedOptionNames instanceof Set) || !selectedOptionNames.size) return;
+        const groups = getVisibleMenuModifierGroups(item);
+        for (const group of groups){
+            const groupId = Number(group.groupId ?? group.id);
+            const max = Number(group.maxSelect || 0);
+            const compatibleIds = (group.options || [])
+                .filter(option => selectedOptionNames.has(normalizeModifierOptionName(option)))
+                .map(option => Number(option.optionId ?? option.id))
+                .filter(Number.isFinite);
+            const compatible = new Set(max > 0 ? compatibleIds.slice(0, max) : compatibleIds);
+            if (compatible.size){
+                state.menuCustomize.selectedByGroup.set(groupId, compatible);
+            }
+        }
     }
 
     function discardCustomization(){
@@ -3470,7 +3592,7 @@
 
         const favCount = state.data.favouritePizzas.length;
         const supCount = state.data.supremePizzas.length;
-        const menuCount = state.data.menuItems.length;
+        const menuCount = state.data.menuItems.filter(item => shouldShowMenuListItem(item, "all")).length;
 
         map.set("all", favCount + supCount + menuCount);
         map.set("pizza-1", favCount);
@@ -3480,6 +3602,7 @@
             const id = Number(m.categoryId);
             if (!Number.isFinite(id)) continue;
             const key = `menu-${id}`;
+            if (!shouldShowMenuListItem(m, key)) continue;
             map.set(key, (map.get(key) || 0) + 1);
         }
 
@@ -3509,7 +3632,9 @@
 
     function matchesSearchMenu(m, q){
         if (!q) return true;
-        const hay = `${m.name} ${m.shortDescription || ""} ${m.description || ""} ${m.categoryName || ""}`.toLowerCase();
+        const pastaFamily = getPastaVariantFamily(m);
+        const familyText = pastaFamily.map(item => `${item.name} ${item.shortDescription || ""}`).join(" ");
+        const hay = `${m.name} ${m.shortDescription || ""} ${m.description || ""} ${m.categoryName || ""} ${familyText}`.toLowerCase();
         return hay.includes(q);
     }
 
@@ -3547,6 +3672,10 @@
     }
 
     function shouldShowMenuListItem(item, activeCategory){
+        const pastaVariants = getPastaVariantFamily(item);
+        if (pastaVariants.length){
+            return Number(item.menuItemId) === Number(pastaVariants[0].menuItemId);
+        }
         if (!isBurgerComboItem(item)) return true;
         if (activeCategory === `menu-${Number(item.categoryId)}`) return true;
         return !getBurgerVariantFamily(item).some(v => !isBurgerComboItem(v));

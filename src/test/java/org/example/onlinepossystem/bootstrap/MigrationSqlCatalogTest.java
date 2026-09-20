@@ -104,6 +104,58 @@ class MigrationSqlCatalogTest {
                 .contains("(1, 1, 3, 36.00)");
     }
 
+    @Test
+    void restoresRibSidesAndAddsSandwichAndKiddiesExtras() throws IOException {
+        String sql = migrationSql();
+
+        assertThat(sql)
+                .contains("(7, 'Kiddies burger extras', FALSE, 0, 8)")
+                .contains("(11, 'Toasted sandwich extras', FALSE, 0, 4)")
+                .contains("(501, 2), (501, 3)")
+                .contains("(502, 2), (502, 3)")
+                .contains("(9, 2, 'Chips', 602, 0.00)")
+                .contains("(10, 2, '5 x Onion Rings', 604, 0.00)")
+                .contains("(11, 2, 'Salad', 605, 0.00)")
+                .contains("(33, 7, 'Add Cheese', NULL, 14.00)")
+                .contains("(47, 7, 'Add Bacon', NULL, 19.00)")
+                .contains("(48, 7, 'Add Egg', NULL, 14.00)")
+                .contains("(49, 7, 'Add Avo', NULL, 19.00)")
+                .contains("(50, 7, 'Add 5 x Onion Rings', NULL, 28.00)")
+                .contains("(51, 7, 'Add Pepper Sauce', NULL, 35.00)")
+                .contains("(52, 7, 'Add Mushroom Sauce', NULL, 35.00)")
+                .contains("(53, 7, 'Add Cheese Sauce', NULL, 35.00)")
+                .contains("(54, 11, 'Add Cheese', NULL, 14.00)")
+                .contains("(57, 11, 'Add Avo', NULL, 19.00)")
+                .doesNotContain("id IN (50, 51, 52, 53)");
+
+        for (int sandwichId = 1001; sandwichId <= 1007; sandwichId++) {
+            assertThat(sql).contains("(" + sandwichId + ", 11)");
+        }
+    }
+
+    @Test
+    void movesSauceMenuItemsIntoSidesAndDeactivatesSaucesCategory() throws IOException {
+        String sql = migrationSql();
+
+        assertThat(sql)
+                .contains("UPDATE menu_category\nSET active = FALSE\nWHERE id = 6;")
+                .contains("(620, 5, 'BBQ Sauce 100ml'")
+                .contains("(621, 5, 'Sweet Chilli Sauce 100ml'")
+                .contains("(622, 5, 'Pink Sauce 100ml'")
+                .contains("(623, 5, 'Pepper Sauce'")
+                .contains("(624, 5, 'Mushroom Sauce'")
+                .contains("(625, 5, 'Cheese Sauce'")
+                .contains("(1, 620, 15.00)")
+                .contains("(1, 621, 15.00)")
+                .contains("(1, 622, 15.00)")
+                .contains("(1, 623, 35.00)")
+                .contains("(1, 624, 35.00)")
+                .contains("(1, 625, 35.00)")
+                .contains("(12, 3, 'BBQ Sauce 100ml', 620, 15.00)")
+                .contains("(13, 3, 'Sweet Chilli Sauce 100ml', 621, 15.00)")
+                .contains("(14, 3, 'Pink Sauce 100ml', 622, 15.00)");
+    }
+
     private String migrationSql() throws IOException {
         ClassPathResource resource = new ClassPathResource("migration.sql");
         return resource.getContentAsString(StandardCharsets.UTF_8);

@@ -2,6 +2,7 @@ package org.example.onlinepossystem.catalog.pizza.repository;
 
 import org.example.onlinepossystem.catalog.entity.Pizza;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaCardRow;
+import org.example.onlinepossystem.catalog.pizza.dto.PizzaDefaultToppingRow;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaSizePriceRow;
 import org.example.onlinepossystem.catalog.pizza.dto.ToppingRow;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,6 +39,19 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
             @Param("branchId") Integer branchId,
             @Param("categoryId") Integer categoryId
     );
+
+    @Query("""
+            select new org.example.onlinepossystem.catalog.pizza.dto.PizzaDefaultToppingRow(
+                pdi.pizza.id,
+                pdi.ingredient.name,
+                pdi.sortOrder
+            )
+            from PizzaDefaultIngredient pdi
+            where pdi.pizza.id in :pizzaIds
+              and pdi.ingredient.active = true
+            order by pdi.pizza.id, pdi.sortOrder, pdi.ingredient.name
+            """)
+    List<PizzaDefaultToppingRow> findDefaultToppingsForPizzas(@Param("pizzaIds") List<Integer> pizzaIds);
 
     @Query("""
             select new org.example.onlinepossystem.catalog.pizza.dto.PizzaSizePriceRow(

@@ -10,6 +10,7 @@ import org.example.onlinepossystem.catalog.entity.BranchPizzaPrice;
 import org.example.onlinepossystem.catalog.entity.Ingredient;
 import org.example.onlinepossystem.catalog.entity.MenuCategory;
 import org.example.onlinepossystem.catalog.entity.MenuItem;
+import org.example.onlinepossystem.catalog.entity.MenuItemModifierGroup;
 import org.example.onlinepossystem.catalog.entity.ModifierGroup;
 import org.example.onlinepossystem.catalog.entity.ModifierOption;
 import org.example.onlinepossystem.catalog.entity.Pizza;
@@ -25,6 +26,7 @@ import org.example.onlinepossystem.catalog.repository.BranchPizzaPriceRepository
 import org.example.onlinepossystem.catalog.repository.IngredientRepository;
 import org.example.onlinepossystem.catalog.repository.MenuCategoryRepository;
 import org.example.onlinepossystem.catalog.repository.MenuItemRepository;
+import org.example.onlinepossystem.catalog.repository.MenuItemModifierGroupRepository;
 import org.example.onlinepossystem.catalog.repository.ModifierGroupRepository;
 import org.example.onlinepossystem.catalog.repository.ModifierOptionRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaAllowedSizeRepository;
@@ -90,6 +92,9 @@ class OrderServicePlacementTest {
 
     @Autowired
     private ModifierOptionRepository modifierOptionRepository;
+
+    @Autowired
+    private MenuItemModifierGroupRepository menuItemModifierGroupRepository;
 
     @Autowired
     private PizzaCategoryRepository pizzaCategoryRepository;
@@ -166,13 +171,22 @@ class OrderServicePlacementTest {
     @Test
     void placesMenuItemsWithModifierExtras() {
         MenuFixture fixture = createMenuFixture();
+        ModifierOption secondOption = new ModifierOption(
+                nextId("modifier_option", "id"),
+                fixture.modifierOption().getGroupId(),
+                "Avo " + suffix(),
+                null
+        );
+        secondOption.setAdditionalPrice(new BigDecimal("19.00"));
+        modifierOptionRepository.saveAndFlush(secondOption);
 
         OrderResponseDTO response = orderOperations.placeOrder(request(
                 fixture.branch().getName(),
                 menuItem(
                         fixture.menuItem().getId(),
                         3,
-                        customization(fixture.modifierOption().getId(), 2, "modifierOption")
+                        customization(fixture.modifierOption().getId(), 1, "modifierOption"),
+                        customization(secondOption.getId(), 1, "modifierOption")
                 )
         ));
         entityManager.flush();
@@ -182,11 +196,29 @@ class OrderServicePlacementTest {
         assertThat(item.getMenuItemId()).isEqualTo(fixture.menuItem().getId());
         assertThat(item.getQty()).isEqualTo(3);
         assertThat(item.getUnitPriceAtTime()).isEqualTo(49.95);
-        assertThat(item.getExtras()).singleElement().satisfies(extra -> {
-            assertThat(extra.getName()).isEqualTo(fixture.modifierOption().getName());
-            assertThat(extra.getQty()).isEqualTo(2);
-            assertThat(extra.getUnitPriceAtTime()).isEqualTo(8.75);
-        });
+        assertThat(item.getExtras()).extracting(OrderResponseDTO.MenuItemExtraDTO::getName)
+                .containsExactly(fixture.modifierOption().getName(), secondOption.getName());
+        assertThat(item.getExtras()).extracting(OrderResponseDTO.MenuItemExtraDTO::getQty)
+                .containsExactly(1, 1);
+        assertThat(item.getExtras()).extracting(OrderResponseDTO.MenuItemExtraDTO::getUnitPriceAtTime)
+                .containsExactly(8.75, 19.00);
+    }
+
+    @Test
+    void rejectsModifierOptionThatIsNotLinkedToTheOrderedMenuItem() {
+        MenuFixture orderedItem = createMenuFixture();
+        MenuFixture unrelatedItem = createMenuFixture();
+
+        assertThatThrownBy(() -> orderOperations.placeOrder(request(
+                orderedItem.branch().getName(),
+                menuItem(
+                        orderedItem.menuItem().getId(),
+                        1,
+                        customization(unrelatedItem.modifierOption().getId(), 1, "modifierOption")
+                )
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not available for the selected menu item");
     }
 
     @Test
@@ -451,6 +483,7 @@ class OrderServicePlacementTest {
         );
         option.setAdditionalPrice(new BigDecimal("8.75"));
         modifierOptionRepository.saveAndFlush(option);
+        menuItemModifierGroupRepository.saveAndFlush(new MenuItemModifierGroup(item.getId(), group.getId()));
         branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch.getId(), item, 49.95));
         return new MenuFixture(branch, item, option);
     }

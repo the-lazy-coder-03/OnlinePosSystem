@@ -4,6 +4,8 @@ import org.example.onlinepossystem.catalog.entity.BranchPizzaBaseOptionPrice;
 import org.example.onlinepossystem.catalog.entity.PizzaBaseOption;
 import org.example.onlinepossystem.catalog.entity.PizzaSize;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaSizePriceRow;
+import org.example.onlinepossystem.catalog.pizza.dto.PizzaCardRow;
+import org.example.onlinepossystem.catalog.pizza.dto.PizzaDefaultToppingRow;
 import org.example.onlinepossystem.catalog.pizza.repository.PizzaReadRepository;
 import org.example.onlinepossystem.catalog.repository.BranchPizzaBaseOptionPriceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +67,34 @@ class PizzaServiceTest {
         assertThatThrownBy(() -> pizzaService.quotePrice(2, 10, 23, List.of(), 1))
                 .isInstanceOf(InvalidPizzaSelectionException.class)
                 .hasMessageContaining("not available");
+    }
+
+    @Test
+    void includesOrderedDefaultToppingsOnPizzaCardsWithOneBatchLookup() {
+        when(pizzaReadRepository.findPizzaCardsByBranchAndCategory(1, 1)).thenReturn(List.of(
+                new PizzaCardRow(10, "Margherita", 1, "Favourite", 23, 80.00, 1, 1),
+                new PizzaCardRow(10, "Margherita", 1, "Favourite", 30, 120.00, 1, 2)
+        ));
+        when(pizzaReadRepository.findPizzaCardsByBranchAndCategory(1, 2)).thenReturn(List.of(
+                new PizzaCardRow(20, "Regina", 2, "Supreme", 23, 95.00, 1, 1)
+        ));
+        when(pizzaReadRepository.findDefaultToppingsForPizzas(List.of(10, 20))).thenReturn(List.of(
+                new PizzaDefaultToppingRow(10, "Tomato", 1),
+                new PizzaDefaultToppingRow(10, "Cheese", 2),
+                new PizzaDefaultToppingRow(20, "Ham", 1),
+                new PizzaDefaultToppingRow(20, "Mushrooms", 2)
+        ));
+
+        var result = pizzaService.listPizzasByCategory(1);
+
+        assertThat(result.favouritePizzas()).singleElement().satisfies(card -> {
+            assertThat(card.name()).isEqualTo("Margherita");
+            assertThat(card.basePrice()).isEqualByComparingTo("80.00");
+            assertThat(card.defaultToppings()).containsExactly("Tomato", "Cheese");
+        });
+        assertThat(result.supremePizzas()).singleElement().satisfies(card ->
+                assertThat(card.defaultToppings()).containsExactly("Ham", "Mushrooms")
+        );
     }
 
     private BranchPizzaBaseOptionPrice baseOptionPrice() {
