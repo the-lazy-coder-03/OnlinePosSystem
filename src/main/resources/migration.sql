@@ -1,8 +1,5 @@
 -- =========================================================
 -- ONLINEPOS - FOOD CATALOG MIGRATION (ORDER HISTORY KEPT)
--- Pricing synced from Pete's Pizza public menus on 2026-09-19.
--- Branch 1 = Kenridge: https://www.petespizzas.co.za/menu-kenridge/
--- Branch 2 = Uitzicht: https://www.petespizzas.co.za/menu-uitzicht/
 -- - Clears aborted transaction state
 -- - Creates missing catalog/order tables without dropping existing data
 -- - Updates food/menu catalog rows in place
@@ -370,6 +367,22 @@ CREATE TABLE IF NOT EXISTS branch_extra_price (
                                                   PRIMARY KEY (branch_id, price_category_id, pizza_size_id)
 );
 
+-- Pizza base choices are separate from toppings. This supports the Kenridge
+-- wheat/gluten-free large-base surcharge without pretending it is a topping.
+CREATE TABLE IF NOT EXISTS pizza_base_option (
+                                                 pizza_base_option_id INT PRIMARY KEY,
+                                                 name                 TEXT NOT NULL UNIQUE,
+                                                 active               BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS branch_pizza_base_option_price (
+                                                              branch_id            INT NOT NULL REFERENCES branch(branch_id) ON DELETE CASCADE,
+                                                              pizza_base_option_id INT NOT NULL REFERENCES pizza_base_option(pizza_base_option_id) ON DELETE CASCADE,
+                                                              pizza_size_id        INT NOT NULL REFERENCES pizza_size(pizza_size_id) ON DELETE CASCADE,
+                                                              price                NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+                                                              PRIMARY KEY (branch_id, pizza_base_option_id, pizza_size_id)
+);
+
 -- =========================================================
 -- 7) ORDERING (ONE HEADER TABLE)
 -- =========================================================
@@ -458,6 +471,13 @@ CREATE TABLE IF NOT EXISTS order_pizza_item_extra (
                                                       ingredient_id             INT NOT NULL REFERENCES ingredient(ingredient_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
                                                       qty                       INT NOT NULL DEFAULT 1 CHECK (qty > 0),
                                                       unit_price_at_time        NUMERIC(10,2) NOT NULL CHECK (unit_price_at_time >= 0)
+);
+
+-- Optional non-standard pizza base selected for an order line.
+CREATE TABLE IF NOT EXISTS order_pizza_item_base_option (
+                                                            order_pizza_item_id  BIGINT PRIMARY KEY REFERENCES order_pizza_item(order_pizza_item_id) ON DELETE CASCADE,
+                                                            pizza_base_option_id INT NOT NULL REFERENCES pizza_base_option(pizza_base_option_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+                                                            unit_price_at_time   NUMERIC(10,2) NOT NULL CHECK (unit_price_at_time >= 0)
 );
 
 
@@ -657,7 +677,9 @@ INSERT INTO menu_category (id, name, sort_order) VALUES
                                                      (6, 'Sauces', 60),
                                                      (7, 'Salads', 70),
                                                      (8, 'Ribs', 80),
-                                                     (9, 'Kiddies Meals', 90)
+                                                     (9, 'Kiddies Meals', 90),
+                                                     (10, 'Toasted Sandwiches', 100),
+                                                     (11, 'Desserts', 110)
 ON CONFLICT (id) DO UPDATE
     SET name = EXCLUDED.name,
         sort_order = EXCLUDED.sort_order,
@@ -666,62 +688,111 @@ ON CONFLICT (id) DO UPDATE
 -- 8.3 Menu items (fixed IDs)
 INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALUES
                                                                                 -- Drinks
-                                                                                (101, 4, 'Coke 300ml', 'Coke can', TRUE, FALSE),
-                                                                                (102, 4, 'Coke 2L', 'Coke bottle', FALSE, TRUE),
-                                                                                (103, 4, 'Coke Zero 300ml', 'Zero sugar', TRUE, FALSE),
-                                                                                (104, 4, 'Still Water 500ml', 'Bottled water', TRUE, FALSE),
-                                                                                (105, 4, 'Sprite 300ml', 'Sprite can', TRUE, FALSE),
-                                                                                (106, 4, 'Fanta Orange 300ml', 'Fanta Orange can', TRUE, FALSE),
-                                                                                (107, 4, 'Creme Soda 300ml', 'Creme Soda can', TRUE, FALSE),
-                                                                                (108, 4, 'Grapetiser 330ml', 'Sparkling grape juice', TRUE, FALSE),
-                                                                                (109, 4, 'Appletiser 330ml', 'Sparkling apple juice', TRUE, FALSE),
-                                                                                (110, 4, 'Naartjie Powerade', 'Sports drink', TRUE, FALSE),
-                                                                                (111, 4, 'Mountain Blast Powerade', 'Sports drink', TRUE, FALSE),
-                                                                                (112, 4, 'Sprite Zero 300ml', 'Zero sugar Sprite can', TRUE, FALSE),
-                                                                                (113, 4, 'Peach Ice Tea 300ml', 'Peach ice tea can', TRUE, FALSE),
+                                                                                (101, 4, 'Coke 300ml', '300ml can', TRUE, FALSE),
+                                                                                (102, 4, 'Coke 2L', '2 litre bottle', FALSE, TRUE),
+                                                                                (103, 4, 'Coke Zero 300ml', '300ml zero sugar can', TRUE, FALSE),
+                                                                                (104, 4, 'Still Water 500ml', '500ml still water', FALSE, FALSE),
+                                                                                (105, 4, 'Sprite 300ml', '300ml can', TRUE, FALSE),
+                                                                                (106, 4, 'Fanta Orange 300ml', '300ml can', TRUE, FALSE),
+                                                                                (107, 4, 'Creme Soda 300ml', '300ml Sparletta can', TRUE, FALSE),
+                                                                                (108, 4, 'Grapetiser Red 330ml', 'Sparkling red grape juice', FALSE, FALSE),
+                                                                                (109, 4, 'Appletiser 330ml', 'Sparkling apple juice', FALSE, FALSE),
+                                                                                (110, 4, 'Naartjie Powerade', 'Sports drink', FALSE, FALSE),
+                                                                                (111, 4, 'Mountain Blast Powerade', 'Sports drink', FALSE, FALSE),
+                                                                                (112, 4, 'Sprite Zero 300ml', '300ml zero sugar can', TRUE, FALSE),
+                                                                                (113, 4, 'Lipton Peach Ice Tea 300ml', 'Lipton Peach ice tea', TRUE, FALSE),
+                                                                                (114, 4, 'Grapetiser White 330ml', 'Sparkling white grape juice', FALSE, FALSE),
+                                                                                (115, 4, 'Lipton Red Fruits Ice Tea 300ml', 'Lipton Red Fruits ice tea', TRUE, FALSE),
+                                                                                (116, 4, 'Cappy Orange Mango', 'Cappy still juice', FALSE, FALSE),
+                                                                                (117, 4, 'Cappy Punch', 'Cappy still juice', FALSE, FALSE),
+                                                                                (118, 4, 'Cappy Tropical', 'Cappy still juice', FALSE, FALSE),
+                                                                                (119, 4, 'Sparkling Water 500ml', '500ml sparkling water', FALSE, FALSE),
+                                                                                (120, 4, 'Fanta Orange 2L', '2 litre bottle', FALSE, TRUE),
+                                                                                (121, 4, 'Creme Soda 2L', '2 litre Sparletta bottle', FALSE, TRUE),
+                                                                                (122, 4, 'Sprite 2L', '2 litre bottle', FALSE, TRUE),
 
                                                                                 -- Burgers
-                                                                                (201, 1, 'Cheese Burger',
-                                                                                 'Standard burger with cheese and one selected protein', FALSE, FALSE),
-                                                                                (202, 1, 'Mega Burger',
-                                                                                 'Standard burger with two portions of the same selected protein', FALSE, FALSE),
-                                                                                (203, 1, 'Steak Burger',
-                                                                                 'Steak burger with your chosen steak doneness', FALSE, FALSE),
-                                                                                (204, 1, 'Default Burger',
-                                                                                 'Standard burger with one selected protein', FALSE, FALSE),
-                                                                                (205, 1, 'Bacon and Cheese Burger',
-                                                                                 'Standard burger with bacon, cheese and one selected protein', FALSE, FALSE),
-                                                                                (206, 1, 'Bacon and Egg Burger',
-                                                                                 'Standard burger with bacon, egg and one selected protein', FALSE, FALSE),
-                                                                                (207, 1, 'Dagwood',
-                                                                                 'Standard burger with bacon, egg, cheese and one selected protein', FALSE, FALSE),
-                                                                                (208, 1, 'Hawaiian Burger',
-                                                                                 'Standard burger with pineapple, cheese and one selected protein', FALSE, FALSE),
+                                                                                (201, 1, 'Cheese Burger', '150g burger with cheese and one selected protein', FALSE, FALSE),
+                                                                                (202, 1, 'Mega Burger', 'Burger with 2 patties and cheese', FALSE, FALSE),
+                                                                                (203, 1, 'Steak Burger', '200g sirloin steak burger with your chosen steak doneness', FALSE, FALSE),
+                                                                                (204, 1, 'Default Burger', '150g standard burger with one selected protein', FALSE, FALSE),
+                                                                                (205, 1, 'Bacon and Cheese Burger', '150g burger with bacon, cheese and one selected protein', FALSE, FALSE),
+                                                                                (206, 1, 'Bacon and Egg Burger', '150g burger with bacon, egg and one selected protein', FALSE, FALSE),
+                                                                                (207, 1, 'Dagwood', '150g burger with egg, cheese, bacon and one selected protein', FALSE, FALSE),
+                                                                                (208, 1, 'Hawaiian Burger', '150g burger with pineapple, cheese and one selected protein', FALSE, FALSE),
 
                                                                                 -- Burger Combos
-                                                                                (301, 2, 'Cheese Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
-                                                                                (302, 2, 'Mega Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
-                                                                                (303, 2, 'Steak Burger Combo', 'Combo with 300ml drink, combo chips and your chosen steak doneness', FALSE, FALSE),
-                                                                                (304, 2, 'Default Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
-                                                                                (305, 2, 'Bacon and Cheese Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
-                                                                                (306, 2, 'Bacon and Egg Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
-                                                                                (307, 2, 'Dagwood Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
-                                                                                (308, 2, 'Hawaiian Burger Combo', 'Combo with 300ml drink and combo chips', FALSE, FALSE),
+                                                                                (301, 2, 'Cheese Burger Combo', 'Cheese Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (302, 2, 'Mega Burger Combo', 'Mega Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (303, 2, 'Steak Burger Combo', 'Steak Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (304, 2, 'Default Burger Combo', 'Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (305, 2, 'Bacon and Cheese Burger Combo', 'Bacon & Cheese Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (306, 2, 'Bacon and Egg Burger Combo', 'Legacy combo retained for order-history compatibility', FALSE, FALSE),
+                                                                                (307, 2, 'Dagwood Combo', 'Dagwood, chips and a 300ml can', FALSE, FALSE),
+                                                                                (308, 2, 'Hawaiian Burger Combo', 'Hawaiian Burger, chips and a 300ml can', FALSE, FALSE),
 
                                                                                 -- Pastas
-                                                                                (401, 3, 'Chicken Alfredo Medium', 'Medium portion with protein and sauce', FALSE, FALSE),
-                                                                                (402, 3, 'Chicken Alfredo Large', 'Large portion with protein and sauce', FALSE, FALSE),
+                                                                                -- Legacy 401/402 rows are kept for historical FK compatibility but have no Kenridge price.
+                                                                                (401, 3, 'Chicken Alfredo Medium', 'Legacy menu item', FALSE, FALSE),
+                                                                                (402, 3, 'Chicken Alfredo Large', 'Legacy menu item', FALSE, FALSE),
+                                                                                (410, 3, 'Lasagne Large', 'Two layers of bolognaise, white sauce and lasagne sheets topped with cheese', FALSE, FALSE),
+                                                                                (411, 3, 'Bolognaise Medium', 'Lean beef mince prepared in a rich napolitana sauce', FALSE, FALSE),
+                                                                                (412, 3, 'Bolognaise Large', 'Lean beef mince prepared in a rich napolitana sauce', FALSE, FALSE),
+                                                                                (413, 3, 'Chicken Pasta Medium', 'Pan fried chicken strips with mushrooms in a creamy white sauce', FALSE, FALSE),
+                                                                                (414, 3, 'Chicken Pasta Large', 'Pan fried chicken strips with mushrooms in a creamy white sauce', FALSE, FALSE),
+                                                                                (415, 3, 'Carbonara Medium', 'Bacon, mushrooms and a touch of garlic in a creamy white sauce', FALSE, FALSE),
+                                                                                (416, 3, 'Carbonara Large', 'Bacon, mushrooms and a touch of garlic in a creamy white sauce', FALSE, FALSE),
+                                                                                (417, 3, 'Alfredo Medium', 'Ham, mushrooms and a dash of garlic in a creamy sauce', FALSE, FALSE),
+                                                                                (418, 3, 'Alfredo Large', 'Ham, mushrooms and a dash of garlic in a creamy sauce', FALSE, FALSE),
+                                                                                (419, 3, 'Cheesy Mac Medium', 'Macaroni in a creamy cheddar cheese sauce', FALSE, FALSE),
+                                                                                (420, 3, 'Cheesy Mac Large', 'Macaroni in a creamy cheddar cheese sauce', FALSE, FALSE),
+                                                                                (421, 3, 'Vegetarian Pasta Medium', 'Mixed seasonal veg, mushrooms, spinach, creamy sauce and peppadew', FALSE, FALSE),
+                                                                                (422, 3, 'Vegetarian Pasta Large', 'Mixed seasonal veg, mushrooms, spinach, creamy sauce and peppadew', FALSE, FALSE),
 
                                                                                 -- Ribs
-                                                                                (501, 8, 'Ribs 400g', 'Ribs with one side choice', FALSE, FALSE),
-                                                                                (502, 8, 'Ribs 1kg', 'Ribs with one side choice', FALSE, FALSE),
+                                                                                (501, 8, 'Ribs 400g', '400g ribs; meat weight quoted before cooking', FALSE, FALSE),
+                                                                                (502, 8, 'Ribs 1kg', '1kg ribs; meat weight quoted before cooking', FALSE, FALSE),
 
                                                                                 -- Sides
                                                                                 (601, 5, 'Chips Small', 'Small chips', FALSE, FALSE),
                                                                                 (602, 5, 'Chips Med', 'Medium chips', FALSE, FALSE),
                                                                                 (603, 5, 'Chips Large', 'Large chips', FALSE, FALSE),
-                                                                                (604, 5, 'Onion Rings', 'Single size onion rings', FALSE, FALSE),
-                                                                                (605, 7, 'Salad', 'Single salad portion', FALSE, FALSE)
+                                                                                (604, 5, '5 x Onion Rings', 'Five onion rings', FALSE, FALSE),
+                                                                                (605, 7, 'Salad', 'Legacy generic salad retained for compatibility', FALSE, FALSE),
+
+                                                                                -- Sauces / extras sold with burgers or ribs
+                                                                                (620, 6, 'BBQ Sauce 100ml', '100ml sauce', FALSE, FALSE),
+                                                                                (621, 6, 'Sweet Chilli Sauce 100ml', '100ml sauce', FALSE, FALSE),
+                                                                                (622, 6, 'Pink Sauce 100ml', '100ml sauce', FALSE, FALSE),
+                                                                                (623, 6, 'Pepper Sauce', 'Burger sauce', FALSE, FALSE),
+                                                                                (624, 6, 'Mushroom Sauce', 'Burger sauce', FALSE, FALSE),
+                                                                                (625, 6, 'Cheese Sauce', 'Burger sauce', FALSE, FALSE),
+
+                                                                                -- Salads
+                                                                                (701, 7, 'Greek Salad', 'Lettuce, tomato, cucumber, peppers, feta and olives', FALSE, FALSE),
+                                                                                (702, 7, 'French Salad', 'Lettuce, tomato, cucumber, peppers and carrots', FALSE, FALSE),
+                                                                                (703, 7, 'Chicken Salad', 'Chicken strips, lettuce, tomato, cucumber and peppers', FALSE, FALSE),
+
+                                                                                -- Kiddies Meals
+                                                                                (901, 9, 'Kiddies Burger & Chips', 'Kiddies burger and chips; optional cheese available', FALSE, FALSE),
+                                                                                (902, 9, '5 x Chicken Nuggets', 'Includes one 35ml sauce', FALSE, FALSE),
+                                                                                (903, 9, '10 x Chicken Nuggets', 'Includes one 35ml sauce', FALSE, FALSE),
+                                                                                (904, 9, '5 x Mini Cheese Grillers', 'Includes one 35ml sauce', FALSE, FALSE),
+                                                                                (905, 9, '10 x Mini Cheese Grillers', 'Includes one 35ml sauce', FALSE, FALSE),
+
+                                                                                -- Toasted Sandwiches
+                                                                                (1001, 10, 'Cheese & Tomato Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
+                                                                                (1002, 10, 'Ham, Cheese & Tomato Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
+                                                                                (1003, 10, 'Bacon & Egg Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
+                                                                                (1004, 10, 'Bacon & Cheese Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
+                                                                                (1005, 10, 'Chicken & Mayo Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
+                                                                                (1006, 10, 'Bacon & Banana Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
+                                                                                (1007, 10, 'Mince & Cheese Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
+
+                                                                                -- Desserts
+                                                                                (1101, 11, 'Magnum', 'Ola ice cream', FALSE, FALSE),
+                                                                                (1102, 11, 'Cornetto', 'Ola ice cream', FALSE, FALSE),
+                                                                                (1103, 11, 'Paddle Pop', 'Ola ice cream', FALSE, FALSE)
 ON CONFLICT (id) DO UPDATE
     SET category_id = EXCLUDED.category_id,
         name = EXCLUDED.name,
@@ -731,109 +802,142 @@ ON CONFLICT (id) DO UPDATE
         active = TRUE;
 
 -- 8.4 Branch menu prices
--- Public-menu prices for existing catalog items with a direct match.
--- Bacon and Egg Burger Combo (306) is not listed on either public menu,
--- so any stale branch price for that item is removed.
+-- Pete's Pizza Kenridge prices updated from the live Kenridge menu.
+-- Existing Uitzicht values are preserved from the previous migration.
+-- Remove stale Kenridge-only legacy rows that are not on the current Kenridge menu.
 DELETE FROM branch_menu_item_price
-WHERE branch_id IN (1, 2)
-  AND menu_item_id = 306;
+WHERE branch_id = 1
+  AND menu_item_id IN (306, 401, 402, 605);
 
 INSERT INTO branch_menu_item_price (branch_id, menu_item_id, price) VALUES
-                                                                        -- =====================================================
-                                                                        -- KENRIDGE (branch_id = 1)
-                                                                        -- =====================================================
+                                                                        -- Kenridge drinks
+                                                                        (1, 101, 20.00),
+                                                                        (1, 102, 38.00),
+                                                                        (1, 103, 20.00),
+                                                                        (1, 104, 14.00),
+                                                                        (1, 105, 20.00),
+                                                                        (1, 106, 20.00),
+                                                                        (1, 107, 20.00),
+                                                                        (1, 108, 24.00),
+                                                                        (1, 109, 24.00),
+                                                                        (1, 110, 22.00),
+                                                                        (1, 111, 22.00),
+                                                                        (1, 112, 20.00),
+                                                                        (1, 113, 21.00),
+                                                                        (1, 114, 24.00),
+                                                                        (1, 115, 21.00),
+                                                                        (1, 116, 22.00),
+                                                                        (1, 117, 22.00),
+                                                                        (1, 118, 22.00),
+                                                                        (1, 119, 14.00),
+                                                                        (1, 120, 38.00),
+                                                                        (1, 121, 38.00),
+                                                                        (1, 122, 38.00),
 
-                                                                        -- Drinks
-                                                                        (1, 101, 20.00), -- Coke 300ml
-                                                                        (1, 102, 38.00), -- Coke 2L
-                                                                        (1, 103, 20.00), -- Coke Zero 300ml
-                                                                        (1, 104, 14.00), -- Still Water 500ml
-                                                                        (1, 105, 20.00), -- Sprite 300ml
-                                                                        (1, 106, 20.00), -- Fanta Orange 300ml
-                                                                        (1, 107, 20.00), -- Creme Soda 300ml
-                                                                        (1, 108, 24.00), -- Grapetiser 330ml
-                                                                        (1, 109, 24.00), -- Appletiser 330ml
-                                                                        (1, 110, 22.00), -- Naartjie Powerade
-                                                                        (1, 111, 22.00), -- Mountain Blast Powerade
-                                                                        (1, 112, 20.00), -- Sprite Zero 300ml
-                                                                        (1, 113, 21.00), -- Peach Ice Tea 300ml
+                                                                        -- Kenridge burgers
+                                                                        (1, 201, 82.00),
+                                                                        (1, 202, 115.00),
+                                                                        (1, 203, 120.00),
+                                                                        (1, 204, 71.00),
+                                                                        (1, 205, 92.00),
+                                                                        (1, 206, 92.00),
+                                                                        (1, 207, 105.00),
+                                                                        (1, 208, 92.00),
 
-                                                                        -- Burgers
-                                                                        (1, 201, 82.00),  -- Cheese Burger
-                                                                        (1, 202, 115.00), -- Mega Burger
-                                                                        (1, 203, 120.00), -- Steak Burger
-                                                                        (1, 204, 71.00),  -- Default Burger
-                                                                        (1, 205, 92.00),  -- Bacon and Cheese Burger
-                                                                        (1, 206, 92.00),  -- Bacon and Egg Burger
-                                                                        (1, 207, 105.00), -- Dagwood
-                                                                        (1, 208, 92.00),  -- Hawaiian Burger
+                                                                        -- Kenridge burger combos
+                                                                        (1, 301, 116.00),
+                                                                        (1, 302, 138.00),
+                                                                        (1, 303, 145.00),
+                                                                        (1, 304, 107.00),
+                                                                        (1, 305, 125.00),
+                                                                        (1, 307, 125.00),
+                                                                        (1, 308, 123.00),
 
-                                                                        -- Burger combos listed on the public menu
-                                                                        (1, 301, 116.00), -- Cheese Burger Combo
-                                                                        (1, 302, 138.00), -- Mega Burger Combo
-                                                                        (1, 303, 145.00), -- Steak Burger Combo
-                                                                        (1, 304, 107.00), -- Default Burger Combo
-                                                                        (1, 305, 125.00), -- Bacon and Cheese Burger Combo
-                                                                        (1, 307, 125.00), -- Dagwood Combo
-                                                                        (1, 308, 123.00), -- Hawaiian Burger Combo
+                                                                        -- Kenridge pastas
+                                                                        (1, 410, 172.00),
+                                                                        (1, 411, 112.00),
+                                                                        (1, 412, 175.00),
+                                                                        (1, 413, 112.00),
+                                                                        (1, 414, 175.00),
+                                                                        (1, 415, 112.00),
+                                                                        (1, 416, 175.00),
+                                                                        (1, 417, 112.00),
+                                                                        (1, 418, 175.00),
+                                                                        (1, 419, 109.00),
+                                                                        (1, 420, 172.00),
+                                                                        (1, 421, 109.00),
+                                                                        (1, 422, 172.00),
 
-                                                                        -- Ribs
-                                                                        (1, 501, 159.00), -- Ribs 400g
-                                                                        (1, 502, 329.00), -- Ribs 1kg
+                                                                        -- Kenridge ribs, sides and sauces
+                                                                        (1, 501, 159.00),
+                                                                        (1, 502, 329.00),
+                                                                        (1, 601, 48.00),
+                                                                        (1, 602, 58.00),
+                                                                        (1, 603, 69.00),
+                                                                        (1, 604, 28.00),
+                                                                        (1, 620, 15.00),
+                                                                        (1, 621, 15.00),
+                                                                        (1, 622, 15.00),
+                                                                        (1, 623, 35.00),
+                                                                        (1, 624, 35.00),
+                                                                        (1, 625, 35.00),
 
-                                                                        -- Sides
-                                                                        (1, 601, 48.00), -- Chips Small
-                                                                        (1, 602, 58.00), -- Chips Medium
-                                                                        (1, 603, 69.00), -- Chips Large
-                                                                        (1, 604, 28.00), -- 5 Onion Rings
+                                                                        -- Kenridge salads
+                                                                        (1, 701, 75.00),
+                                                                        (1, 702, 58.00),
+                                                                        (1, 703, 80.00),
 
-                                                                        -- =====================================================
-                                                                        -- UITZICHT (branch_id = 2)
-                                                                        -- =====================================================
+                                                                        -- Kenridge kiddies meals
+                                                                        (1, 901, 65.00),
+                                                                        (1, 902, 72.00),
+                                                                        (1, 903, 144.00),
+                                                                        (1, 904, 58.00),
+                                                                        (1, 905, 116.00),
 
-                                                                        -- Drinks
-                                                                        (2, 101, 20.00), -- Coke 300ml
-                                                                        (2, 102, 38.00), -- Coke 2L
-                                                                        (2, 103, 20.00), -- Coke Zero 300ml
-                                                                        (2, 104, 14.00), -- Still Water 500ml
-                                                                        (2, 105, 20.00), -- Sprite 300ml
-                                                                        (2, 106, 20.00), -- Fanta Orange 300ml
-                                                                        (2, 107, 20.00), -- Creme Soda 300ml
-                                                                        (2, 108, 24.00), -- Grapetiser 330ml
-                                                                        (2, 109, 24.00), -- Appletiser 330ml
-                                                                        (2, 110, 22.00), -- Naartjie Powerade
-                                                                        (2, 111, 22.00), -- Mountain Blast Powerade
-                                                                        (2, 112, 20.00), -- Sprite Zero 300ml
-                                                                        (2, 113, 21.00), -- Peach Ice Tea 300ml
+                                                                        -- Kenridge toasted sandwiches
+                                                                        (1, 1001, 46.00),
+                                                                        (1, 1002, 52.00),
+                                                                        (1, 1003, 52.00),
+                                                                        (1, 1004, 52.00),
+                                                                        (1, 1005, 52.00),
+                                                                        (1, 1006, 52.00),
+                                                                        (1, 1007, 56.00),
 
-                                                                        -- Burgers
-                                                                        (2, 201, 80.00),  -- Cheese Burger
-                                                                        (2, 202, 114.00), -- Mega Burger
-                                                                        (2, 203, 116.00), -- Steak Burger
-                                                                        (2, 204, 68.00),  -- Default Burger
-                                                                        (2, 205, 90.00),  -- Bacon and Cheese Burger
-                                                                        (2, 206, 90.00),  -- Bacon and Egg Burger
-                                                                        (2, 207, 103.00), -- Dagwood
-                                                                        (2, 208, 90.00),  -- Hawaiian Burger
+                                                                        -- Kenridge desserts
+                                                                        (1, 1101, 45.00),
+                                                                        (1, 1102, 35.00),
+                                                                        (1, 1103, 25.00),
 
-                                                                        -- Burger combos listed on the public menu
-                                                                        (2, 301, 113.00), -- Cheese Burger Combo
-                                                                        (2, 302, 136.00), -- Mega Burger Combo
-                                                                        (2, 303, 138.00), -- Steak Burger Combo
-                                                                        (2, 304, 105.00), -- Default Burger Combo
-                                                                        (2, 305, 120.00), -- Bacon and Cheese Burger Combo
-                                                                        (2, 307, 123.00), -- Dagwood Combo
-                                                                        (2, 308, 120.00), -- Hawaiian Burger Combo
+                                                                        -- Existing Uitzicht values preserved
+                                                                        (2, 101, 16.00),
+                                                                        (2, 103, 16.00),
+                                                                        (2, 104, 16.00),
+                                                                        (2, 105, 16.00),
+                                                                        (2, 106, 16.00),
+                                                                        (2, 107, 16.00),
+                                                                        (2, 108, 19.00),
+                                                                        (2, 109, 19.00),
+                                                                        (2, 110, 19.00),
+                                                                        (2, 111, 19.00),
+                                                                        (2, 112, 16.00),
+                                                                        (2, 113, 16.00),
 
-                                                                        -- Ribs
-                                                                        (2, 501, 155.00), -- Ribs 400g
-                                                                        (2, 502, 320.00), -- Ribs 1kg
+                                                                        (2, 201, 80.00),
+                                                                        (2, 202, 114.00),
+                                                                        (2, 203, 116.00),
+                                                                        (2, 204, 68.00),
+                                                                        (2, 205, 90.00),
+                                                                        (2, 206, 90.00),
+                                                                        (2, 207, 103.00),
+                                                                        (2, 208, 90.00),
 
-                                                                        -- Sides
-                                                                        (2, 601, 46.00), -- Chips Small
-                                                                        (2, 602, 58.00), -- Chips Medium
-                                                                        (2, 603, 69.00), -- Chips Large
-                                                                        (2, 604, 28.00)  -- 5 Onion Rings
+                                                                        (2, 301, 113.00),
+                                                                        (2, 302, 136.00),
+                                                                        (2, 303, 138.00),
+                                                                        (2, 304, 105.00),
+                                                                        (2, 305, 120.00),
+                                                                        (2, 307, 123.00),
+                                                                        (2, 308, 120.00)
 ON CONFLICT (branch_id, menu_item_id) DO UPDATE
     SET price = EXCLUDED.price;
 
@@ -850,8 +954,8 @@ INSERT INTO burger_component (
       -- Default Standard Burger recipe
       (1,   'Lettuce',             'default_topping', TRUE, FALSE),
       (2,   'Tomato',              'default_topping', TRUE, FALSE),
-      (3,   'BBQ Sauce',           'default_topping', TRUE, FALSE),
-      (4,   'Gherkin',             'default_topping', TRUE, FALSE),
+      (3,   'BBQ Sauce',           'extra_topping',   TRUE, FALSE),
+      (4,   'Dills',                'default_topping', TRUE, FALSE),
       (5,   'Mustard',             'default_topping', TRUE, FALSE),
       (6,   'Relish Sauce',        'default_topping', TRUE, FALSE),
       (7,   'Caramelised Onions',  'default_topping', TRUE, FALSE),
@@ -862,12 +966,16 @@ INSERT INTO burger_component (
       (103, 'Fried Chicken',       'protein', TRUE, FALSE),
       (104, 'Vegetable Patty',     'protein', TRUE, FALSE),
 
-      -- Optional additional toppings
+      -- Optional additions
       (201, 'Cheese',              'extra_topping', TRUE, FALSE),
       (202, 'Bacon',               'extra_topping', TRUE, FALSE),
       (203, 'Pineapple',           'extra_topping', TRUE, FALSE),
       (204, 'Egg',                 'extra_topping', TRUE, FALSE),
-      (205, 'Avo',                 'extra_topping', TRUE, TRUE)
+      (205, 'Avo',                 'extra_topping', TRUE, TRUE),
+      (206, '5 x Onion Rings',     'extra_topping', TRUE, FALSE),
+      (207, 'Pepper Sauce',        'extra_topping', TRUE, FALSE),
+      (208, 'Mushroom Sauce',      'extra_topping', TRUE, FALSE),
+      (209, 'Cheese Sauce',        'extra_topping', TRUE, FALSE)
 ON CONFLICT (component_id) DO UPDATE
     SET name = EXCLUDED.name,
         component_type = EXCLUDED.component_type,
@@ -882,6 +990,9 @@ ON CONFLICT (recipe_id) DO UPDATE
         active = EXCLUDED.active;
 
 -- The Standard Burger default recipe is stored once.
+-- Remove the old BBQ Sauce default if this migration was run previously.
+DELETE FROM burger_recipe_component WHERE recipe_id = 1 AND component_id = 3;
+
 INSERT INTO burger_recipe_component (
     recipe_id,
     component_id,
@@ -890,11 +1001,10 @@ INSERT INTO burger_recipe_component (
 ) VALUES
       (1, 1, TRUE, 1),  -- Lettuce
       (1, 2, TRUE, 2),  -- Tomato
-      (1, 3, TRUE, 3),  -- BBQ Sauce
-      (1, 4, TRUE, 4),  -- Gherkin
-      (1, 5, TRUE, 5),  -- Mustard
-      (1, 6, TRUE, 6),  -- Relish Sauce
-      (1, 7, TRUE, 7)   -- Caramelised Onions
+      (1, 4, TRUE, 3),  -- Dills
+      (1, 5, TRUE, 4),  -- Mustard
+      (1, 6, TRUE, 5),  -- Relish Sauce
+      (1, 7, TRUE, 6)   -- Caramelised Onions
 ON CONFLICT (recipe_id, component_id) DO UPDATE
     SET is_removable = EXCLUDED.is_removable,
         sort_order = EXCLUDED.sort_order;
@@ -938,6 +1048,7 @@ INSERT INTO burger_item_default_component (
     sort_order
 ) VALUES
       (201, 201, TRUE, 101), -- Cheese Burger: Cheese
+      (202, 201, TRUE, 101), -- Mega Burger: Cheese included
       (205, 201, TRUE, 101), -- Bacon and Cheese Burger: Cheese
       (205, 202, TRUE, 102), -- Bacon and Cheese Burger: Bacon
       (206, 202, TRUE, 101), -- Bacon and Egg Burger: Bacon
@@ -948,6 +1059,7 @@ INSERT INTO burger_item_default_component (
       (208, 201, TRUE, 101), -- Hawaiian Burger: Cheese
       (208, 203, TRUE, 102), -- Hawaiian Burger: Pineapple
       (301, 201, TRUE, 101), -- Cheese Burger Combo: Cheese
+      (302, 201, TRUE, 101), -- Mega Burger Combo: Cheese included
       (305, 201, TRUE, 101), -- Bacon and Cheese Burger Combo: Cheese
       (305, 202, TRUE, 102), -- Bacon and Cheese Burger Combo: Bacon
       (306, 202, TRUE, 101), -- Bacon and Egg Burger Combo: Bacon
@@ -961,12 +1073,8 @@ ON CONFLICT (burger_id, component_id) DO UPDATE
     SET is_removable = EXCLUDED.is_removable,
         sort_order = EXCLUDED.sort_order;
 
--- 8.5.1 Branch-specific burger component prices
--- Protein choices carry no surcharge in this catalog.
--- Public burger-extra prices:
--- Kenridge: Egg/Cheese R14, Bacon/Avo R19.
--- Uitzicht: Egg/Cheese R14, Bacon/Avo R17.
--- Pineapple is not separately priced on the public menus, so it remains R0 here.
+-- Temporary R0.00 component prices for both branches.
+-- Replace these values when the real protein and topping prices are known.
 INSERT INTO branch_burger_component_price (
     branch_id,
     component_id,
@@ -975,19 +1083,24 @@ INSERT INTO branch_burger_component_price (
 SELECT
     branch.branch_id,
     component.component_id,
-    CASE
-        WHEN component.component_id = 201 THEN 14.00 -- Cheese
-        WHEN component.component_id = 202 AND branch.branch_id = 1 THEN 19.00 -- Bacon, Kenridge
-        WHEN component.component_id = 202 AND branch.branch_id = 2 THEN 17.00 -- Bacon, Uitzicht
-        WHEN component.component_id = 204 THEN 14.00 -- Egg
-        WHEN component.component_id = 205 AND branch.branch_id = 1 THEN 19.00 -- Avo, Kenridge
-        WHEN component.component_id = 205 AND branch.branch_id = 2 THEN 17.00 -- Avo, Uitzicht
-        ELSE 0.00
-        END AS price
+    0.00
 FROM branch
          CROSS JOIN burger_component component
-WHERE branch.branch_id IN (1, 2)
-  AND component.active = TRUE
+WHERE component.active = TRUE
+ON CONFLICT (branch_id, component_id) DO UPDATE
+    SET price = EXCLUDED.price;
+
+
+-- Kenridge burger extras from the live menu.
+INSERT INTO branch_burger_component_price (branch_id, component_id, price) VALUES
+                                                                               (1, 201, 14.00), -- Cheese
+                                                                               (1, 202, 19.00), -- Bacon
+                                                                               (1, 204, 14.00), -- Egg
+                                                                               (1, 205, 19.00), -- Avo
+                                                                               (1, 206, 28.00), -- 5 x Onion Rings
+                                                                               (1, 207, 35.00), -- Pepper Sauce
+                                                                               (1, 208, 35.00), -- Mushroom Sauce
+                                                                               (1, 209, 35.00)  -- Cheese Sauce
 ON CONFLICT (branch_id, component_id) DO UPDATE
     SET price = EXCLUDED.price;
 
@@ -998,14 +1111,18 @@ INSERT INTO salad_ingredients (id, salad_id, ingredient_name, price) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- 8.7 Generic modifier groups and options
--- Burger proteins and toppings use the normalised burger tables above.
--- The generic modifier system remains available for combo drink choices.
+-- Burger proteins/toppings use the normalised burger tables above.
 INSERT INTO modifier_group (id, name, required, min_select, max_select) VALUES
                                                                             (1, 'Choose your drink', TRUE, 1, 1),
                                                                             (2, 'Choose your side', TRUE, 1, 1),
-                                                                            (3, 'Rib extras', FALSE, 0, 1),
+                                                                            (3, 'Rib extras', FALSE, 0, 2),
                                                                             (4, 'Chip extras', FALSE, 0, 2),
-                                                                            (5, 'Steak doneness', TRUE, 1, 1)
+                                                                            (5, 'Steak doneness', TRUE, 1, 1),
+                                                                            (6, 'Choose included kiddies sauce', TRUE, 1, 1),
+                                                                            (7, 'Kiddies burger extras', FALSE, 0, 1),
+                                                                            (8, 'Choose pasta type', TRUE, 1, 1),
+                                                                            (9, 'Cheesy Mac Medium Extra', FALSE, 0, 1),
+                                                                            (10, 'Cheesy Mac Large Extra', FALSE, 0, 1)
 ON CONFLICT (id) DO UPDATE
     SET name = EXCLUDED.name,
         required = EXCLUDED.required,
@@ -1013,25 +1130,57 @@ ON CONFLICT (id) DO UPDATE
         max_select = EXCLUDED.max_select;
 
 INSERT INTO modifier_option (id, group_id, name, menu_item_id, additional_price) VALUES
-                                                                                     (1, 1, 'Grapetiser 330ml', 108, 3.00),
-                                                                                     (2, 1, 'Appletiser 330ml', 109, 3.00),
-                                                                                     (3, 1, 'Naartjie Powerade', 110, 3.00),
-                                                                                     (4, 1, 'Mountain Blast Powerade', 111, 3.00),
+                                                                                     -- Combo drinks: a 300ml soft-drink can is included; premium drinks use the menu-price difference.
+                                                                                     (1, 1, 'Grapetiser Red 330ml', 108, 4.00),
+                                                                                     (2, 1, 'Appletiser 330ml', 109, 4.00),
+                                                                                     (3, 1, 'Naartjie Powerade', 110, 2.00),
+                                                                                     (4, 1, 'Mountain Blast Powerade', 111, 2.00),
                                                                                      (5, 1, 'Creme Soda 300ml', 107, 0.00),
                                                                                      (6, 1, 'Sprite 300ml', 105, 0.00),
                                                                                      (7, 1, 'Sprite Zero 300ml', 112, 0.00),
-                                                                                     (8, 1, 'Peach Ice Tea 300ml', 113, 0.00),
+                                                                                     (8, 1, 'Lipton Peach Ice Tea 300ml', 113, 1.00),
+                                                                                     (20, 1, 'Coke 300ml', 101, 0.00),
+                                                                                     (21, 1, 'Coke Zero 300ml', 103, 0.00),
+                                                                                     (22, 1, 'Fanta Orange 300ml', 106, 0.00),
+                                                                                     (23, 1, 'Grapetiser White 330ml', 114, 4.00),
+                                                                                     (24, 1, 'Lipton Red Fruits Ice Tea 300ml', 115, 1.00),
+
+                                                                                     -- Side choices retained for compatibility with the existing ordering flow.
                                                                                      (9, 2, 'Chips', 602, 0.00),
-                                                                                     (10, 2, 'Onion Rings', 604, 0.00),
+                                                                                     (10, 2, '5 x Onion Rings', 604, 0.00),
                                                                                      (11, 2, 'Salad', 605, 0.00),
-                                                                                     (12, 3, 'Extra Rib Sauce', NULL, 0.00),
-                                                                                     (13, 4, 'Extra Chip Sauce', NULL, 0.00),
-                                                                                     (14, 4, 'Extra Rib Sauce', NULL, 0.00),
+
+                                                                                     -- Rib extras
+                                                                                     (12, 3, 'BBQ Sauce 100ml', 620, 15.00),
+                                                                                     (13, 3, 'Sweet Chilli Sauce 100ml', 621, 15.00),
+                                                                                     (14, 3, 'Pink Sauce 100ml', 622, 15.00),
+                                                                                     (25, 3, '5 x Onion Rings', 604, 28.00),
+
+                                                                                     -- Steak doneness
                                                                                      (15, 5, 'Rare', NULL, 0.00),
                                                                                      (16, 5, 'Medium Rare', NULL, 0.00),
                                                                                      (17, 5, 'Medium', NULL, 0.00),
                                                                                      (18, 5, 'Medium Well', NULL, 0.00),
-                                                                                     (19, 5, 'Well Done', NULL, 0.00)
+                                                                                     (19, 5, 'Well Done', NULL, 0.00),
+
+                                                                                     -- Kiddies sauce choice, included in the meal price
+                                                                                     (30, 6, 'BBQ Sauce 35ml', NULL, 0.00),
+                                                                                     (31, 6, 'Sweet Chilli Sauce 35ml', NULL, 0.00),
+                                                                                     (32, 6, 'Pink Sauce 35ml', NULL, 0.00),
+
+                                                                                     -- Kiddies burger optional cheese
+                                                                                     (33, 7, 'Add Cheese', NULL, 14.00),
+
+                                                                                     -- Pasta shape choice
+                                                                                     (40, 8, 'Spaghetti', NULL, 0.00),
+                                                                                     (41, 8, 'Tagliatelle', NULL, 0.00),
+                                                                                     (42, 8, 'Penne', NULL, 0.00),
+
+                                                                                     -- Cheesy Mac bacon/ham extras
+                                                                                     (43, 9, 'Add Bacon', NULL, 23.00),
+                                                                                     (44, 9, 'Add Ham', NULL, 23.00),
+                                                                                     (45, 10, 'Add Bacon', NULL, 26.00),
+                                                                                     (46, 10, 'Add Ham', NULL, 26.00)
 ON CONFLICT (id) DO UPDATE
     SET group_id = EXCLUDED.group_id,
         name = EXCLUDED.name,
@@ -1040,34 +1189,39 @@ ON CONFLICT (id) DO UPDATE
 
 INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES
                                                                   (203, 5),
-                                                                  (301, 1),
-                                                                  (301, 2),
-                                                                  (302, 1),
-                                                                  (302, 2),
-                                                                  (303, 1),
-                                                                  (303, 2),
-                                                                  (303, 5),
-                                                                  (304, 1),
-                                                                  (304, 2),
-                                                                  (305, 1),
-                                                                  (305, 2),
-                                                                  (306, 1),
-                                                                  (306, 2),
-                                                                  (307, 1),
-                                                                  (307, 2),
-                                                                  (308, 1),
-                                                                  (308, 2),
-                                                                  (501, 2),
+                                                                  (301, 1), (301, 2),
+                                                                  (302, 1), (302, 2),
+                                                                  (303, 1), (303, 2), (303, 5),
+                                                                  (304, 1), (304, 2),
+                                                                  (305, 1), (305, 2),
+                                                                  (306, 1), (306, 2),
+                                                                  (307, 1), (307, 2),
+                                                                  (308, 1), (308, 2),
                                                                   (501, 3),
-                                                                  (501, 4),
-                                                                  (502, 2),
                                                                   (502, 3),
-                                                                  (502, 4)
+                                                                  (901, 6), (901, 7),
+                                                                  (902, 6),
+                                                                  (903, 6),
+                                                                  (904, 6),
+                                                                  (905, 6),
+                                                                  (411, 8), (412, 8),
+                                                                  (413, 8), (414, 8),
+                                                                  (415, 8), (416, 8),
+                                                                  (417, 8), (418, 8),
+                                                                  (421, 8), (422, 8),
+                                                                  (419, 9),
+                                                                  (420, 10)
 ON CONFLICT (menu_item_id, group_id) DO NOTHING;
+
+-- Remove old rib side/chip-extra mappings that do not match the current Kenridge menu.
+DELETE FROM menu_item_modifier_group
+WHERE menu_item_id IN (501, 502)
+  AND group_id IN (2, 4);
 
 DELETE FROM menu_item_modifier_group
 WHERE group_id = 4
   AND menu_item_id IN (601, 602, 603);
+
 
 -- =========================================================
 -- 9) PIZZA SEED (FROM YOUR BIG SCRIPT)
@@ -1083,6 +1237,19 @@ ON CONFLICT (pizza_size_id) DO UPDATE
         sort_order = EXCLUDED.sort_order,
         active = TRUE;
 
+-- Pizza base options
+INSERT INTO pizza_base_option (pizza_base_option_id, name, active) VALUES
+    (1, 'Wheat and Gluten Free Base', TRUE)
+ON CONFLICT (pizza_base_option_id) DO UPDATE
+    SET name = EXCLUDED.name,
+        active = EXCLUDED.active;
+
+-- Kenridge: wheat/gluten-free base is available on large (30cm) pizzas for R36 extra.
+INSERT INTO branch_pizza_base_option_price (branch_id, pizza_base_option_id, pizza_size_id, price) VALUES
+    (1, 1, 3, 36.00)
+ON CONFLICT (branch_id, pizza_base_option_id, pizza_size_id) DO UPDATE
+    SET price = EXCLUDED.price;
+
 -- Categories
 INSERT INTO pizza_category (pizza_category_id, name, sort_order) VALUES
                                                                      (1, 'Favourites', 1),
@@ -1097,7 +1264,7 @@ INSERT INTO price_category (price_category_id, name, sort_order) VALUES
                                                                      (1, 'Chilli / Garlic', 1),
                                                                      (2, 'Onion / Green Pepper / Capers / Banana / Fresh Tomato', 2),
                                                                      (3, 'Olives / Asparagus / Spinach / Mushrooms / Peppadew / Sundried Tomato / Pineapple', 3),
-                                                                     (4, 'All Cheeses / Meats / Avo (seasonal)', 4)
+                                                                     (4, 'All Cheeses / Meats / Avo (seasonal) / Blue Cheese', 4)
 ON CONFLICT (price_category_id) DO UPDATE
     SET name = EXCLUDED.name,
         sort_order = EXCLUDED.sort_order,
@@ -1147,7 +1314,8 @@ INSERT INTO ingredient (ingredient_id, name, price_category_id, seasonal) VALUES
                                                                               (40, 'shrimps',         4, FALSE),
                                                                               (41, 'mussels',         4, FALSE),
                                                                               (42, 'calamari',        4, FALSE),
-                                                                              (43, 'crab sticks',     4, FALSE)
+                                                                              (43, 'crab sticks',     4, FALSE),
+                                                                              (44, 'blue cheese',      4, FALSE)
 ON CONFLICT (ingredient_id) DO UPDATE
     SET name = EXCLUDED.name,
         price_category_id = EXCLUDED.price_category_id,
@@ -1180,7 +1348,7 @@ INSERT INTO pizza (pizza_id, pizza_category_id, name, description, sort_order) V
                                                                                    (205, 2, 'Carli''s Super',   'ham, salami, mushrooms, olives & avo', 5),
                                                                                    (206, 2, 'Tikka Chicken',    'chicken, onion, peppadew & tikka sauce', 6),
                                                                                    (207, 2, 'Mexicana',         'mince, onion, green pepper, chilli & garlic', 7),
-                                                                                   (208, 2, 'Sweet & Sour',     'chicken, green pepper, pineapple & sweet & sour sauce', 8),
+                                                                                   (208, 2, 'Sweet & Sour Chic',     'chicken, green pepper, pineapple & sweet & sour sauce', 8),
                                                                                    (209, 2, 'Honey & Mustard',  'chicken, mushrooms, feta, pineapple & honey and mustard sauce', 9),
                                                                                    (210, 2, 'Four Seasons',     'salami, olives, mushrooms & asparagus', 10),
                                                                                    (211, 2, 'Chicken Mayo',     'chicken, onion, mushrooms & mayonnaise', 11),
@@ -1207,7 +1375,7 @@ INSERT INTO pizza_allowed_size (pizza_id, pizza_size_id) VALUES
                                                              (106,2),(106,3),
                                                              (107,1),(107,2),(107,3),
                                                              (108,2),(108,3),
-                                                             (109,2),(109,3),
+                                                             (109,1),(109,2),(109,3),
                                                              (110,1),(110,2),(110,3),
                                                              (111,2),(111,3),
                                                              (112,2),(112,3),
@@ -1273,23 +1441,11 @@ INSERT INTO pizza_default_ingredient (pizza_id, ingredient_id, sort_order) VALUE
                                                                                (217,25,1),(217,8,2)
 ON CONFLICT DO NOTHING;
 
--- Branch pizza prices from the current public menus.
--- Branch 1 = Kenridge, Branch 2 = Uitzicht.
--- Remove existing rows for these seeded pizzas first so a size that is no longer
--- priced at a branch cannot survive as a stale row.
-DELETE FROM branch_pizza_price
-WHERE branch_id IN (1, 2)
-  AND pizza_id IN (
-                   101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,
-                   201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217
-    );
-
+-- Branch pizza prices (Kenridge=1, Uitzicht=2)
+-- Kenridge updated from the live Pete's Pizza Kenridge menu.
+-- Uitzicht values are intentionally preserved from the prior migration.
 INSERT INTO branch_pizza_price (branch_id, pizza_id, pizza_size_id, price) VALUES
-                                                                               -- =====================================================
-                                                                               -- KENRIDGE (branch_id = 1)
-                                                                               -- =====================================================
-
-                                                                               -- Favourites
+                                                                               -- Branch 1: Kenridge Favourites
                                                                                (1,101,2,59),(1,101,3,82),
                                                                                (1,102,2,95),(1,102,3,118),
                                                                                (1,103,1,58),(1,103,2,95),(1,103,3,115),
@@ -1307,7 +1463,7 @@ INSERT INTO branch_pizza_price (branch_id, pizza_id, pizza_size_id, price) VALUE
                                                                                (1,115,2,114),(1,115,3,142),
                                                                                (1,116,1,65),(1,116,2,114),(1,116,3,142),
 
-                                                                               -- Supremes
+                                                                               -- Branch 1: Kenridge Supremes
                                                                                (1,201,2,119),(1,201,3,153),
                                                                                (1,202,2,137),(1,202,3,170),
                                                                                (1,203,2,119),(1,203,3,153),
@@ -1326,11 +1482,7 @@ INSERT INTO branch_pizza_price (branch_id, pizza_id, pizza_size_id, price) VALUE
                                                                                (1,216,3,157),
                                                                                (1,217,2,122),(1,217,3,157),
 
-                                                                               -- =====================================================
-                                                                               -- UITZICHT (branch_id = 2)
-                                                                               -- =====================================================
-
-                                                                               -- Favourites
+                                                                               -- Branch 2: existing Uitzicht values preserved
                                                                                (2,101,2,59),(2,101,3,78),
                                                                                (2,102,2,92),(2,102,3,112),
                                                                                (2,103,1,58),(2,103,2,92),(2,103,3,112),
@@ -1348,9 +1500,8 @@ INSERT INTO branch_pizza_price (branch_id, pizza_id, pizza_size_id, price) VALUE
                                                                                (2,115,2,109),(2,115,3,138),
                                                                                (2,116,1,64),(2,116,2,109),(2,116,3,138),
 
-                                                                               -- Supremes
                                                                                (2,201,2,116),(2,201,3,147),
-                                                                               (2,202,2,131),(2,202,3,170),
+                                                                               (2,202,2,131),(2,202,3,159),
                                                                                (2,203,2,116),(2,203,3,147),
                                                                                (2,204,2,116),(2,204,3,147),
                                                                                (2,205,2,116),(2,205,3,147),
@@ -1369,21 +1520,22 @@ INSERT INTO branch_pizza_price (branch_id, pizza_id, pizza_size_id, price) VALUE
 ON CONFLICT (branch_id, pizza_id, pizza_size_id) DO UPDATE
     SET price = EXCLUDED.price;
 
--- Pizza extras pricing grid from the public branch menus.
+-- Extras pricing grid
+-- Kenridge live menu: 19cm / 23cm / 30cm.
+-- Uitzicht values are preserved from the prior migration.
 INSERT INTO branch_extra_price (branch_id, price_category_id, pizza_size_id, price) VALUES
-                                                                                        -- Kenridge
                                                                                         (1,1,1,7),(1,1,2,9),(1,1,3,10),
                                                                                         (1,2,1,14),(1,2,2,18),(1,2,3,19),
                                                                                         (1,3,1,16),(1,3,2,21),(1,3,3,22),
                                                                                         (1,4,1,17),(1,4,2,23),(1,4,3,26),
 
-                                                                                        -- Uitzicht
                                                                                         (2,1,1,7),(2,1,2,8),(2,1,3,9),
                                                                                         (2,2,1,14),(2,2,2,17),(2,2,3,18),
                                                                                         (2,3,1,16),(2,3,2,20),(2,3,3,22),
                                                                                         (2,4,1,17),(2,4,2,22),(2,4,3,25)
 ON CONFLICT (branch_id, price_category_id, pizza_size_id) DO UPDATE
     SET price = EXCLUDED.price;
+
 
 -- =========================================================
 -- 9.1) BURGER BUILDER VIEWS
@@ -1500,6 +1652,7 @@ CREATE INDEX IF NOT EXISTS idx_burger_item_default_component_component
     ON burger_item_default_component (component_id);
 
 COMMIT;
+
 -- =========================================================
 -- 10) NORMALIZE PIZZA CATEGORY IDS (FAVOURITE / SUPREME)
 -- =========================================================
@@ -1552,3 +1705,4 @@ WHERE pizza_category_id <> 2
   AND LOWER(name) IN ('supreme', 'supremes');
 
 COMMIT;
+
