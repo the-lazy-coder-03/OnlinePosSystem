@@ -7,6 +7,7 @@ import org.example.onlinepossystem.catalog.dto.MenuDTO;
 import org.example.onlinepossystem.catalog.entity.BranchExtraPrice;
 import org.example.onlinepossystem.catalog.entity.BranchMenuItemPrice;
 import org.example.onlinepossystem.catalog.entity.BranchPizzaPrice;
+import org.example.onlinepossystem.catalog.entity.BranchPizzaBaseOptionPrice;
 import org.example.onlinepossystem.catalog.entity.Ingredient;
 import org.example.onlinepossystem.catalog.entity.MenuItemModifierGroup;
 import org.example.onlinepossystem.catalog.entity.MenuItem;
@@ -20,12 +21,14 @@ import org.example.onlinepossystem.catalog.menu.repository.BurgerComponentReadRe
 import org.example.onlinepossystem.catalog.repository.BranchExtraPriceRepository;
 import org.example.onlinepossystem.catalog.repository.BranchMenuItemPriceRepository;
 import org.example.onlinepossystem.catalog.repository.BranchPizzaPriceRepository;
+import org.example.onlinepossystem.catalog.repository.BranchPizzaBaseOptionPriceRepository;
 import org.example.onlinepossystem.catalog.repository.IngredientRepository;
 import org.example.onlinepossystem.catalog.repository.MenuItemModifierGroupRepository;
 import org.example.onlinepossystem.catalog.repository.MenuItemRepository;
 import org.example.onlinepossystem.catalog.repository.ModifierGroupRepository;
 import org.example.onlinepossystem.catalog.repository.ModifierOptionRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaRepository;
+import org.example.onlinepossystem.catalog.repository.PizzaBaseOptionRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaSizeRepository;
 import org.example.onlinepossystem.catalog.repository.SaladIngredientRepository;
 import org.springframework.stereotype.Service;
@@ -56,6 +59,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
     private final ModifierOptionRepository modifierOptionRepository;
     private final MenuItemModifierGroupRepository menuItemModifierGroupRepository;
     private final ModifierGroupRepository modifierGroupRepository;
+    private final BranchPizzaBaseOptionPriceRepository pizzaBaseOptionPriceRepository;
+    private final PizzaBaseOptionRepository pizzaBaseOptionRepository;
 
     public CatalogOrderResolver(BranchLookup branchLookup,
                                 MenuItemRepository menuItemRepository,
@@ -69,7 +74,9 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                                 BranchExtraPriceRepository branchExtraPriceRepository,
                                 ModifierOptionRepository modifierOptionRepository,
                                 MenuItemModifierGroupRepository menuItemModifierGroupRepository,
-                                ModifierGroupRepository modifierGroupRepository) {
+                                ModifierGroupRepository modifierGroupRepository,
+                                BranchPizzaBaseOptionPriceRepository pizzaBaseOptionPriceRepository,
+                                PizzaBaseOptionRepository pizzaBaseOptionRepository) {
         this.branchLookup = branchLookup;
         this.menuItemRepository = menuItemRepository;
         this.branchMenuItemPriceRepository = branchMenuItemPriceRepository;
@@ -83,6 +90,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
         this.modifierOptionRepository = modifierOptionRepository;
         this.menuItemModifierGroupRepository = menuItemModifierGroupRepository;
         this.modifierGroupRepository = modifierGroupRepository;
+        this.pizzaBaseOptionPriceRepository = pizzaBaseOptionPriceRepository;
+        this.pizzaBaseOptionRepository = pizzaBaseOptionRepository;
     }
 
     @Override
@@ -178,6 +187,7 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
             Integer pizzaId,
             Integer pizzaSizeId,
             Integer sizeCm,
+            Integer pizzaBaseOptionId,
             List<CatalogCustomizationRequest> customizations
     ) {
         Integer resolvedSizeId = pizzaSizeId;
@@ -224,12 +234,33 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
             ));
         }
 
+        ResolvedPizzaBaseOption baseOption = null;
+        if (pizzaBaseOptionId != null) {
+            BranchPizzaBaseOptionPrice optionPrice = pizzaBaseOptionPriceRepository.findById(
+                            new BranchPizzaBaseOptionPrice.BranchPizzaBaseOptionPriceId(
+                                    branchId,
+                                    pizzaBaseOptionId,
+                                    size.getId()
+                            )
+                    )
+                    .filter(candidate -> candidate.getPizzaBaseOption().isActive())
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Pizza base option is not available for this branch and size."
+                    ));
+            baseOption = new ResolvedPizzaBaseOption(
+                    optionPrice.getPizzaBaseOption().getId(),
+                    optionPrice.getPizzaBaseOption().getName(),
+                    optionPrice.getPrice()
+            );
+        }
+
         return new ResolvedPizzaItem(
                 pizza.getId(),
                 pizza.getName(),
                 size.getId(),
                 size.getCm(),
                 price.getPrice(),
+                baseOption,
                 extras
         );
     }
@@ -623,6 +654,15 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
     public Optional<NamedReference> findBurgerComponent(Integer id) {
         return burgerComponentReadRepository.findNameById(id)
                 .map(name -> new NamedReference(id, name));
+    }
+
+    @Override
+    public Optional<NamedReference> findPizzaBaseOption(Integer id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return pizzaBaseOptionRepository.findById(id)
+                .map(option -> new NamedReference(option.getId(), option.getName()));
     }
 
     private record MenuCustomizations(

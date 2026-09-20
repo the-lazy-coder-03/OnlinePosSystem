@@ -370,7 +370,8 @@
         });
         (order.pizzaItems || []).forEach(pi => {
             const size = pi.pizzaSizeCm ? ` (${pi.pizzaSizeCm}cm)` : '';
-            items.push(`${pi.qty}x ${pi.pizzaName}${size}`);
+            const base = pi.pizzaBaseOptionName ? `, ${pi.pizzaBaseOptionName}` : '';
+            items.push(`${pi.qty}x ${pi.pizzaName}${size}${base}`);
         });
         return items.length ? items.join(', ') : 'No items';
     }
@@ -501,6 +502,7 @@
         });
         const pizzaLines = pizzaItems.map(pi => {
             const extras = (pi.extras || []).map(e => e.ingredientName).filter(Boolean);
+            if (pi.pizzaBaseOptionName) extras.unshift(pi.pizzaBaseOptionName);
             const size = pi.pizzaSizeCm ? ` (${pi.pizzaSizeCm}cm)` : '';
             const extraStr = extras.length ? ` (Extras: ${extras.join(', ')})` : '';
             return `<li>${pi.qty}x ${pi.pizzaName}${size}${extraStr}</li>`;

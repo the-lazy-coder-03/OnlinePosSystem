@@ -46,9 +46,14 @@ public class CustomerOrderSummaryMapper {
     }
 
     private String pizzaExtras(OrderResponseDTO.PizzaItemDTO item) {
-        return safeList(item.getExtras()).stream()
+        List<String> extras = new ArrayList<>();
+        if (item.getPizzaBaseOptionName() != null && !item.getPizzaBaseOptionName().isBlank()) {
+            extras.add(item.getPizzaBaseOptionName());
+        }
+        extras.addAll(safeList(item.getExtras()).stream()
                 .map(extra -> quantity(extra.getQty()) + " x " + display(extra.getIngredientName(), "Extra"))
-                .collect(Collectors.joining(", "));
+                .toList());
+        return String.join(", ", extras);
     }
 
     private String withExtras(String line, String extras) {
@@ -65,6 +70,7 @@ public class CustomerOrderSummaryMapper {
         }
         for (OrderResponseDTO.PizzaItemDTO item : safeList(order.getPizzaItems())) {
             total = total.add(money(item.getBasePriceAtTime()).multiply(BigDecimal.valueOf(quantity(item.getQty()))));
+            total = total.add(money(item.getPizzaBaseOptionPriceAtTime()).multiply(BigDecimal.valueOf(quantity(item.getQty()))));
             for (OrderResponseDTO.PizzaItemExtraDTO extra : safeList(item.getExtras())) {
                 total = total.add(money(extra.getUnitPriceAtTime()).multiply(BigDecimal.valueOf(quantity(extra.getQty()))));
             }

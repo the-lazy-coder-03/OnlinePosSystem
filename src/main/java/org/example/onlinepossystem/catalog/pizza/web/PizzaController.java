@@ -53,7 +53,13 @@ public class PizzaController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sizeCm is required");
         }
         return translateServiceErrors(
-                () -> pizzaService.quotePrice(branchId, pizzaId, request.sizeCm(), request.selectedToppingIds())
+                () -> pizzaService.quotePrice(
+                        branchId,
+                        pizzaId,
+                        request.sizeCm(),
+                        request.selectedToppingIds(),
+                        request.pizzaBaseOptionId()
+                )
         );
     }
 

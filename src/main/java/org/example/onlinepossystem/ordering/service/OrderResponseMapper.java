@@ -145,6 +145,12 @@ public class OrderResponseMapper {
             }
             itemDto.setQty(item.getQty());
             itemDto.setBasePriceAtTime(item.getBasePriceAtTime());
+            if (item.getBaseOption() != null) {
+                itemDto.setPizzaBaseOptionId(item.getBaseOption().getPizzaBaseOptionId());
+                itemDto.setPizzaBaseOptionPriceAtTime(item.getBaseOption().getUnitPriceAtTime());
+                catalogResolver.findPizzaBaseOption(item.getBaseOption().getPizzaBaseOptionId())
+                        .ifPresent(reference -> itemDto.setPizzaBaseOptionName(reference.name()));
+            }
             itemDto.setNotes(item.getNotes());
             itemDto.setExtras(toPizzaItemExtraDtos(item.getExtras()));
             pizzaItems.add(itemDto);

@@ -107,6 +107,9 @@ public class OrderResponseDTO {
         private Integer pizzaSizeCm;
         private Integer qty;
         private Double basePriceAtTime;
+        private Integer pizzaBaseOptionId;
+        private String pizzaBaseOptionName;
+        private Double pizzaBaseOptionPriceAtTime;
         private String notes;
         private List<PizzaItemExtraDTO> extras = new ArrayList<>();
 
@@ -124,6 +127,12 @@ public class OrderResponseDTO {
         public void setQty(Integer qty) { this.qty = qty; }
         public Double getBasePriceAtTime() { return basePriceAtTime; }
         public void setBasePriceAtTime(Double basePriceAtTime) { this.basePriceAtTime = basePriceAtTime; }
+        public Integer getPizzaBaseOptionId() { return pizzaBaseOptionId; }
+        public void setPizzaBaseOptionId(Integer pizzaBaseOptionId) { this.pizzaBaseOptionId = pizzaBaseOptionId; }
+        public String getPizzaBaseOptionName() { return pizzaBaseOptionName; }
+        public void setPizzaBaseOptionName(String pizzaBaseOptionName) { this.pizzaBaseOptionName = pizzaBaseOptionName; }
+        public Double getPizzaBaseOptionPriceAtTime() { return pizzaBaseOptionPriceAtTime; }
+        public void setPizzaBaseOptionPriceAtTime(Double pizzaBaseOptionPriceAtTime) { this.pizzaBaseOptionPriceAtTime = pizzaBaseOptionPriceAtTime; }
         public String getNotes() { return notes; }
         public void setNotes(String notes) { this.notes = notes; }
         public List<PizzaItemExtraDTO> getExtras() { return extras; }

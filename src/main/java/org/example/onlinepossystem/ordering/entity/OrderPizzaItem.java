@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 
 import java.util.ArrayList;
@@ -45,6 +46,9 @@ public class OrderPizzaItem {
     @OneToMany(mappedBy = "orderPizzaItem", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderPizzaItemExtra> extras = new ArrayList<>();
 
+    @OneToOne(mappedBy = "orderPizzaItem", cascade = CascadeType.ALL, orphanRemoval = true)
+    private OrderPizzaItemBaseOption baseOption;
+
     public OrderPizzaItem() {}
 
     public Long getId() { return id; }
@@ -66,5 +70,12 @@ public class OrderPizzaItem {
     public void addExtra(OrderPizzaItemExtra extra) {
         extras.add(extra);
         extra.setOrderPizzaItem(this);
+    }
+    public OrderPizzaItemBaseOption getBaseOption() { return baseOption; }
+    public void setBaseOption(OrderPizzaItemBaseOption baseOption) {
+        this.baseOption = baseOption;
+        if (baseOption != null) {
+            baseOption.setOrderPizzaItem(this);
+        }
     }
 }

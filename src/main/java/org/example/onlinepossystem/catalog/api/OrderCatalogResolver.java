@@ -20,6 +20,7 @@ public interface OrderCatalogResolver {
             Integer pizzaId,
             Integer pizzaSizeId,
             Integer sizeCm,
+            Integer pizzaBaseOptionId,
             List<CatalogCustomizationRequest> customizations
     );
 
@@ -32,6 +33,8 @@ public interface OrderCatalogResolver {
     Optional<NamedReference> findIngredient(Integer id);
 
     Optional<NamedReference> findBurgerComponent(Integer id);
+
+    Optional<NamedReference> findPizzaBaseOption(Integer id);
 
     record CatalogCustomizationRequest(Integer id, Integer quantity, String type) {
     }
@@ -51,8 +54,12 @@ public interface OrderCatalogResolver {
             Integer pizzaSizeId,
             Integer pizzaSizeCm,
             Double basePrice,
+            ResolvedPizzaBaseOption baseOption,
             List<ResolvedPizzaExtra> extras
     ) {
+    }
+
+    record ResolvedPizzaBaseOption(Integer pizzaBaseOptionId, String name, Double unitPrice) {
     }
 
     record ResolvedPizzaExtra(Integer ingredientId, String ingredientName, Integer quantity, Double unitPrice) {

@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.catalog.pizza.service;
 
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaCard;
+import org.example.onlinepossystem.catalog.pizza.dto.PizzaBaseOptionItem;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaCardRow;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaCategorySplit;
 import org.example.onlinepossystem.catalog.pizza.dto.PizzaDetail;
@@ -11,6 +12,8 @@ import org.example.onlinepossystem.catalog.pizza.dto.ToppingItem;
 import org.example.onlinepossystem.catalog.pizza.dto.ToppingPrice;
 import org.example.onlinepossystem.catalog.pizza.dto.ToppingRow;
 import org.example.onlinepossystem.catalog.pizza.repository.PizzaReadRepository;
+import org.example.onlinepossystem.catalog.entity.BranchPizzaBaseOptionPrice;
+import org.example.onlinepossystem.catalog.repository.BranchPizzaBaseOptionPriceRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -24,9 +27,14 @@ import java.util.Objects;
 @Service
 public class PizzaService {
     private final PizzaReadRepository pizzaReadRepository;
+    private final BranchPizzaBaseOptionPriceRepository baseOptionPriceRepository;
 
-    public PizzaService(PizzaReadRepository pizzaReadRepository) {
+    public PizzaService(
+            PizzaReadRepository pizzaReadRepository,
+            BranchPizzaBaseOptionPriceRepository baseOptionPriceRepository
+    ) {
         this.pizzaReadRepository = pizzaReadRepository;
+        this.baseOptionPriceRepository = baseOptionPriceRepository;
     }
 
     public PizzaCategorySplit listPizzasByCategory(Integer branchId) {
@@ -72,6 +80,16 @@ public class PizzaService {
                 .map(row -> new ToppingPrice(row.toppingId(), toBigDecimal(row.extraPrice())))
                 .toList();
 
+        List<PizzaBaseOptionItem> baseOptions = baseOptionPriceRepository
+                .findAvailableOptions(branchId, selectedSizeCm)
+                .stream()
+                .map(price -> new PizzaBaseOptionItem(
+                        price.getPizzaBaseOption().getId(),
+                        price.getPizzaBaseOption().getName(),
+                        toBigDecimal(price.getPrice())
+                ))
+                .toList();
+
         return new PizzaDetail(
                 pizzaId,
                 name,
@@ -79,11 +97,18 @@ public class PizzaService {
                 selectedSize.basePrice(),
                 defaultToppings,
                 allToppings,
-                extraPrices
+                extraPrices,
+                baseOptions
         );
     }
 
-    public PriceQuoteResponse quotePrice(Integer branchId, Integer pizzaId, Integer sizeCm, List<Integer> selectedToppingIds) {
+    public PriceQuoteResponse quotePrice(
+            Integer branchId,
+            Integer pizzaId,
+            Integer sizeCm,
+            List<Integer> selectedToppingIds,
+            Integer pizzaBaseOptionId
+    ) {
         Double basePriceRaw = pizzaReadRepository.findBasePrice(branchId, pizzaId, sizeCm)
                 .orElseThrow(() -> new PizzaNotFoundException("Price not found for pizza and size"));
 
@@ -99,9 +124,22 @@ public class PizzaService {
 
         BigDecimal basePrice = toBigDecimal(basePriceRaw);
         BigDecimal toppingsTotal = toBigDecimal(toppingsTotalRaw);
-        BigDecimal total = basePrice.add(toppingsTotal);
+        BigDecimal baseOptionTotal = selectedBaseOptionPrice(branchId, sizeCm, pizzaBaseOptionId);
+        BigDecimal total = basePrice.add(toppingsTotal).add(baseOptionTotal);
 
-        return new PriceQuoteResponse(pizzaId, sizeCm, basePrice, toppingsTotal, total);
+        return new PriceQuoteResponse(pizzaId, sizeCm, basePrice, toppingsTotal, baseOptionTotal, total);
+    }
+
+    private BigDecimal selectedBaseOptionPrice(Integer branchId, Integer sizeCm, Integer pizzaBaseOptionId) {
+        if (pizzaBaseOptionId == null) {
+            return BigDecimal.ZERO;
+        }
+        return baseOptionPriceRepository.findAvailableOptions(branchId, sizeCm).stream()
+                .filter(price -> Objects.equals(price.getPizzaBaseOption().getId(), pizzaBaseOptionId))
+                .map(BranchPizzaBaseOptionPrice::getPrice)
+                .map(this::toBigDecimal)
+                .findFirst()
+                .orElseThrow(() -> new InvalidPizzaSelectionException("Pizza base option is not available for this branch and size"));
     }
 
     private BigDecimal toBigDecimal(Double value) {

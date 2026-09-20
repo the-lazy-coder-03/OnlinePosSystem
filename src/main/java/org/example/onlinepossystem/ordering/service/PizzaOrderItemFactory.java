@@ -3,6 +3,7 @@ package org.example.onlinepossystem.ordering.service;
 import org.example.onlinepossystem.catalog.api.OrderCatalogResolver;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
 import org.example.onlinepossystem.ordering.entity.OrderPizzaItem;
+import org.example.onlinepossystem.ordering.entity.OrderPizzaItemBaseOption;
 import org.example.onlinepossystem.ordering.entity.OrderPizzaItemExtra;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +24,7 @@ public class PizzaOrderItemFactory {
                 request.getPizzaId(),
                 request.getPizzaSizeId(),
                 request.getSizeCm(),
+                request.getPizzaBaseOptionId(),
                 customizationMapper.toCatalogRequests(request.getCustomizations())
         );
 
@@ -32,6 +34,13 @@ public class PizzaOrderItemFactory {
         pizzaItem.setQty(request.getQuantity());
         pizzaItem.setBasePriceAtTime(resolvedItem.basePrice());
         pizzaItem.setNotes(request.getNotes());
+
+        if (resolvedItem.baseOption() != null) {
+            OrderPizzaItemBaseOption baseOption = new OrderPizzaItemBaseOption();
+            baseOption.setPizzaBaseOptionId(resolvedItem.baseOption().pizzaBaseOptionId());
+            baseOption.setUnitPriceAtTime(resolvedItem.baseOption().unitPrice());
+            pizzaItem.setBaseOption(baseOption);
+        }
 
         for (OrderCatalogResolver.ResolvedPizzaExtra resolvedExtra : resolvedItem.extras()) {
             OrderPizzaItemExtra extra = new OrderPizzaItemExtra();

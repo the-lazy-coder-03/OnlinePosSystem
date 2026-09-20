@@ -10,6 +10,12 @@ public record PizzaDetail(
         BigDecimal basePriceForSelectedSize,
         List<ToppingItem> defaultToppings,
         List<ToppingItem> allToppings,
-        List<ToppingPrice> extraPrices
+        List<ToppingPrice> extraPrices,
+        List<PizzaBaseOptionItem> baseOptions
 ) {
+    public PizzaDetail {
+        if (baseOptions == null) {
+            baseOptions = List.of();
+        }
+    }
 }

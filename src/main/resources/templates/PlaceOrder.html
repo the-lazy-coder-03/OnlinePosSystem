@@ -1002,6 +1002,13 @@
                     <div id="sizeOptions"></div>
                 </div>
 
+                <!-- Pizza base -->
+                <div class="card" id="cardBaseOptions">
+                    <h3>Pizza Base</h3>
+                    <div class="sub">Choose the standard base or an available alternative.</div>
+                    <div id="baseOptions"></div>
+                </div>
+
                 <!-- Default toppings -->
                 <div class="card" id="cardDefaults">
                     <h3>Default Toppings</h3>
@@ -1035,6 +1042,7 @@
                     <div class="sub">Calculated via <code>/quote</code> (auto-updates).</div>
                     <div id="quoteLines" style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;">
                         <div style="font-weight:850;color:var(--muted);">Base</div><div style="font-weight:950;" id="qBase">R0.00</div>
+                        <div style="font-weight:850;color:var(--muted);">Base option</div><div style="font-weight:950;" id="qBaseOption">R0.00</div>
                         <div style="font-weight:850;color:var(--muted);">Toppings</div><div style="font-weight:950;" id="qToppings">R0.00</div>
                         <div style="font-weight:850;color:var(--muted);">Subtotal (1 item)</div><div style="font-weight:950;" id="qSubtotal">R0.00</div>
                         <div style="font-weight:950;color:var(--blue-800);border-top:1px solid var(--line);padding-top:10px;">Total (qty)</div>
@@ -1127,6 +1135,7 @@
             pizzaId: null,
             detail: null,                  // loaded from /pizzas/{pizzaId}
             sizeCm: null,                  // selected size
+            selectedBaseOptionId: null,
             selectedToppingIds: new Set(), // includes defaults and extras currently selected
             defaultToppingIds: new Set(),  // defaults from backend (checked by default)
             extraToppingIds: new Set(),    // extras subset (for display convenience)
@@ -1445,6 +1454,7 @@
             setCustomizeCardHeader("cardExtras", "Extra Toppings", "Optional extras (grouped by category).");
             setCustomizeCardHeader("cardQuote", "Live Price", "Calculated via /quote (auto-updates).");
             $("cardSizes").style.display = "";
+            $("cardBaseOptions").style.display = "";
             $("cardDefaults").style.display = "";
             $("cardExtras").style.display = "";
             $("cardQuote").style.display = "";
@@ -1455,6 +1465,7 @@
                 $("customizePizzaName").textContent = "Loading…";
                 $("customizePizzaMeta").textContent = "Please wait.";
                 $("sizeOptions").innerHTML = "";
+                $("baseOptions").innerHTML = "";
                 $("defaultToppings").innerHTML = "";
                 $("extraToppingsGroups").innerHTML = "";
                 return;
@@ -1486,6 +1497,30 @@
                         actions.setSize(s.sizeCm).catch(err => alert(err.message));
                     });
                     $("sizeOptions").appendChild(wrap);
+                }
+            }
+
+            const baseOptions = normalizeBaseOptions(d);
+            $("baseOptions").innerHTML = "";
+            if (!baseOptions.length){
+                $("cardBaseOptions").style.display = "none";
+                state.customize.selectedBaseOptionId = null;
+            } else {
+                const options = [{ pizzaBaseOptionId: null, name: "Standard base", extraPrice: 0 }, ...baseOptions];
+                for (const option of options){
+                    const optionId = option.pizzaBaseOptionId;
+                    const id = optionId == null ? "pizza_base_standard" : `pizza_base_${optionId}`;
+                    const wrap = document.createElement("div");
+                    wrap.className = "opt";
+                    wrap.innerHTML = `
+                        <div class="opt-left">
+                          <input type="radio" name="pizza_base" id="${id}" ${optionId === state.customize.selectedBaseOptionId ? "checked" : ""} />
+                          <label for="${id}">${escapeHtml(option.name)}</label>
+                        </div>
+                        <div class="opt-price">${optionPriceLabel(option.extraPrice)}</div>
+                    `;
+                    wrap.querySelector("input").addEventListener("change", () => actions.setBaseOption(optionId));
+                    $("baseOptions").appendChild(wrap);
                 }
             }
 
@@ -1556,6 +1591,7 @@
             const item = state.menuCustomize.menuItem;
             $("btnAddToCart").textContent = "Add to cart";
             $("cardSizes").style.display = "";
+            $("cardBaseOptions").style.display = "none";
             $("cardDefaults").style.display = "";
             $("cardExtras").style.display = "";
             $("cardQuote").style.display = "";
@@ -1569,6 +1605,7 @@
                 $("qtyValue").textContent = "1";
                 $("stickyQty").textContent = "1 item";
                 $("qBase").textContent = money(0);
+                $("qBaseOption").textContent = money(0);
                 $("qToppings").textContent = money(0);
                 $("qSubtotal").textContent = money(0);
                 $("qTotal").textContent = money(0);
@@ -1748,6 +1785,7 @@
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
             $("quoteError").style.display = "none";
             $("qBase").textContent = money(pricing.base);
+            $("qBaseOption").textContent = money(0);
             $("qToppings").textContent = money(pricing.modifiers);
             $("qSubtotal").textContent = money(pricing.subtotal);
             $("qTotal").textContent = money(pricing.lineTotal);
@@ -1758,6 +1796,7 @@
             const item = state.menuCustomize.menuItem;
             $("btnAddToCart").textContent = "Add to cart";
             $("cardSizes").style.display = "none";
+            $("cardBaseOptions").style.display = "none";
             $("cardDefaults").style.display = "none";
             $("cardExtras").style.display = "";
             $("cardQuote").style.display = "";
@@ -1771,6 +1810,7 @@
                 $("qtyValue").textContent = "1";
                 $("stickyQty").textContent = "1 item";
                 $("qBase").textContent = money(0);
+                $("qBaseOption").textContent = money(0);
                 $("qToppings").textContent = money(0);
                 $("qSubtotal").textContent = money(0);
                 $("qTotal").textContent = money(0);
@@ -1832,6 +1872,7 @@
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
             $("quoteError").style.display = "none";
             $("qBase").textContent = money(pricing.base);
+            $("qBaseOption").textContent = money(0);
             $("qToppings").textContent = money(pricing.modifiers);
             $("qSubtotal").textContent = money(pricing.subtotal);
             $("qTotal").textContent = money(pricing.lineTotal);
@@ -1844,6 +1885,7 @@
 
             if (!q){
                 $("qBase").textContent = money(0);
+                $("qBaseOption").textContent = money(0);
                 $("qToppings").textContent = money(0);
                 $("qSubtotal").textContent = money(0);
                 $("qTotal").textContent = money(0);
@@ -1855,10 +1897,12 @@
             errEl.style.display = "none";
 
             const base = Number(q.basePrice || 0);
+            const baseOption = Number(q.baseOptionTotal || 0);
             const toppings = Number(q.toppingsTotal || 0);
-            const subtotal = Number(q.total || (base + toppings) || 0);
+            const subtotal = Number(q.total || (base + baseOption + toppings) || 0);
 
             $("qBase").textContent = money(base);
+            $("qBaseOption").textContent = money(baseOption);
             $("qToppings").textContent = money(toppings);
             $("qSubtotal").textContent = money(subtotal);
 
@@ -2220,6 +2264,7 @@
             state.customize.pizzaId = id;
             state.customize.detail = null;
             state.customize.sizeCm = null;
+            state.customize.selectedBaseOptionId = null;
             state.customize.selectedToppingIds = new Set();
             state.customize.defaultToppingIds = new Set();
             state.customize.extraToppingIds = new Set();
@@ -2272,6 +2317,13 @@
                 if (sessionId !== state.customize.sessionId) return;
                 state.customize.detail = detail;
 
+                const availableBaseOptionIds = new Set(
+                    normalizeBaseOptions(detail).map(option => option.pizzaBaseOptionId)
+                );
+                if (!availableBaseOptionIds.has(state.customize.selectedBaseOptionId)){
+                    state.customize.selectedBaseOptionId = null;
+                }
+
                 const all = normalizeAllToppings(detail);
                 const allowed = new Set(all.map(t => Number(t.toppingId)));
 
@@ -2314,6 +2366,13 @@
             debouncedQuote();
         },
 
+        setBaseOption(pizzaBaseOptionId){
+            const id = pizzaBaseOptionId == null ? null : Number(pizzaBaseOptionId);
+            state.customize.selectedBaseOptionId = Number.isFinite(id) ? id : null;
+            render.customize();
+            debouncedQuote();
+        },
+
         setQty(qty){
             const next = clamp(Number(qty) || 1, 1, 99);
             state.customize.qty = next;
@@ -2334,6 +2393,7 @@
                 branchId: Number(branchId),
                 pizzaId: Number(pizzaId),
                 sizeCm: Number(sizeCm),
+                pizzaBaseOptionId: state.customize.selectedBaseOptionId,
                 selectedToppingIds: Array.from(state.customize.selectedToppingIds)
             };
 
@@ -2374,6 +2434,8 @@
             const nameById = new Map(all.map(t => [Number(t.toppingId), t.name]));
             const selectedNames = selectedIds.map(id => nameById.get(Number(id))).filter(Boolean);
             const extraNames = extraIds.map(id => nameById.get(Number(id))).filter(Boolean);
+            const selectedBaseOption = normalizeBaseOptions(d)
+                .find(option => option.pizzaBaseOptionId === state.customize.selectedBaseOptionId) || null;
 
             const subtotal = Number(state.customize.lastQuote.total || 0);
             const lineTotal = subtotal * qty;
@@ -2384,6 +2446,8 @@
                 pizzaId: Number(state.customize.pizzaId),
                 name: d.name || "Pizza",
                 sizeCm: Number(state.customize.sizeCm),
+                pizzaBaseOptionId: selectedBaseOption?.pizzaBaseOptionId ?? null,
+                pizzaBaseOptionName: selectedBaseOption?.name || "",
                 quantity: qty,
                 selectedToppingIds: selectedIds,
                 selectedToppingNames: selectedNames,
@@ -2391,6 +2455,7 @@
                 selectedExtraToppingNames: extraNames,
                 pricing: {
                     base: Number(state.customize.lastQuote.basePrice || 0),
+                    baseOption: Number(state.customize.lastQuote.baseOptionTotal || 0),
                     toppings: Number(state.customize.lastQuote.toppingsTotal || 0),
                     subtotal: subtotal,
                     lineTotal: lineTotal
@@ -2428,6 +2493,7 @@
             state.customize.pizzaId = null;
             state.customize.detail = null;
             state.customize.sizeCm = null;
+            state.customize.selectedBaseOptionId = null;
             state.customize.selectedToppingIds = new Set();
             state.customize.defaultToppingIds = new Set();
             state.customize.extraToppingIds = new Set();
@@ -2470,6 +2536,7 @@
             state.customize.pizzaId = null;
             state.customize.detail = null;
             state.customize.sizeCm = null;
+            state.customize.selectedBaseOptionId = null;
             state.customize.selectedToppingIds = new Set();
             state.customize.defaultToppingIds = new Set();
             state.customize.extraToppingIds = new Set();
@@ -2951,6 +3018,7 @@
         state.customize.pizzaId = null;
         state.customize.detail = null;
         state.customize.sizeCm = null;
+        state.customize.selectedBaseOptionId = null;
         state.customize.selectedToppingIds = new Set();
         state.customize.defaultToppingIds = new Set();
         state.customize.extraToppingIds = new Set();
@@ -3132,6 +3200,18 @@
             .filter(s => Number.isFinite(s.sizeCm) && s.sizeCm > 0)
             .sort((a,b)=>a.sizeCm-b.sizeCm)
             .map(s => ({ ...s, label: `${s.sizeCm} cm` }));
+    }
+
+    function normalizeBaseOptions(detail){
+        const raw = detail.baseOptions ?? detail.pizzaBaseOptions ?? detail.base_options ?? [];
+        if (!Array.isArray(raw)) return [];
+        return raw
+            .map(option => ({
+                pizzaBaseOptionId: Number(option.pizzaBaseOptionId ?? option.id ?? option.pizza_base_option_id),
+                name: safeText(option.name ?? option.label ?? option.baseOptionName),
+                extraPrice: Number(option.extraPrice ?? option.price ?? option.extra_price ?? 0)
+            }))
+            .filter(option => Number.isFinite(option.pizzaBaseOptionId) && option.name);
     }
 
     function normalizeDefaultToppings(detail){
@@ -3519,6 +3599,7 @@
                 return {
                     pizzaId: it.pizzaId,
                     sizeCm: it.sizeCm,
+                    pizzaBaseOptionId: it.pizzaBaseOptionId || null,
                     quantity: it.quantity,
                     customizations: (it.selectedExtraToppingIds || []).map(id => ({
                         id: Number(id),
@@ -3610,10 +3691,13 @@
             const mods = !isPizza ? (it.selectedModifierNames || []).join(", ") : "";
             const meta = isPizza ? ` <span style="color:var(--muted);font-weight:850;">(${it.sizeCm} cm)</span>` : "";
             const detailLine = isPizza
-                ? (tops ? ("Toppings: " + escapeHtml(tops)) : "No toppings selected.")
+                ? [
+                    it.pizzaBaseOptionName ? ("Base: " + escapeHtml(it.pizzaBaseOptionName)) : "",
+                    tops ? ("Toppings: " + escapeHtml(tops)) : "No toppings selected."
+                  ].filter(Boolean).join(" • ")
                 : (mods ? ("Modifiers: " + escapeHtml(mods)) : "No modifiers selected.");
             const pricingLine = isPizza
-                ? `Subtotal (1): ${money(it.pricing?.subtotal || 0)} • Base: ${money(it.pricing?.base || 0)} • Toppings: ${money(it.pricing?.toppings || 0)}`
+                ? `Subtotal (1): ${money(it.pricing?.subtotal || 0)} • Base: ${money(it.pricing?.base || 0)}${Number(it.pricing?.baseOption || 0) > 0 ? ` • Base option: ${money(it.pricing.baseOption)}` : ""} • Toppings: ${money(it.pricing?.toppings || 0)}`
                 : `Subtotal (1): ${money(it.pricing?.subtotal || 0)} • Base: ${money(it.pricing?.base || 0)} • Modifiers: ${money(it.pricing?.modifiers || 0)}`;
             div.innerHTML = `
                 <div class="sum-top">

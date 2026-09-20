@@ -55,6 +55,7 @@ public class OrderRequestDTO {
         private Integer pizzaId;
         private Integer pizzaSizeId;
         private Integer sizeCm;
+        private Integer pizzaBaseOptionId;
         @NotNull
         @Positive
         private Integer quantity;
@@ -71,6 +72,8 @@ public class OrderRequestDTO {
         public void setPizzaSizeId(Integer pizzaSizeId) { this.pizzaSizeId = pizzaSizeId; }
         public Integer getSizeCm() { return sizeCm; }
         public void setSizeCm(Integer sizeCm) { this.sizeCm = sizeCm; }
+        public Integer getPizzaBaseOptionId() { return pizzaBaseOptionId; }
+        public void setPizzaBaseOptionId(Integer pizzaBaseOptionId) { this.pizzaBaseOptionId = pizzaBaseOptionId; }
         public Integer getQuantity() { return quantity; }
         public void setQuantity(Integer quantity) { this.quantity = quantity; }
         public List<CustomizationRequestDTO> getCustomizations() { return customizations; }

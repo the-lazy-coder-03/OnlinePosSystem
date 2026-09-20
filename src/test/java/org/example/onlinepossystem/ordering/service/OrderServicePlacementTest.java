@@ -5,6 +5,7 @@ import org.example.onlinepossystem.branch.entity.Branch;
 import org.example.onlinepossystem.branch.repository.BranchRepository;
 import org.example.onlinepossystem.catalog.entity.BranchExtraPrice;
 import org.example.onlinepossystem.catalog.entity.BranchMenuItemPrice;
+import org.example.onlinepossystem.catalog.entity.BranchPizzaBaseOptionPrice;
 import org.example.onlinepossystem.catalog.entity.BranchPizzaPrice;
 import org.example.onlinepossystem.catalog.entity.Ingredient;
 import org.example.onlinepossystem.catalog.entity.MenuCategory;
@@ -13,11 +14,13 @@ import org.example.onlinepossystem.catalog.entity.ModifierGroup;
 import org.example.onlinepossystem.catalog.entity.ModifierOption;
 import org.example.onlinepossystem.catalog.entity.Pizza;
 import org.example.onlinepossystem.catalog.entity.PizzaAllowedSize;
+import org.example.onlinepossystem.catalog.entity.PizzaBaseOption;
 import org.example.onlinepossystem.catalog.entity.PizzaCategory;
 import org.example.onlinepossystem.catalog.entity.PizzaSize;
 import org.example.onlinepossystem.catalog.entity.PriceCategory;
 import org.example.onlinepossystem.catalog.repository.BranchExtraPriceRepository;
 import org.example.onlinepossystem.catalog.repository.BranchMenuItemPriceRepository;
+import org.example.onlinepossystem.catalog.repository.BranchPizzaBaseOptionPriceRepository;
 import org.example.onlinepossystem.catalog.repository.BranchPizzaPriceRepository;
 import org.example.onlinepossystem.catalog.repository.IngredientRepository;
 import org.example.onlinepossystem.catalog.repository.MenuCategoryRepository;
@@ -25,6 +28,7 @@ import org.example.onlinepossystem.catalog.repository.MenuItemRepository;
 import org.example.onlinepossystem.catalog.repository.ModifierGroupRepository;
 import org.example.onlinepossystem.catalog.repository.ModifierOptionRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaAllowedSizeRepository;
+import org.example.onlinepossystem.catalog.repository.PizzaBaseOptionRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaCategoryRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaSizeRepository;
@@ -103,6 +107,12 @@ class OrderServicePlacementTest {
     private BranchPizzaPriceRepository branchPizzaPriceRepository;
 
     @Autowired
+    private PizzaBaseOptionRepository pizzaBaseOptionRepository;
+
+    @Autowired
+    private BranchPizzaBaseOptionPriceRepository branchPizzaBaseOptionPriceRepository;
+
+    @Autowired
     private PriceCategoryRepository priceCategoryRepository;
 
     @Autowired
@@ -121,14 +131,17 @@ class OrderServicePlacementTest {
     void placesPizzaItemsWithExtraIngredients() {
         PizzaFixture fixture = createPizzaFixture();
 
+        OrderRequestDTO.OrderItemRequestDTO requestedPizza = pizzaItem(
+                fixture.pizza().getId(),
+                fixture.size().getId(),
+                2,
+                customization(fixture.extraIngredient().getId(), 2, "ingredient")
+        );
+        requestedPizza.setPizzaBaseOptionId(fixture.baseOption().getId());
+
         OrderResponseDTO response = orderOperations.placeOrder(request(
                 fixture.branch().getName(),
-                pizzaItem(
-                        fixture.pizza().getId(),
-                        fixture.size().getId(),
-                        2,
-                        customization(fixture.extraIngredient().getId(), 2, "ingredient")
-                )
+                requestedPizza
         ));
         entityManager.flush();
 
@@ -139,6 +152,9 @@ class OrderServicePlacementTest {
         assertThat(pizzaItem.getPizzaSizeId()).isEqualTo(fixture.size().getId());
         assertThat(pizzaItem.getQty()).isEqualTo(2);
         assertThat(pizzaItem.getBasePriceAtTime()).isEqualTo(119.99);
+        assertThat(pizzaItem.getPizzaBaseOptionId()).isEqualTo(fixture.baseOption().getId());
+        assertThat(pizzaItem.getPizzaBaseOptionName()).isEqualTo(fixture.baseOption().getName());
+        assertThat(pizzaItem.getPizzaBaseOptionPriceAtTime()).isEqualTo(36.00);
         assertThat(pizzaItem.getExtras()).singleElement().satisfies(extra -> {
             assertThat(extra.getIngredientId()).isEqualTo(fixture.extraIngredient().getId());
             assertThat(extra.getIngredientName()).isEqualTo(fixture.extraIngredient().getName());
@@ -390,7 +406,17 @@ class OrderServicePlacementTest {
         pizzaAllowedSizeRepository.saveAndFlush(new PizzaAllowedSize(pizza, size));
         branchPizzaPriceRepository.saveAndFlush(new BranchPizzaPrice(branch.getId(), pizza, size, 119.99));
         branchExtraPriceRepository.saveAndFlush(new BranchExtraPrice(branch.getId(), priceCategory, size, 12.50));
-        return new PizzaFixture(branch, pizza, size, extraIngredient);
+        PizzaBaseOption baseOption = pizzaBaseOptionRepository.saveAndFlush(new PizzaBaseOption(
+                nextId("pizza_base_option", "pizza_base_option_id"),
+                "Wheat and Gluten Free Base " + suffix
+        ));
+        branchPizzaBaseOptionPriceRepository.saveAndFlush(new BranchPizzaBaseOptionPrice(
+                branch.getId(),
+                baseOption,
+                size,
+                36.00
+        ));
+        return new PizzaFixture(branch, pizza, size, extraIngredient, baseOption);
     }
 
     private MenuFixture createMenuFixture() {
@@ -717,7 +743,13 @@ class OrderServicePlacementTest {
         return UUID.randomUUID().toString();
     }
 
-    private record PizzaFixture(Branch branch, Pizza pizza, PizzaSize size, Ingredient extraIngredient) {
+    private record PizzaFixture(
+            Branch branch,
+            Pizza pizza,
+            PizzaSize size,
+            Ingredient extraIngredient,
+            PizzaBaseOption baseOption
+    ) {
     }
 
     private record MenuFixture(Branch branch, MenuItem menuItem, ModifierOption modifierOption) {

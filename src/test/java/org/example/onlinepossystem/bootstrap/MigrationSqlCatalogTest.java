@@ -76,6 +76,34 @@ class MigrationSqlCatalogTest {
                 .doesNotContain("delete from order_menu_item");
     }
 
+    @Test
+    void seedsExpandedMenuAndOrderablePizzaBaseOption() throws IOException {
+        String sql = migrationSql();
+
+        assertThat(sql)
+                .contains("(10, 'Toasted Sandwiches', 100)")
+                .contains("(11, 'Desserts', 110)")
+                .contains("(114, 4, 'Grapetiser White 330ml'")
+                .contains("(122, 4, 'Sprite 2L'")
+                .contains("(410, 3, 'Lasagne Large'")
+                .contains("(422, 3, 'Vegetarian Pasta Large'")
+                .contains("(701, 7, 'Greek Salad'")
+                .contains("(905, 9, '10 x Mini Cheese Grillers'")
+                .contains("(1001, 10, 'Cheese & Tomato Toasted Sandwich'")
+                .contains("(1007, 10, 'Mince & Cheese Toasted Sandwich'")
+                .contains("(1101, 11, 'Magnum'")
+                .contains("(1103, 11, 'Paddle Pop'")
+                .contains("(6, 'Choose included kiddies sauce', TRUE, 1, 1)")
+                .contains("(8, 'Choose pasta type', TRUE, 1, 1)")
+                .contains("(419, 9)")
+                .contains("(420, 10)")
+                .contains("CREATE TABLE IF NOT EXISTS pizza_base_option")
+                .contains("CREATE TABLE IF NOT EXISTS branch_pizza_base_option_price")
+                .contains("CREATE TABLE IF NOT EXISTS order_pizza_item_base_option")
+                .contains("(1, 'Wheat and Gluten Free Base', TRUE)")
+                .contains("(1, 1, 3, 36.00)");
+    }
+
     private String migrationSql() throws IOException {
         ClassPathResource resource = new ClassPathResource("migration.sql");
         return resource.getContentAsString(StandardCharsets.UTF_8);
