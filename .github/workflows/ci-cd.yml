@@ -58,22 +58,13 @@ jobs:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
           AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          MAIL_API: ${{ secrets.MAIL_API }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
           test -n "$AZURE_VM_HOST" || (echo "Missing AZURE_VM_HOST secret" && exit 1)
           test -n "$AZURE_VM_USER" || (echo "Missing AZURE_VM_USER secret" && exit 1)
           test -n "$AZURE_VM_SSH_KEY" || (echo "Missing AZURE_VM_SSH_KEY secret" && exit 1)
-          test -n "${POSTGRES_PASSWORD:-${SPRING_DATASOURCE_PASSWORD:-}}" || (echo "Missing POSTGRES_PASSWORD or SPRING_DATASOURCE_PASSWORD secret" && exit 1)
-          test -n "$JWT_SECRET" || (echo "Missing JWT_SECRET secret" && exit 1)
-          test -n "$ADMIN_PASSWORD" || (echo "Missing ADMIN_PASSWORD secret" && exit 1)
-          test -n "${RESEND_API_KEY:-${MAIL_API:-}}" || (echo "Missing RESEND_API_KEY or MAIL_API secret" && exit 1)
 
       - name: Build runtime environment file
+        id: runtime-env
         env:
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
@@ -96,6 +87,12 @@ jobs:
           db_name="${POSTGRES_DB:-online_pos_system}"
           db_user="${POSTGRES_USER:-pos_app}"
           db_password="${POSTGRES_PASSWORD:-${SPRING_DATASOURCE_PASSWORD:-}}"
+
+          if [[ -z "$db_password" || -z "$JWT_SECRET" || -z "$ADMIN_PASSWORD" || -z "${RESEND_API_KEY:-${MAIL_API:-}}" ]]; then
+            echo "A complete runtime secret set was not provided; deployment will keep the existing server .env file."
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           {
             echo "POSTGRES_DB=${db_name}"
@@ -123,6 +120,8 @@ jobs:
             echo "GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}"
           } > runtime/online-pos-system.env
 
+          echo "created=true" >> "$GITHUB_OUTPUT"
+
       - name: Configure SSH
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
@@ -135,6 +134,7 @@ jobs:
           ssh-keyscan -p "${AZURE_VM_PORT:-22}" "$AZURE_VM_HOST" >> ~/.ssh/known_hosts
 
       - name: Upload runtime environment
+        if: steps.runtime-env.outputs.created == 'true'
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
@@ -151,6 +151,7 @@ jobs:
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
           AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
           REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
+          RUNTIME_ENV_CREATED: ${{ steps.runtime-env.outputs.created }}
         run: |
           remote_env="/tmp/online-pos-system-${GITHUB_SHA}.env"
           remote_app_dir="${REMOTE_APP_DIR:-/home/${AZURE_VM_USER}/OnlinePosSystem}"
@@ -158,9 +159,10 @@ jobs:
           quoted_remote_app_dir="$(printf '%q' "$remote_app_dir")"
           quoted_branch="$(printf '%q' "$GITHUB_REF_NAME")"
           quoted_sha="$(printf '%q' "$GITHUB_SHA")"
+          quoted_runtime_env_created="$(printf '%q' "$RUNTIME_ENV_CREATED")"
 
           ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
-            "REMOTE_ENV=${quoted_remote_env} REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} bash -s" <<'REMOTE'
+            "REMOTE_ENV=${quoted_remote_env} REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} RUNTIME_ENV_CREATED=${quoted_runtime_env_created} bash -s" <<'REMOTE'
           set -euo pipefail
 
           compose() {
@@ -168,7 +170,6 @@ jobs:
           }
 
           test -d "$REMOTE_APP_DIR/.git" || (echo "Remote app directory is not a git repository: $REMOTE_APP_DIR" && exit 1)
-          test -f "$REMOTE_ENV" || (echo "Uploaded environment file missing: $REMOTE_ENV" && exit 1)
           command -v git >/dev/null 2>&1 || (echo "git is not installed on the server" && exit 1)
           command -v docker >/dev/null 2>&1 || (echo "docker is not installed on the server" && exit 1)
 
@@ -178,7 +179,12 @@ jobs:
           git pull --ff-only origin "$DEPLOY_BRANCH"
 
           mkdir -p SupportConfigFiles
-          mv "$REMOTE_ENV" SupportConfigFiles/.env
+          if [[ "$RUNTIME_ENV_CREATED" == "true" ]]; then
+            test -f "$REMOTE_ENV" || (echo "Uploaded environment file missing: $REMOTE_ENV" && exit 1)
+            mv "$REMOTE_ENV" SupportConfigFiles/.env
+          fi
+
+          test -f SupportConfigFiles/.env || (echo "SupportConfigFiles/.env is missing on the server" && exit 1)
           chmod 600 SupportConfigFiles/.env
 
           compose up -d --build
