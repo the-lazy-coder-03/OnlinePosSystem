@@ -190,7 +190,9 @@ jobs:
           compose up -d --build
 
           for i in $(seq 1 60); do
-            if curl -kfsS https://127.0.0.1/ >/dev/null; then
+            if curl --fail --silent --show-error --max-time 10 \
+              --resolve crowdcam.co.za:443:127.0.0.1 \
+              https://crowdcam.co.za/ >/dev/null; then
               compose ps
               exit 0
             fi
