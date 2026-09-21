@@ -91,7 +91,7 @@ public class CatalogDashboardService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> getDashboardAttributes() {
+    public Map<String, Object> getDashboardAttributes(Integer branchId) {
         List<Pizza> pizzas = sorted(pizzaRepository.findAll(), Comparator
                 .comparingInt((Pizza p) -> p.getCategory() == null ? 9999 : safeInt(p.getCategory().getSortOrder()))
                 .thenComparingInt(p -> safeInt(p.getSortOrder()))
@@ -121,9 +121,16 @@ public class CatalogDashboardService {
                 .comparingInt((ModifierOption o) -> safeInt(o.getGroupId()))
                 .thenComparing(ModifierOption::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
         List<BranchView> branches = sorted(branchLookup.findAll(), Comparator.comparing(BranchView::name));
+        if (branchId != null) {
+            branches = branches.stream().filter(branch -> branch.id().equals(branchId)).toList();
+        }
         Map<Integer, String> branchNames = branches.stream().collect(Collectors.toMap(BranchView::id, BranchView::name));
-        List<BranchPizzaPrice> pizzaPrices = branchPizzaPriceRepository.findAll();
-        List<BranchMenuItemPrice> menuPrices = branchMenuItemPriceRepository.findAll();
+        List<BranchPizzaPrice> pizzaPrices = branchPizzaPriceRepository.findAll().stream()
+                .filter(price -> branchId == null || branchId.equals(price.getBranchId()))
+                .toList();
+        List<BranchMenuItemPrice> menuPrices = branchMenuItemPriceRepository.findAll().stream()
+                .filter(price -> branchId == null || branchId.equals(price.getBranchId()))
+                .toList();
         List<PizzaDefaultIngredient> defaultIngredients = pizzaDefaultIngredientRepository.findAll();
         List<MenuItemModifierGroup> menuModifierGroups = menuItemModifierGroupRepository.findAll();
 
@@ -144,6 +151,7 @@ public class CatalogDashboardService {
                 .toList());
         attributes.put("priceCategories", priceCategories);
         attributes.put("branchExtraPrices", branchExtraPriceRepository.findAll().stream()
+                .filter(price -> branchId == null || branchId.equals(price.getBranchId()))
                 .map(price -> new BranchExtraPriceView(price.getBranchId(), branchNames.get(price.getBranchId()),
                         price.getPriceCategory(), price.getPizzaSize(), price.getPrice()))
                 .toList());

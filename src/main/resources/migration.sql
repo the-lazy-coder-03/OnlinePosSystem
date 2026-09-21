@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
                                                 first_name      varchar(255),
                                                 last_name       varchar(255),
                                                 role            varchar(255) NOT NULL DEFAULT 'USER',
+                                                access_level    smallint NOT NULL DEFAULT 0,
 
                                                 CONSTRAINT customers_pkey PRIMARY KEY (id),
                                                 CONSTRAINT customers_email_key UNIQUE (email),
@@ -92,9 +93,41 @@ ALTER TABLE public.customers
     ALTER COLUMN role SET DEFAULT 'USER',
     ALTER COLUMN role SET NOT NULL;
 
+ALTER TABLE public.customers
+    ADD COLUMN IF NOT EXISTS access_level smallint;
+
+UPDATE public.customers
+SET access_level = CASE upper(replace(coalesce(role, 'USER'), 'ROLE_', ''))
+                       WHEN 'ADMIN' THEN 3
+                       WHEN 'SUPER_ADMIN' THEN 3
+                       WHEN 'DRIVER' THEN 4
+                       ELSE 0
+    END
+WHERE access_level IS NULL;
+
+UPDATE public.customers
+SET role = CASE access_level
+               WHEN 1 THEN 'ADMIN'
+               WHEN 2 THEN 'ADMIN'
+               WHEN 3 THEN 'SUPER_ADMIN'
+               WHEN 4 THEN 'DRIVER'
+               ELSE 'USER'
+    END;
+
+ALTER TABLE public.customers
+    ALTER COLUMN access_level SET DEFAULT 0,
+    ALTER COLUMN access_level SET NOT NULL;
+
+ALTER TABLE public.customers
+    DROP CONSTRAINT IF EXISTS customers_access_level_check;
+
+ALTER TABLE public.customers
+    ADD CONSTRAINT customers_access_level_check CHECK (access_level BETWEEN 0 AND 4);
+
 CREATE INDEX IF NOT EXISTS idx_customers_email  ON public.customers (email);
 CREATE INDEX IF NOT EXISTS idx_customers_phone1 ON public.customers (phone1);
 CREATE INDEX IF NOT EXISTS idx_customers_phone2 ON public.customers (phone2);
+CREATE INDEX IF NOT EXISTS idx_customers_access_level ON public.customers (access_level);
 
 -- =========================================================
 -- 3.1) PASSWORD RESET TOKENS

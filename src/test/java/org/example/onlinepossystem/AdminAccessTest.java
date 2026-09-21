@@ -50,8 +50,8 @@ public class AdminAccessTest {
     @WithMockUser(username = "admin", roles = {"ADMIN"})
     public void testAdminOrdersPageAccessibleWithAdminRole() throws Exception {
         mockMvc.perform(get("/admin/orders"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("InputOrders"));
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin#orders"));
     }
 
     @Test
@@ -74,6 +74,24 @@ public class AdminAccessTest {
         mockMvc.perform(put("/api/admin/orders/1/status")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"Preparing\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "driver", roles = {"DRIVER"})
+    public void testDriverCannotAccessCustomerOrAdminPages() throws Exception {
+        mockMvc.perform(get("/order"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/profile/edit"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/admin"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "branch-admin", roles = {"ADMIN"})
+    public void testBranchAdminCannotManageAccountLevels() throws Exception {
+        mockMvc.perform(get("/api/admin/accounts"))
                 .andExpect(status().isForbidden());
     }
 

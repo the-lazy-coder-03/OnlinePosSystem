@@ -1,11 +1,15 @@
 package org.example.onlinepossystem.shared.web;
 
+import org.example.onlinepossystem.customer.api.CustomerAccount;
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.Locale;
+import java.util.Optional;
 
 @Controller
 public class MainController {
@@ -60,16 +64,48 @@ public class MainController {
     ) {
         if (authentication != null && authentication.isAuthenticated()) {
             String email = authentication.getName();
-            customerAccountReader.findByEmail(email).ifPresent(customer -> {
-                model.addAttribute("customerName", customer.firstName());
-                model.addAttribute("user", customer);
-            });
+            addCustomerDetails(model, email);
         }
-        
-        // Default to branch 1 if nothing is provided
+
         model.addAttribute("branchId", branchId != null ? branchId : 1);
-        
         return "PlaceOrder";
+    }
+
+    private void addCustomerDetails(Model model, String email) {
+        customerAccountReader.findByEmail(email).ifPresent(customer -> {
+            model.addAttribute("customerName", customer.firstName());
+            model.addAttribute("user", customer);
+            resolvePreferredBranch(customer).ifPresent(branch -> {
+                model.addAttribute("preferredBranchId", branch.id());
+                model.addAttribute("preferredBranchName", branch.name());
+            });
+        });
+    }
+
+    private Optional<PreferredBranch> resolvePreferredBranch(CustomerAccount customer) {
+        String preferredStore = normalizeBranchName(customer.preferredStore());
+        if (preferredStore.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return switch (preferredStore) {
+            case "kenridge" -> Optional.of(new PreferredBranch(1, "Kenridge"));
+            case "uitzicht" -> Optional.of(new PreferredBranch(2, "Uitzicht"));
+            default -> Optional.empty();
+        };
+    }
+
+    private String normalizeBranchName(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim()
+                .toLowerCase(Locale.ROOT)
+                .replaceFirst("\\s+branch$", "")
+                .replaceAll("\\s+", " ");
+    }
+
+    private record PreferredBranch(Integer id, String name) {
     }
 
     @GetMapping("/login")

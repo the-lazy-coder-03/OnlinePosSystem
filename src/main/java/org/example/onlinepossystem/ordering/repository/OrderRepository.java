@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.time.LocalDateTime;
+import java.util.Collection;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
@@ -13,4 +15,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByBranchIdAndStatusOrderByCreatedAtDesc(Integer branchId, String status);
     List<Order> findAllByOrderByCreatedAtDesc();
     List<Order> findByCustomerIdOrderByCreatedAtDesc(Long customerId, Pageable pageable);
+    List<Order> findByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+            LocalDateTime start, LocalDateTime end);
+    List<Order> findByBranchIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+            Integer branchId, LocalDateTime start, LocalDateTime end);
+    List<Order> findByStatusInOrderByCreatedAtDesc(Collection<String> statuses);
+    List<Order> findByBranchIdAndStatusInOrderByCreatedAtDesc(Integer branchId, Collection<String> statuses);
 }

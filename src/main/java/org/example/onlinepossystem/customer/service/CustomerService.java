@@ -65,6 +65,7 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         customer.setPostalCode(postalCode);
         customer.setLastOrderedAt(LocalDateTime.now());
         customer.setRole("USER");
+        customer.setAccessLevel(0);
 
         return customerRepository.save(customer); // insert into DB
     }
@@ -147,7 +148,8 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
                 customer.getPostalCode(),
                 customer.getFirstName(),
                 customer.getLastName(),
-                customer.getRole()
+                customer.getRole(),
+                customer.getAccessLevel() == null ? 0 : customer.getAccessLevel()
         );
     }
 }

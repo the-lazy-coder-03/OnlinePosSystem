@@ -33,8 +33,8 @@ public class CatalogAdminService implements CatalogAdministration {
     }
 
     @Override
-    public Map<String, Object> getDashboardAttributes() {
-        return dashboardService.getDashboardAttributes();
+    public Map<String, Object> getDashboardAttributes(Integer branchId) {
+        return dashboardService.getDashboardAttributes(branchId);
     }
 
     @Override

@@ -61,6 +61,9 @@ public class Customer {
     @Column(name = "role")
     private String role = "USER";
 
+    @Column(name = "access_level", nullable = false)
+    private Integer accessLevel = 0;
+
     // Default constructor
     public Customer() {}
 
@@ -114,4 +117,7 @@ public class Customer {
 
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+
+    public Integer getAccessLevel() { return accessLevel; }
+    public void setAccessLevel(Integer accessLevel) { this.accessLevel = accessLevel; }
 }

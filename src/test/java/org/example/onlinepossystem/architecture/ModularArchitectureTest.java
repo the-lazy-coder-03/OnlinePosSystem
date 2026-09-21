@@ -37,7 +37,7 @@ class ModularArchitectureTest {
             "staff"
     );
     private static final Map<String, Set<String>> ALLOWED_DEPENDENCIES = Map.ofEntries(
-            Map.entry("admin", Set.of("catalog")),
+            Map.entry("admin", Set.of("catalog", "customer")),
             Map.entry("bootstrap", Set.of("catalog", "staff")),
             Map.entry("branch", Set.of()),
             Map.entry("catalog", Set.of("branch")),

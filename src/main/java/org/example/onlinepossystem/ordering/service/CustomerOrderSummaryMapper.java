@@ -11,6 +11,12 @@ import java.util.stream.Collectors;
 
 @Component
 public class CustomerOrderSummaryMapper {
+    private final OrderTotalCalculator orderTotalCalculator;
+
+    public CustomerOrderSummaryMapper(OrderTotalCalculator orderTotalCalculator) {
+        this.orderTotalCalculator = orderTotalCalculator;
+    }
+
     public CustomerOrderSummary toSummary(OrderResponseDTO order) {
         return new CustomerOrderSummary(
                 order.getId(),
@@ -19,7 +25,7 @@ public class CustomerOrderSummaryMapper {
                 order.getStatus(),
                 order.getOrderType(),
                 itemLines(order),
-                orderTotal(order)
+                orderTotalCalculator.total(order)
         );
     }
 
@@ -58,28 +64,6 @@ public class CustomerOrderSummaryMapper {
 
     private String withExtras(String line, String extras) {
         return extras == null || extras.isBlank() ? line : line + " - Extras: " + extras;
-    }
-
-    private BigDecimal orderTotal(OrderResponseDTO order) {
-        BigDecimal total = BigDecimal.ZERO;
-        for (OrderResponseDTO.MenuItemDTO item : safeList(order.getMenuItems())) {
-            total = total.add(money(item.getUnitPriceAtTime()).multiply(BigDecimal.valueOf(quantity(item.getQty()))));
-            for (OrderResponseDTO.MenuItemExtraDTO extra : safeList(item.getExtras())) {
-                total = total.add(money(extra.getUnitPriceAtTime()).multiply(BigDecimal.valueOf(quantity(extra.getQty()))));
-            }
-        }
-        for (OrderResponseDTO.PizzaItemDTO item : safeList(order.getPizzaItems())) {
-            total = total.add(money(item.getBasePriceAtTime()).multiply(BigDecimal.valueOf(quantity(item.getQty()))));
-            total = total.add(money(item.getPizzaBaseOptionPriceAtTime()).multiply(BigDecimal.valueOf(quantity(item.getQty()))));
-            for (OrderResponseDTO.PizzaItemExtraDTO extra : safeList(item.getExtras())) {
-                total = total.add(money(extra.getUnitPriceAtTime()).multiply(BigDecimal.valueOf(quantity(extra.getQty()))));
-            }
-        }
-        return total;
-    }
-
-    private BigDecimal money(Double value) {
-        return value == null ? BigDecimal.ZERO : BigDecimal.valueOf(value);
     }
 
     private int quantity(Integer value) {

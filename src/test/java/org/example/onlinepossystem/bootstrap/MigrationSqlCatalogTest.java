@@ -95,6 +95,23 @@ class MigrationSqlCatalogTest {
     }
 
     @Test
+    void migratesAndConstrainsCustomerAccessLevels() throws IOException {
+        String sql = migrationSql();
+
+        assertThat(sql)
+                .contains("access_level    smallint NOT NULL DEFAULT 0")
+                .contains("ADD COLUMN IF NOT EXISTS access_level smallint")
+                .contains("WHEN 'ADMIN' THEN 3")
+                .contains("WHEN 'SUPER_ADMIN' THEN 3")
+                .contains("WHEN 'DRIVER' THEN 4")
+                .contains("CHECK (access_level BETWEEN 0 AND 4)")
+                .contains("WHEN 1 THEN 'ADMIN'")
+                .contains("WHEN 2 THEN 'ADMIN'")
+                .contains("WHEN 3 THEN 'SUPER_ADMIN'")
+                .contains("WHEN 4 THEN 'DRIVER'");
+    }
+
+    @Test
     void seedsExpandedMenuAndOrderablePizzaBaseOption() throws IOException {
         String sql = migrationSql();
 

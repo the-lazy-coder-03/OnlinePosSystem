@@ -1,6 +1,10 @@
 package org.example.onlinepossystem.admin.web;
 
 import org.example.onlinepossystem.catalog.api.CatalogAdministration;
+import org.example.onlinepossystem.customer.api.AccountAccess;
+import org.example.onlinepossystem.customer.api.AccountAccessReader;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -18,24 +22,32 @@ import java.util.Map;
 @RequestMapping("/admin")
 public class AdminController {
     private final CatalogAdministration catalogAdministration;
+    private final AccountAccessReader accountAccessReader;
 
-    public AdminController(CatalogAdministration catalogAdministration) {
+    public AdminController(CatalogAdministration catalogAdministration,
+                           AccountAccessReader accountAccessReader) {
         this.catalogAdministration = catalogAdministration;
+        this.accountAccessReader = accountAccessReader;
     }
 
     @GetMapping
-    public String adminDashboard(Model model) {
-        model.addAllAttributes(catalogAdministration.getDashboardAttributes());
+    public String adminDashboard(Model model, Authentication authentication) {
+        AccountAccess access = access(authentication);
+        model.addAllAttributes(catalogAdministration.getDashboardAttributes(access.branchId()));
+        model.addAttribute("adminLevel", access.level());
+        model.addAttribute("adminBranchId", access.branchId());
+        model.addAttribute("adminBranchName", branchName(access.branchId()));
+        model.addAttribute("superAdmin", access.isSuperAdmin());
         return "admin";
     }
 
     @GetMapping("/orders")
-    public String adminOrdersPage(Model model) {
-        model.addAttribute("adminMode", true);
-        return "InputOrders";
+    public String adminOrdersPage() {
+        return "redirect:/admin#orders";
     }
 
     @PostMapping("/pizzas/save")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String savePizza(@RequestParam(required = false) Integer id,
                             @RequestParam String name,
                             @RequestParam Integer categoryId,
@@ -49,6 +61,7 @@ public class AdminController {
     }
 
     @PostMapping("/pizzas/delete/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String deletePizza(@PathVariable Integer id, Authentication authentication) {
         catalogAdministration.deletePizza(id, actor(authentication));
         return "redirect:/admin#items";
@@ -60,11 +73,13 @@ public class AdminController {
                                    @RequestParam Integer pizzaSizeId,
                                    @RequestParam Double price,
                                    Authentication authentication) {
+        requireBranch(authentication, branchId);
         catalogAdministration.updatePizzaPrice(branchId, pizzaId, pizzaSizeId, price, actor(authentication));
         return "redirect:/admin#pricing";
     }
 
     @PostMapping("/menu-items/save")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String saveMenuItem(@RequestParam(required = false) Integer id,
                                @RequestParam String name,
                                @RequestParam Integer categoryId,
@@ -78,6 +93,7 @@ public class AdminController {
     }
 
     @PostMapping("/menu-items/delete/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String deleteMenuItem(@PathVariable Integer id, Authentication authentication) {
         catalogAdministration.deleteMenuItem(id, actor(authentication));
         return "redirect:/admin#items";
@@ -88,6 +104,7 @@ public class AdminController {
                                       @RequestParam Integer menuItemId,
                                       @RequestParam Double price,
                                       Authentication authentication) {
+        requireBranch(authentication, branchId);
         catalogAdministration.updateMenuItemPrice(branchId, menuItemId, price, actor(authentication));
         return "redirect:/admin#pricing";
     }
@@ -98,11 +115,13 @@ public class AdminController {
                                      @RequestParam Integer pizzaSizeId,
                                      @RequestParam Double price,
                                      Authentication authentication) {
+        requireBranch(authentication, branchId);
         catalogAdministration.updateToppingPrice(branchId, priceCategoryId, pizzaSizeId, price, actor(authentication));
         return "redirect:/admin#pricing";
     }
 
     @PostMapping("/pizza-categories/save")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String savePizzaCategory(@RequestParam(required = false) Integer id,
                                     @RequestParam String name,
                                     @RequestParam(required = false) Integer sortOrder,
@@ -113,6 +132,7 @@ public class AdminController {
     }
 
     @PostMapping("/menu-categories/save")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String saveMenuCategory(@RequestParam(required = false) Integer id,
                                    @RequestParam String name,
                                    @RequestParam(required = false) Integer sortOrder,
@@ -123,6 +143,7 @@ public class AdminController {
     }
 
     @PostMapping("/pizza-sizes/save")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String savePizzaSize(@RequestParam(required = false) Integer id,
                                 @RequestParam Integer cm,
                                 @RequestParam(required = false) Integer sortOrder,
@@ -133,6 +154,7 @@ public class AdminController {
     }
 
     @PostMapping("/price-categories/save")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String savePriceCategory(@RequestParam(required = false) Integer id,
                                     @RequestParam String name,
                                     @RequestParam(required = false) Integer sortOrder,
@@ -143,6 +165,7 @@ public class AdminController {
     }
 
     @PostMapping("/ingredients/save")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String saveIngredient(@RequestParam(required = false) Integer id,
                                  @RequestParam String name,
                                  @RequestParam Integer priceCategoryId,
@@ -153,6 +176,7 @@ public class AdminController {
     }
 
     @PostMapping("/modifier-groups/save")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String saveModifierGroup(@RequestParam(required = false) Integer id,
                                     @RequestParam String name,
                                     @RequestParam(required = false) Integer minSelect,
@@ -164,6 +188,7 @@ public class AdminController {
     }
 
     @PostMapping("/modifier-options/save")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String saveModifierOption(@RequestParam(required = false) Integer id,
                                      @RequestParam Integer groupId,
                                      @RequestParam String name,
@@ -176,5 +201,29 @@ public class AdminController {
 
     private String actor(Authentication authentication) {
         return authentication == null ? null : authentication.getName();
+    }
+
+    private AccountAccess access(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Admin authentication is required.");
+        }
+        AccountAccess access = accountAccessReader.findByUsername(authentication.getName());
+        if (!access.isAdmin()) {
+            throw new AccessDeniedException("Admin access is required.");
+        }
+        return access;
+    }
+
+    private void requireBranch(Authentication authentication, Integer branchId) {
+        if (!access(authentication).canAccessBranch(branchId)) {
+            throw new AccessDeniedException("This admin account cannot manage the requested branch.");
+        }
+    }
+
+    private String branchName(Integer branchId) {
+        if (branchId == null) {
+            return "All Branches";
+        }
+        return branchId == 1 ? "Kenridge" : "Uitzicht";
     }
 }

@@ -17,6 +17,7 @@ public record CustomerAccount(
         String postalCode,
         String firstName,
         String lastName,
-        String role
+        String role,
+        int accessLevel
 ) {
 }

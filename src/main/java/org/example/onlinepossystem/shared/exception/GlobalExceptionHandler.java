@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -76,6 +77,15 @@ public class GlobalExceptionHandler {
         model.addAttribute("message", ex.getStatusCode().is4xxClientError()
                 ? "Please check your input and try again."
                 : "An unexpected error occurred.");
+        return "error";
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public String handleAccessDenied(AccessDeniedException ex, Model model) {
+        logger.warn("Access denied: {}", ex.getMessage());
+        model.addAttribute("status", 403);
+        model.addAttribute("message", "You do not have permission to perform this action.");
         return "error";
     }
 

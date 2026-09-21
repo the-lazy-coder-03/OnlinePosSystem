@@ -1114,6 +1114,8 @@
     const MENU_ONLY = /*[[${menuOnly == true}]]*/ false;
     const INITIAL_BRANCH_ID = /*[[${branchId}]]*/ null;
     const INITIAL_BRANCH_NAME = /*[[${branchName ?: ''}]]*/ "";
+    const PREFERRED_BRANCH_ID = /*[[${preferredBranchId}]]*/ null;
+    const PREFERRED_BRANCH_NAME = /*[[${preferredBranchName ?: ''}]]*/ "";
     const CUSTOMER_ORDER_QUEUE = "/user/queue/orders";
     let customerStompClient = null;
     let customerReconnectTimerId = null;
@@ -2156,7 +2158,7 @@
             $("btnSidebarClear").addEventListener("click", () => store.clearCart(true));
 
             $("btnChangeBranch").addEventListener("click", () => {
-                ui.showBranchOverlay(true);
+                ui.openBranchPicker();
             });
 
             $("btnHomeTop").addEventListener("click", goHome);
@@ -2206,6 +2208,8 @@
             if (MENU_ONLY && Number.isFinite(Number(INITIAL_BRANCH_ID))){
                 const branchId = Number(INITIAL_BRANCH_ID);
                 await actions.loadBranch(branchId, INITIAL_BRANCH_NAME || branchNameFromId(branchId), null);
+            } else if (!MENU_ONLY && Number.isFinite(Number(PREFERRED_BRANCH_ID)) && PREFERRED_BRANCH_NAME){
+                actions.preparePreferredBranch(Number(PREFERRED_BRANCH_ID), PREFERRED_BRANCH_NAME);
             } else {
                 ui.showBranchOverlay(true);
             }
@@ -2235,6 +2239,18 @@
             }
             ui.showOrderTypeStep(true);
             ui.resetOrderTypeUI();
+        },
+
+        preparePreferredBranch(branchId, branchName){
+            state.selection.branchId = branchId;
+            state.selection.branchName = branchName;
+            state.orderType = null;
+            ui.setBranchChoiceUI(branchId);
+            ui.showBranchOverlay(true);
+            ui.showBranchStep(false);
+            ui.showOrderTypeStep(true);
+            ui.resetOrderTypeUI();
+            ui.showPreferredBranchPrompt(branchName);
         },
 
         async selectOrderType(orderType){
@@ -3325,16 +3341,43 @@
                     state.selection.branchId = state.branch.id;
                     state.selection.branchName = state.branch.name;
                     ui.setBranchChoiceUI(state.branch.id);
+                    ui.showBranchStep(true);
                     ui.showOrderTypeStep(!MENU_ONLY);
                     if (!MENU_ONLY) ui.setOrderTypeChoiceUI(state.orderType);
+                } else if (state.selection.branchId && !MENU_ONLY){
+                    ui.setBranchChoiceUI(state.selection.branchId);
+                    ui.showBranchStep(false);
+                    ui.showOrderTypeStep(true);
+                    ui.setOrderTypeChoiceUI(state.orderType);
                 } else {
                     state.selection.branchId = null;
                     state.selection.branchName = "";
                     ui.setBranchChoiceUI(null);
                     ui.resetOrderTypeUI();
+                    ui.showBranchStep(true);
                     ui.showOrderTypeStep(false);
                 }
             }
+        },
+        openBranchPicker(){
+            if (!state.branch.id){
+                state.selection.branchId = null;
+                state.selection.branchName = "";
+                state.orderType = null;
+            }
+            ui.showBranchOverlay(true);
+            ui.showBranchStep(true);
+            ui.showOrderTypeStep(false);
+            ui.resetOrderTypeUI();
+            $("branchOverlayTitle").textContent = "Start Your Order";
+            $("branchOverlayDesc").textContent = "Choose a branch first, then select collection or delivery.";
+        },
+        showPreferredBranchPrompt(branchName){
+            $("branchOverlayTitle").textContent = "Use Your Preferred Store";
+            $("branchOverlayDesc").textContent = `${branchName} is selected from your account. Choose collection or delivery.`;
+        },
+        showBranchStep(show){
+            $("branchStep").classList.toggle("hidden", !show);
         },
         showOrderTypeStep(show){
             $("orderTypeStep").classList.toggle("hidden", !show);

@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface CatalogAdministration {
-    Map<String, Object> getDashboardAttributes();
+    Map<String, Object> getDashboardAttributes(Integer branchId);
 
     void savePizza(Integer id, String name, Integer categoryId, String description, Integer sortOrder,
                    List<Integer> ingredientIds, Map<String, String> parameters, String actor);

@@ -7,7 +7,10 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class CustomerUserDetailsService implements UserDetailsService {
@@ -40,7 +43,7 @@ public class CustomerUserDetailsService implements UserDetailsService {
             return User.builder()
                     .username(adminUsername)
                     .password("{noop}" + adminPassword)
-                    .roles("ADMIN", "USER")
+                    .authorities(authoritiesFor(3))
                     .build();
         }
 
@@ -53,7 +56,7 @@ public class CustomerUserDetailsService implements UserDetailsService {
         return User.builder()
                 .username(customer.getEmail())
                 .password(formatPasswordForSpringSecurity(customer.getPassword()))
-                .roles(safeRole(customer.getRole()))
+                .authorities(authoritiesFor(effectiveLevel(customer)))
                 .accountLocked(false)
                 .disabled(false)
                 .build();
@@ -66,10 +69,27 @@ public class CustomerUserDetailsService implements UserDetailsService {
         return "{bcrypt}" + storedPassword;
     }
 
-    private String safeRole(String role) {
-        if (role == null || role.isBlank()) {
-            return "USER";
+    private int effectiveLevel(Customer customer) {
+        if (customer.getAccessLevel() != null) {
+            return customer.getAccessLevel();
         }
-        return role.replace("ROLE_", "").trim().toUpperCase();
+        String role = customer.getRole() == null ? "" : customer.getRole().replace("ROLE_", "").trim().toUpperCase();
+        return switch (role) {
+            case "ADMIN", "SUPER_ADMIN" -> 3;
+            case "DRIVER" -> 4;
+            default -> 0;
+        };
+    }
+
+    private List<SimpleGrantedAuthority> authoritiesFor(int accessLevel) {
+        return switch (accessLevel) {
+            case 1, 2 -> List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+            case 3 -> List.of(
+                    new SimpleGrantedAuthority("ROLE_ADMIN"),
+                    new SimpleGrantedAuthority("ROLE_SUPER_ADMIN")
+            );
+            case 4 -> List.of(new SimpleGrantedAuthority("ROLE_DRIVER"));
+            default -> List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        };
     }
 }

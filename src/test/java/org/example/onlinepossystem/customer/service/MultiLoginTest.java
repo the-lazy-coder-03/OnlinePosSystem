@@ -10,6 +10,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.hamcrest.Matchers.containsString;
 
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.mock.web.MockHttpSession;
@@ -118,7 +119,54 @@ public class MultiLoginTest {
 
         mockMvc.perform(MockMvcRequestBuilders.get("/order").session(session))
                 .andExpect(status().isOk())
-                .andExpect(authenticated().withUsername(email));
+                .andExpect(authenticated().withUsername(email))
+                .andExpect(model().attribute("preferredBranchId", 1))
+                .andExpect(model().attribute("preferredBranchName", "Kenridge"))
+                .andExpect(content().string(containsString("const PREFERRED_BRANCH_ID = 1;")))
+                .andExpect(content().string(containsString("const PREFERRED_BRANCH_NAME = \"Kenridge\";")));
+    }
+
+    @Test
+    public void testPreferredUitzichtStoreIsResolvedForOrdering() throws Exception {
+        String email = "preferred-uitzicht@example.com";
+        customerService.registerCustomer(
+                "Preferred", "Uitzicht", email, "Password1!", "0712345679", null,
+                "12", "Main Street", "Area", null, "Uitzicht Branch", "7550"
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/order")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(email)
+                                .roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("preferredBranchId", 2))
+                .andExpect(model().attribute("preferredBranchName", "Uitzicht"));
+    }
+
+    @Test
+    public void testMissingOrInvalidPreferredStoreFallsBackToBranchPicker() throws Exception {
+        String missingEmail = "missing-preferred@example.com";
+        customerService.registerCustomer(
+                "Missing", "Preferred", missingEmail, "Password1!", "0712345680", null,
+                "12", "Main Street", "Area", null, null, "7550"
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/order")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(missingEmail)
+                                .roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeDoesNotExist("preferredBranchId", "preferredBranchName"));
+
+        String invalidEmail = "invalid-preferred@example.com";
+        customerService.registerCustomer(
+                "Invalid", "Preferred", invalidEmail, "Password1!", "0712345681", null,
+                "12", "Main Street", "Area", null, "Unknown Branch", "7550"
+        );
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/order")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(invalidEmail)
+                                .roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeDoesNotExist("preferredBranchId", "preferredBranchName"));
     }
 
     @Test

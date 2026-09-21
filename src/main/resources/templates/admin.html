@@ -2,402 +2,162 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_parameter" th:content="${_csrf.parameterName}">
-    <title>Admin Dashboard - Pete's Pizza</title>
-    <style>
-        body { font-family: sans-serif; margin: 20px; background: #f4f4f4; }
-        h1, h2 { color: #333; }
-        .container { max-width: 1200px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .tabs { display: flex; border-bottom: 2px solid #ccc; margin-bottom: 20px; }
-        .tab { padding: 10px 20px; cursor: pointer; border: 1px solid transparent; border-bottom: none; }
-        .tab.active { background: #fff; border-color: #ccc; border-bottom: 2px solid #fff; margin-bottom: -2px; font-weight: bold; }
-        .section { display: none; }
-        .section.active { display: block; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background: #f2f2f2; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
-        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: #fff; }
-        .btn-primary { background: #007bff; }
-        .btn-danger { background: #dc3545; }
-        .btn-success { background: #28a745; }
-        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); }
-        .modal-content { background: #fff; margin: 10% auto; padding: 20px; border-radius: 8px; width: 50%; }
-    </style>
+    <title>Admin Workspace | Pete's Pizza</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
 </head>
-<body>
+<body class="admin-body" th:data-admin-level="${adminLevel}" th:data-admin-branch-id="${adminBranchId}">
+<div class="admin-shell">
+    <aside class="admin-sidebar" aria-label="Admin navigation">
+        <div class="admin-brand">
+            <span class="admin-brand-mark"><i class="bi bi-shop" aria-hidden="true"></i></span>
+            <div><strong>Pete's Pizza</strong><span>Admin workspace</span></div>
+        </div>
+        <nav class="admin-nav nav nav-pills flex-column" role="tablist" aria-orientation="vertical">
+            <button class="nav-link active" type="button" data-admin-panel="overview" role="tab" aria-selected="true"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i><span data-panel-title="overview">Overview</span></button>
+            <button class="nav-link" type="button" data-admin-panel="orders" role="tab" aria-selected="false"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i><span data-panel-title="orders">Live Orders</span></button>
+            <button class="nav-link" type="button" data-admin-panel="items" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-box-seam" aria-hidden="true"></i><span data-panel-title="items">Items</span></button>
+            <button class="nav-link" type="button" data-admin-panel="pricing" role="tab" aria-selected="false"><i class="bi bi-tags" aria-hidden="true"></i><span data-panel-title="pricing">Pricing</span></button>
+            <button class="nav-link" type="button" data-admin-panel="categories" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-ui-checks-grid" aria-hidden="true"></i><span data-panel-title="categories">Categories &amp; Sizes</span></button>
+            <button class="nav-link" type="button" data-admin-panel="ingredients" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-list-check" aria-hidden="true"></i><span data-panel-title="ingredients">Ingredients</span></button>
+            <button class="nav-link" type="button" data-admin-panel="modifiers" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-sliders" aria-hidden="true"></i><span data-panel-title="modifiers">Modifiers</span></button>
+            <button class="nav-link" type="button" data-admin-panel="accounts" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-people" aria-hidden="true"></i><span data-panel-title="accounts">Admin Accounts</span></button>
+        </nav>
+        <div class="admin-sidebar-footer">
+            <div class="admin-access-label"><span th:text="${adminBranchName}">All Branches</span><span th:text="${' | Level ' + adminLevel}"> | Level 3</span></div>
+            <a class="btn btn-sm btn-outline-light w-100" th:href="@{/}"><i class="bi bi-arrow-left me-2"></i>Return to site</a>
+        </div>
+    </aside>
 
-<div class="container">
-    <h1>Admin Dashboard</h1>
-    <a href="/" style="display: inline-block; margin-bottom: 20px;">&larr; Back to Home</a>
-    <a href="/admin/orders" style="display: inline-block; margin-bottom: 20px; margin-left: 15px;">Live Orders</a>
-
-    <div class="tabs">
-        <div class="tab active" onclick="showSection('pizzas')">Pizzas</div>
-        <div class="tab" onclick="showSection('menuItems')">Menu Items</div>
-        <div class="tab" onclick="showSection('toppings')">Extra Toppings</div>
+    <div class="mobile-admin-bar">
+        <div class="d-flex align-items-center gap-2"><span class="admin-brand-mark"><i class="bi bi-shop" aria-hidden="true"></i></span><strong>Pete's Admin</strong></div>
+        <button class="btn btn-outline-light" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileAdminNav" aria-controls="mobileAdminNav" aria-label="Open navigation"><i class="bi bi-list fs-5" aria-hidden="true"></i></button>
     </div>
 
-    <!-- Pizzas Section -->
-    <div id="pizzas" class="section active">
-        <h2>Manage Pizzas</h2>
-        <button class="btn btn-primary" onclick="openModal('pizzaModal')">Add New Pizza</button>
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>Default Toppings</th>
-                    <th>Description</th>
-                    <th>Active</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="p : ${pizzas}">
-                    <td th:text="${p.id}">1</td>
-                    <td th:text="${p.name}">Margherita</td>
-                    <td th:text="${p.category != null ? p.category.name : 'Unassigned'}">Favourite</td>
-                    <td>
-                        <div style="font-size: 0.8em;">
-                            <th:block th:each="pdi : ${pizzaDefaultIngredients}"
-                                      th:if="${pdi.pizza != null and pdi.ingredient != null and pdi.pizza.id == p.id}">
-                                <span th:text="${pdi.ingredient.name}"></span><br/>
-                            </th:block>
-                        </div>
-                    </td>
-                    <td th:text="${p.description}">Classic</td>
-                    <td th:text="${p.active}">true</td>
-                    <td>
-                        <div style="font-size: 0.8em; margin-bottom: 5px;">
-                            <th:block th:each="bp : ${branchPizzaPrices}"
-                                      th:if="${bp.pizza != null and bp.branchName != null and bp.pizzaSize != null and bp.pizza.id == p.id}">
-                                <span th:text="${bp.branchName + ' (' + bp.pizzaSize.cm + 'cm): R' + bp.price}"></span><br/>
-                            </th:block>
-                        </div>
-                        <button class="btn btn-success" th:onclick="'openPriceModal(' + ${p.id} + ', \'pizza\')'">Set Prices</button>
-                        <button class="btn btn-primary"
-                                onclick="openPizzaEditFromButton(this)"
-                                th:data-id="${p.id}"
-                                th:data-name="${p.name}"
-                                th:data-category-id="${p.category != null ? p.category.id : ''}"
-                                th:data-description="${p.description != null ? p.description : ''}"
-                                th:data-sort-order="${p.sortOrder}"
-                                th:data-active="${p.active}"
-                                th:data-ingredient-ids="${#strings.listJoin(pizzaDefaultIngredients.?[pizza != null and ingredient != null and pizza.id == __${p.id}__].![ingredient.id], ',')}"
-                                style="background: #17a2b8;">Edit</button>
-                        <form th:action="@{/admin/pizzas/delete/{id}(id=${p.id})}" method="post" style="display:inline;">
-                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                            <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="offcanvas offcanvas-start text-bg-dark" tabindex="-1" id="mobileAdminNav" aria-labelledby="mobileAdminNavLabel">
+        <div class="offcanvas-header border-bottom border-secondary"><h2 class="offcanvas-title fs-5" id="mobileAdminNavLabel">Admin workspace</h2><button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button></div>
+        <div class="offcanvas-body p-0"><nav class="admin-nav nav nav-pills flex-column" role="tablist" aria-orientation="vertical">
+            <button class="nav-link active" type="button" data-admin-panel="overview" role="tab" aria-selected="true"><i class="bi bi-grid-1x2-fill"></i>Overview</button>
+            <button class="nav-link" type="button" data-admin-panel="orders" role="tab" aria-selected="false"><i class="bi bi-receipt-cutoff"></i>Live Orders</button>
+            <button class="nav-link" type="button" data-admin-panel="items" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-box-seam"></i>Items</button>
+            <button class="nav-link" type="button" data-admin-panel="pricing" role="tab" aria-selected="false"><i class="bi bi-tags"></i>Pricing</button>
+            <button class="nav-link" type="button" data-admin-panel="categories" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-ui-checks-grid"></i>Categories &amp; Sizes</button>
+            <button class="nav-link" type="button" data-admin-panel="ingredients" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-list-check"></i>Ingredients</button>
+            <button class="nav-link" type="button" data-admin-panel="modifiers" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-sliders"></i>Modifiers</button>
+            <button class="nav-link" type="button" data-admin-panel="accounts" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-people"></i>Admin Accounts</button>
+        </nav></div>
     </div>
 
-    <!-- Menu Items Section -->
-    <div id="menuItems" class="section">
-        <h2>Manage Menu Items</h2>
-        <button class="btn btn-primary" onclick="openModal('menuItemModal')">Add New Menu Item</button>
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>Description</th>
-                    <th>Active</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="m : ${menuItems}">
-                    <td th:text="${m.id}">1</td>
-                    <td th:text="${m.name}">Coke</td>
-                    <td th:text="${m.category != null ? m.category.name : 'Unassigned'}">Drinks</td>
-                    <td th:text="${m.description}">500ml</td>
-                    <td th:text="${m.active}">true</td>
-                    <td>
-                        <div style="font-size: 0.8em; margin-bottom: 5px;">
-                            <th:block th:each="bm : ${branchMenuItemPrices}"
-                                      th:if="${bm.menuItem != null and bm.branchName != null and bm.menuItem.id == m.id}">
-                                <span th:text="${bm.branchName + ': R' + bm.price}"></span><br/>
-                            </th:block>
-                        </div>
-                        <button class="btn btn-success" th:onclick="'openPriceModal(' + ${m.id} + ', \'menuItem\')'">Set Prices</button>
-                        <form th:action="@{/admin/menu-items/delete/{id}(id=${m.id})}" method="post" style="display:inline;">
-                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                            <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure?')">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Extra Toppings Section -->
-    <div id="toppings" class="section">
-        <h2>Manage Extra Topping Prices</h2>
-        <button class="btn btn-primary" onclick="openPriceModal(null, 'topping')">Set Topping Price</button>
-        <table>
-            <thead>
-                <tr>
-                    <th>Branch</th>
-                    <th>Price Category</th>
-                    <th>Size</th>
-                    <th>Price</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr th:each="ep : ${branchExtraPrices}">
-                    <td th:text="${ep.branchName != null ? ep.branchName : 'Missing branch'}">Branch</td>
-                    <td th:text="${ep.priceCategory != null ? ep.priceCategory.name : 'Missing category'}">Category</td>
-                    <td th:text="${ep.pizzaSize != null ? ep.pizzaSize.cm + 'cm' : 'Missing size'}">Size</td>
-                    <td th:text="'R' + ${ep.price}">Price</td>
-                    <td>
-                        <button class="btn btn-success"
-                                th:if="${ep.priceCategory != null and ep.branchId != null and ep.pizzaSize != null}"
-                                th:onclick="'openPriceModal(' + ${ep.priceCategory.id} + ', \'topping\', ' + ${ep.branchId} + ', ' + ${ep.pizzaSize.id} + ', ' + ${ep.price} + ')'">Edit</button>
-                        <span th:unless="${ep.priceCategory != null and ep.branchId != null and ep.pizzaSize != null}">Fix related data first</span>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Pizza Modal -->
-<div id="pizzaModal" class="modal">
-    <div class="modal-content">
-        <h2>Add/Edit Pizza</h2>
-        <form th:action="@{/admin/pizzas/save}" method="post">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-            <input type="hidden" name="id" id="pizzaId">
-            <div class="form-group">
-                <label>Name</label>
-                <input type="text" name="name" required>
-            </div>
-            <div class="form-group">
-                <label>Category</label>
-                <select name="categoryId">
-                    <option th:each="cat : ${pizzaCategories}" th:value="${cat.id}" th:text="${cat.name}"></option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Description</label>
-                <textarea name="description" id="pizzaDescription"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Default Toppings</label>
-                <div style="max-height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 5px;">
-                    <th:block th:each="ing : ${ingredients}">
-                        <label style="font-weight: normal; display: block;">
-                            <input type="checkbox" name="ingredientIds" th:value="${ing.id}" class="pizza-ingredient-checkbox">
-                            <span th:text="${ing.name}">Ingredient</span>
-                        </label>
-                    </th:block>
+    <main class="admin-main">
+        <header class="admin-topbar">
+            <div><h1 id="currentPanelTitle">Overview</h1><div class="admin-topbar-meta" th:text="${adminBranchName + ' access'}">All Branches access</div></div>
+            <div class="connection-indicator" data-live-status><span class="connection-dot"></span><span>Connecting</span></div>
+        </header>
+        <div class="admin-content">
+            <section id="overview" class="admin-panel active" aria-labelledby="overviewHeading">
+                <div class="panel-heading"><div><h2 id="overviewHeading">Operations at a glance</h2><p>Live workload and recognized sales in Africa/Johannesburg time.</p></div><div class="connection-indicator" data-live-status><span class="connection-dot"></span><span>Connecting</span></div></div>
+                <div class="toolbar flex-wrap">
+                    <div th:if="${superAdmin}"><label class="form-label" for="overviewBranch">Branch</label><select class="form-select" id="overviewBranch"><option value="">All Branches</option><option th:each="branch : ${branches}" th:value="${branch.id}" th:text="${branch.name}">Branch</option></select></div>
+                    <div><label class="form-label" for="overviewRange">Sales period</label><select class="form-select" id="overviewRange"><option value="today">Today</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="custom">Custom range</option></select></div>
+                    <div id="customDateFields" class="d-none d-flex flex-wrap gap-2"><div><label class="form-label" for="overviewStart">Start</label><input class="form-control" id="overviewStart" type="date"></div><div><label class="form-label" for="overviewEnd">End</label><input class="form-control" id="overviewEnd" type="date"></div></div>
+                    <button class="btn btn-primary" type="button" id="overviewApply"><i class="bi bi-arrow-clockwise me-1"></i>Apply</button><span class="ms-auto text-secondary small align-self-center" id="overviewPeriod"></span>
                 </div>
-            </div>
-            <div class="form-group">
-                <label>Sort Order</label>
-                <input type="number" name="sortOrder" value="0">
-            </div>
-            <div class="form-group">
-                <label><input type="checkbox" name="active" checked> Active</label>
-            </div>
-            <button type="submit" class="btn btn-primary">Save</button>
-            <button type="button" class="btn btn-danger" onclick="closeModal('pizzaModal')">Cancel</button>
-        </form>
-    </div>
+                <div id="overviewError" class="alert alert-danger d-none" role="alert">Overview metrics could not be loaded.</div>
+                <div class="metric-grid">
+                    <div class="metric-card"><span class="metric-label">Pending orders</span><strong class="metric-value" id="metricPending">0</strong></div>
+                    <div class="metric-card is-orange"><span class="metric-label">Preparing</span><strong class="metric-value" id="metricPreparing">0</strong></div>
+                    <div class="metric-card is-green"><span class="metric-label">Completed</span><strong class="metric-value" id="metricCompleted">0</strong></div>
+                    <div class="metric-card is-red"><span class="metric-label">Rejected</span><strong class="metric-value" id="metricRejected">0</strong></div>
+                    <div class="metric-card is-green"><span class="metric-label">Completed revenue</span><strong class="metric-value" id="metricRevenue">R0.00</strong></div>
+                    <div class="metric-card"><span class="metric-label">Average order</span><strong class="metric-value" id="metricAverage">R0.00</strong></div>
+                    <div class="metric-card"><span class="metric-label">Active pizzas</span><strong class="metric-value" th:text="${activePizzaCount}">0</strong></div>
+                    <div class="metric-card is-orange"><span class="metric-label">Active catalog items</span><strong class="metric-value" th:text="${activeMenuItemCount + activeIngredientCount}">0</strong></div>
+                </div>
+                <div class="admin-section"><div class="section-title"><h3>Branch comparison</h3></div><div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Branch</th><th>Pending</th><th>Preparing</th><th>Completed</th><th>Rejected</th><th>Revenue</th></tr></thead><tbody id="branchSummaryBody"><tr><td colspan="6" class="text-center text-secondary py-4">Loading sales summary...</td></tr></tbody></table></div></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Workspace shortcuts</h3></div><div class="quick-links">
+                    <a class="quick-link" href="#orders" data-admin-panel="orders"><i class="bi bi-receipt-cutoff"></i><span>Open live orders</span></a>
+                    <a class="quick-link" href="#pricing" data-admin-panel="pricing"><i class="bi bi-tags"></i><span>Manage pricing</span></a>
+                    <a class="quick-link" href="#items" data-admin-panel="items" th:if="${superAdmin}"><i class="bi bi-box-seam"></i><span>Manage items</span></a>
+                    <a class="quick-link" href="#accounts" data-admin-panel="accounts" th:if="${superAdmin}"><i class="bi bi-people"></i><span>Manage access</span></a>
+                </div></div>
+            </section>
+
+            <section id="orders" class="admin-panel" aria-labelledby="ordersHeading">
+                <div class="panel-heading"><div><h2 id="ordersHeading">Live Orders</h2><p>Pending and in-progress orders for your permitted branch scope.</p></div><button class="btn btn-outline-primary" type="button" id="adminOrdersRefresh"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button></div>
+                <div class="order-list" id="adminOrderList"><div class="empty-state">Loading live orders...</div></div>
+            </section>
+
+            <section id="items" class="admin-panel" aria-labelledby="itemsHeading" th:if="${superAdmin}">
+                <div class="panel-heading"><div><h2 id="itemsHeading">Catalog Items</h2><p>Maintain pizzas and other menu items across both branches.</p></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Pizzas</h3><button class="btn btn-primary" type="button" id="addPizzaButton" data-bs-toggle="modal" data-bs-target="#pizzaModal"><i class="bi bi-plus-lg me-1"></i>Add pizza</button></div><div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table">
+                    <thead><tr><th>Name</th><th>Category</th><th>Default ingredients</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+                    <tr th:each="pizza : ${pizzas}"><td><strong th:text="${pizza.name}">Pizza</strong><div class="small text-secondary" th:text="${pizza.description}"></div></td><td th:text="${pizza.category != null ? pizza.category.name : 'Unassigned'}">Category</td><td><span class="small d-block" th:each="link : ${pizzaDefaultIngredients}" th:if="${link.pizza != null and link.ingredient != null and link.pizza.id == pizza.id}" th:text="${link.ingredient.name}">Ingredient</span></td><td><span class="badge" th:classappend="${pizza.active ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${pizza.active ? 'Active' : 'Hidden'}">Active</span></td><td><div class="table-actions"><button class="btn btn-sm btn-outline-primary" type="button" data-pizza-edit data-bs-toggle="modal" data-bs-target="#pizzaModal" th:data-id="${pizza.id}" th:data-name="${pizza.name}" th:data-category-id="${pizza.category != null ? pizza.category.id : ''}" th:data-description="${pizza.description}" th:data-sort-order="${pizza.sortOrder}" th:data-active="${pizza.active}" th:data-ingredient-ids="${pizzaIngredientIdsByPizzaId[pizza.id]}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></button><button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal" th:data-delete-action="@{/admin/pizzas/delete/{id}(id=${pizza.id})}" th:data-delete-name="${pizza.name}" data-delete-action><i class="bi bi-trash"></i><span class="visually-hidden">Delete</span></button></div></td></tr>
+                    </tbody></table></div></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Menu items</h3><button class="btn btn-primary" type="button" id="addMenuButton" data-bs-toggle="modal" data-bs-target="#menuItemModal"><i class="bi bi-plus-lg me-1"></i>Add item</button></div><div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table">
+                    <thead><tr><th>Name</th><th>Category</th><th>Format</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+                    <tr th:each="item : ${menuItems}"><td><strong th:text="${item.name}">Item</strong><div class="small text-secondary" th:text="${item.description}"></div></td><td th:text="${item.category != null ? item.category.name : 'Unassigned'}">Category</td><td><span th:if="${item.is300ml}" class="badge text-bg-light me-1">300 ml</span><span th:if="${item.is2l}" class="badge text-bg-light">2 L</span><span th:if="${!item.is300ml and !item.is2l}" class="text-secondary">Standard</span></td><td><span class="badge" th:classappend="${item.active ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${item.active ? 'Active' : 'Hidden'}">Active</span></td><td><div class="table-actions"><button class="btn btn-sm btn-outline-primary" type="button" data-menu-edit data-bs-toggle="modal" data-bs-target="#menuItemModal" th:data-id="${item.id}" th:data-name="${item.name}" th:data-category-id="${item.category != null ? item.category.id : ''}" th:data-description="${item.description}" th:data-sort-order="${item.sortOrder}" th:data-active="${item.active}" th:data-is300ml="${item.is300ml}" th:data-is2l="${item.is2l}" th:data-modifier-group-ids="${modifierGroupIdsByMenuItemId[item.id]}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></button><button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal" th:data-delete-action="@{/admin/menu-items/delete/{id}(id=${item.id})}" th:data-delete-name="${item.name}" data-delete-action><i class="bi bi-trash"></i><span class="visually-hidden">Delete</span></button></div></td></tr>
+                    </tbody></table></div></div></div>
+            </section>
+
+            <section id="pricing" class="admin-panel" aria-labelledby="pricingHeading">
+                <div class="panel-heading"><div><h2 id="pricingHeading">Branch Pricing</h2><p th:text="${superAdmin ? 'Set stored catalog prices for either branch.' : 'Set stored catalog prices for ' + adminBranchName + '.'}">Set branch prices.</p></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Pizza prices</h3><button class="btn btn-primary" type="button" data-price-edit data-type="pizza" data-action="/admin/pizzas/price" data-title="Set pizza price" data-bs-toggle="modal" data-bs-target="#priceModal"><i class="bi bi-plus-lg me-1"></i>Set pizza price</button></div><div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Branch</th><th>Pizza</th><th>Size</th><th>Price</th><th>Action</th></tr></thead><tbody><tr th:each="price : ${branchPizzaPrices}"><td th:text="${price.branchName}">Branch</td><td th:text="${price.pizza != null ? price.pizza.name : 'Missing item'}">Pizza</td><td th:text="${price.pizzaSize != null ? price.pizzaSize.cm + ' cm' : 'Missing size'}">Size</td><td th:text="${'R' + #numbers.formatDecimal(price.price, 1, 2)}">R0.00</td><td><button class="btn btn-sm btn-outline-primary" type="button" data-price-edit data-type="pizza" data-action="/admin/pizzas/price" data-title="Edit pizza price" data-bs-toggle="modal" data-bs-target="#priceModal" th:data-branch-id="${price.branchId}" th:data-pizza-id="${price.pizza.id}" th:data-pizza-size-id="${price.pizzaSize.id}" th:data-price="${price.price}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></button></td></tr></tbody></table></div></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Menu item prices</h3><button class="btn btn-primary" type="button" data-price-edit data-type="menu" data-action="/admin/menu-items/price" data-title="Set menu item price" data-bs-toggle="modal" data-bs-target="#priceModal"><i class="bi bi-plus-lg me-1"></i>Set item price</button></div><div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Branch</th><th>Menu item</th><th>Price</th><th>Action</th></tr></thead><tbody><tr th:each="price : ${branchMenuItemPrices}"><td th:text="${price.branchName}">Branch</td><td th:text="${price.menuItem != null ? price.menuItem.name : 'Missing item'}">Item</td><td th:text="${'R' + #numbers.formatDecimal(price.price, 1, 2)}">R0.00</td><td><button class="btn btn-sm btn-outline-primary" type="button" data-price-edit data-type="menu" data-action="/admin/menu-items/price" data-title="Edit menu item price" data-bs-toggle="modal" data-bs-target="#priceModal" th:data-branch-id="${price.branchId}" th:data-menu-item-id="${price.menuItem.id}" th:data-price="${price.price}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></button></td></tr></tbody></table></div></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Extra topping prices</h3><button class="btn btn-primary" type="button" data-price-edit data-type="topping" data-action="/admin/toppings/price" data-title="Set extra topping price" data-bs-toggle="modal" data-bs-target="#priceModal"><i class="bi bi-plus-lg me-1"></i>Set topping price</button></div><div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Branch</th><th>Price category</th><th>Size</th><th>Price</th><th>Action</th></tr></thead><tbody><tr th:each="price : ${branchExtraPrices}"><td th:text="${price.branchName}">Branch</td><td th:text="${price.priceCategory != null ? price.priceCategory.name : 'Missing category'}">Category</td><td th:text="${price.pizzaSize != null ? price.pizzaSize.cm + ' cm' : 'Missing size'}">Size</td><td th:text="${'R' + #numbers.formatDecimal(price.price, 1, 2)}">R0.00</td><td><button class="btn btn-sm btn-outline-primary" type="button" data-price-edit data-type="topping" data-action="/admin/toppings/price" data-title="Edit extra topping price" data-bs-toggle="modal" data-bs-target="#priceModal" th:data-branch-id="${price.branchId}" th:data-price-category-id="${price.priceCategory.id}" th:data-pizza-size-id="${price.pizzaSize.id}" th:data-price="${price.price}"><i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span></button></td></tr></tbody></table></div></div></div>
+            </section>
+
+            <section id="categories" class="admin-panel" aria-labelledby="categoriesHeading" th:if="${superAdmin}">
+                <div class="panel-heading"><div><h2 id="categoriesHeading">Categories &amp; Sizes</h2><p>Shared catalog structure used by both branches.</p></div></div>
+                <div class="row g-4">
+                    <div class="col-xl-6"><div class="section-title"><h3>Pizza categories</h3><button class="btn btn-sm btn-primary" type="button" data-taxonomy-edit data-kind="pizza-category" data-action="/admin/pizza-categories/save" data-title="Add pizza category" data-bs-toggle="modal" data-bs-target="#taxonomyModal"><i class="bi bi-plus-lg"></i></button></div><div class="admin-table-wrap"><table class="table admin-table"><thead><tr><th>Name</th><th>Order</th><th>Status</th><th></th></tr></thead><tbody><tr th:each="category : ${pizzaCategories}"><td th:text="${category.name}">Name</td><td th:text="${category.sortOrder}">0</td><td><span class="badge" th:classappend="${category.active ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${category.active ? 'Active' : 'Hidden'}">Active</span></td><td><button class="btn btn-sm btn-outline-primary" type="button" data-taxonomy-edit data-kind="pizza-category" data-action="/admin/pizza-categories/save" data-title="Edit pizza category" data-bs-toggle="modal" data-bs-target="#taxonomyModal" th:data-id="${category.id}" th:data-name="${category.name}" th:data-sort-order="${category.sortOrder}" th:data-active="${category.active}"><i class="bi bi-pencil"></i></button></td></tr></tbody></table></div></div>
+                    <div class="col-xl-6"><div class="section-title"><h3>Menu categories</h3><button class="btn btn-sm btn-primary" type="button" data-taxonomy-edit data-kind="menu-category" data-action="/admin/menu-categories/save" data-title="Add menu category" data-bs-toggle="modal" data-bs-target="#taxonomyModal"><i class="bi bi-plus-lg"></i></button></div><div class="admin-table-wrap"><table class="table admin-table"><thead><tr><th>Name</th><th>Order</th><th>Status</th><th></th></tr></thead><tbody><tr th:each="category : ${menuCategories}"><td th:text="${category.name}">Name</td><td th:text="${category.sortOrder}">0</td><td><span class="badge" th:classappend="${category.active ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${category.active ? 'Active' : 'Hidden'}">Active</span></td><td><button class="btn btn-sm btn-outline-primary" type="button" data-taxonomy-edit data-kind="menu-category" data-action="/admin/menu-categories/save" data-title="Edit menu category" data-bs-toggle="modal" data-bs-target="#taxonomyModal" th:data-id="${category.id}" th:data-name="${category.name}" th:data-sort-order="${category.sortOrder}" th:data-active="${category.active}"><i class="bi bi-pencil"></i></button></td></tr></tbody></table></div></div>
+                    <div class="col-xl-6"><div class="section-title"><h3>Pizza sizes</h3><button class="btn btn-sm btn-primary" type="button" data-taxonomy-edit data-kind="size" data-action="/admin/pizza-sizes/save" data-title="Add pizza size" data-bs-toggle="modal" data-bs-target="#taxonomyModal"><i class="bi bi-plus-lg"></i></button></div><div class="admin-table-wrap"><table class="table admin-table"><thead><tr><th>Size</th><th>Order</th><th>Status</th><th></th></tr></thead><tbody><tr th:each="size : ${pizzaSizes}"><td th:text="${size.cm + ' cm'}">30 cm</td><td th:text="${size.sortOrder}">0</td><td><span class="badge" th:classappend="${size.active ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${size.active ? 'Active' : 'Hidden'}">Active</span></td><td><button class="btn btn-sm btn-outline-primary" type="button" data-taxonomy-edit data-kind="size" data-action="/admin/pizza-sizes/save" data-title="Edit pizza size" data-bs-toggle="modal" data-bs-target="#taxonomyModal" th:data-id="${size.id}" th:data-cm="${size.cm}" th:data-sort-order="${size.sortOrder}" th:data-active="${size.active}"><i class="bi bi-pencil"></i></button></td></tr></tbody></table></div></div>
+                    <div class="col-xl-6"><div class="section-title"><h3>Price categories</h3><button class="btn btn-sm btn-primary" type="button" data-taxonomy-edit data-kind="price-category" data-action="/admin/price-categories/save" data-title="Add price category" data-bs-toggle="modal" data-bs-target="#taxonomyModal"><i class="bi bi-plus-lg"></i></button></div><div class="admin-table-wrap"><table class="table admin-table"><thead><tr><th>Name</th><th>Order</th><th>Status</th><th></th></tr></thead><tbody><tr th:each="category : ${priceCategories}"><td th:text="${category.name}">Name</td><td th:text="${category.sortOrder}">0</td><td><span class="badge" th:classappend="${category.active ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${category.active ? 'Active' : 'Hidden'}">Active</span></td><td><button class="btn btn-sm btn-outline-primary" type="button" data-taxonomy-edit data-kind="price-category" data-action="/admin/price-categories/save" data-title="Edit price category" data-bs-toggle="modal" data-bs-target="#taxonomyModal" th:data-id="${category.id}" th:data-name="${category.name}" th:data-sort-order="${category.sortOrder}" th:data-active="${category.active}"><i class="bi bi-pencil"></i></button></td></tr></tbody></table></div></div>
+                </div>
+            </section>
+
+            <section id="ingredients" class="admin-panel" aria-labelledby="ingredientsHeading" th:if="${superAdmin}">
+                <div class="panel-heading"><div><h2 id="ingredientsHeading">Ingredients</h2><p>Manage reusable pizza ingredients and their price groups.</p></div><button class="btn btn-primary" type="button" data-ingredient-edit data-bs-toggle="modal" data-bs-target="#ingredientModal"><i class="bi bi-plus-lg me-1"></i>Add ingredient</button></div>
+                <div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Name</th><th>Price category</th><th>Seasonal</th><th>Status</th><th>Action</th></tr></thead><tbody><tr th:each="ingredient : ${ingredients}"><td th:text="${ingredient.name}">Name</td><td th:text="${ingredient.priceCategory != null ? ingredient.priceCategory.name : 'Unassigned'}">Category</td><td th:text="${ingredient.seasonal ? 'Yes' : 'No'}">No</td><td><span class="badge" th:classappend="${ingredient.active ? ' text-bg-success' : ' text-bg-secondary'}" th:text="${ingredient.active ? 'Active' : 'Hidden'}">Active</span></td><td><button class="btn btn-sm btn-outline-primary" type="button" data-ingredient-edit data-bs-toggle="modal" data-bs-target="#ingredientModal" th:data-id="${ingredient.id}" th:data-name="${ingredient.name}" th:data-price-category-id="${ingredient.priceCategory != null ? ingredient.priceCategory.id : ''}" th:data-active="${ingredient.active}" th:data-seasonal="${ingredient.seasonal}"><i class="bi bi-pencil"></i></button></td></tr></tbody></table></div></div>
+            </section>
+
+            <section id="modifiers" class="admin-panel" aria-labelledby="modifiersHeading" th:if="${superAdmin}">
+                <div class="panel-heading"><div><h2 id="modifiersHeading">Modifiers</h2><p>Configure selection groups and their options.</p></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Modifier groups</h3><button class="btn btn-primary" type="button" data-modifier-group-edit data-bs-toggle="modal" data-bs-target="#modifierGroupModal"><i class="bi bi-plus-lg me-1"></i>Add group</button></div><div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Name</th><th>Required</th><th>Minimum</th><th>Maximum</th><th>Action</th></tr></thead><tbody><tr th:each="group : ${modifierGroups}"><td th:text="${group.name}">Group</td><td th:text="${group.required ? 'Yes' : 'No'}">No</td><td th:text="${group.minSelect}">0</td><td th:text="${group.maxSelect}">1</td><td><button class="btn btn-sm btn-outline-primary" type="button" data-modifier-group-edit data-bs-toggle="modal" data-bs-target="#modifierGroupModal" th:data-id="${group.id}" th:data-name="${group.name}" th:data-required="${group.required}" th:data-min-select="${group.minSelect}" th:data-max-select="${group.maxSelect}"><i class="bi bi-pencil"></i></button></td></tr></tbody></table></div></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Modifier options</h3><button class="btn btn-primary" type="button" data-modifier-option-edit data-bs-toggle="modal" data-bs-target="#modifierOptionModal"><i class="bi bi-plus-lg me-1"></i>Add option</button></div><div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Group</th><th>Name</th><th>Linked menu item</th><th>Additional price</th><th>Action</th></tr></thead><tbody><tr th:each="option : ${modifierOptions}"><td th:text="${option.groupId}">1</td><td th:text="${option.name}">Option</td><td th:text="${option.menuItemId != null ? option.menuItemId : '-'}">-</td><td th:text="${'R' + #numbers.formatDecimal(option.additionalPrice, 1, 2)}">R0.00</td><td><button class="btn btn-sm btn-outline-primary" type="button" data-modifier-option-edit data-bs-toggle="modal" data-bs-target="#modifierOptionModal" th:data-id="${option.id}" th:data-group-id="${option.groupId}" th:data-name="${option.name}" th:data-menu-item-id="${option.menuItemId}" th:data-additional-price="${option.additionalPrice}"><i class="bi bi-pencil"></i></button></td></tr></tbody></table></div></div></div>
+            </section>
+
+            <section id="accounts" class="admin-panel" aria-labelledby="accountsHeading" th:if="${superAdmin}">
+                <div class="panel-heading"><div><h2 id="accountsHeading">Admin Accounts</h2><p>Find registered users and assign their access level. Changes apply after their next sign-in.</p></div></div>
+                <form id="accountSearchForm" class="toolbar" role="search"><div class="flex-grow-1"><label class="form-label" for="accountQuery">Name, email or phone</label><input class="form-control" id="accountQuery" type="search" autocomplete="off" placeholder="Search registered accounts"></div><button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>Search</button></form>
+                <div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Current access</th><th>Assign level</th></tr></thead><tbody id="accountResults"><tr><td colspan="5" class="text-center text-secondary py-4">Loading accounts...</td></tr></tbody></table></div></div>
+            </section>
+        </div>
+    </main>
 </div>
 
-<!-- Menu Item Modal -->
-<div id="menuItemModal" class="modal">
-    <div class="modal-content">
-        <h2>Add/Edit Menu Item</h2>
-        <form th:action="@{/admin/menu-items/save}" method="post">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-            <input type="hidden" name="id" id="menuItemId">
-            <div class="form-group">
-                <label>Name</label>
-                <input type="text" name="name" required>
-            </div>
-            <div class="form-group">
-                <label>Category</label>
-                <select name="categoryId">
-                    <option th:each="cat : ${menuCategories}" th:value="${cat.id}" th:text="${cat.name}"></option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Description</label>
-                <textarea name="description"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Sort Order</label>
-                <input type="number" name="sortOrder" value="0">
-            </div>
-            <div class="form-group">
-                <label><input type="checkbox" name="active" checked> Active</label>
-            </div>
-            <button type="submit" class="btn btn-primary">Save</button>
-            <button type="button" class="btn btn-danger" onclick="closeModal('menuItemModal')">Cancel</button>
-        </form>
-    </div>
-</div>
+<div class="modal fade" id="pizzaModal" tabindex="-1" aria-labelledby="pizzaModalTitle" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><form th:action="@{/admin/pizzas/save}" method="post"><div class="modal-header"><h2 class="modal-title fs-5" id="pizzaModalTitle">Add pizza</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="id" id="pizzaId"><div class="row g-3"><div class="col-md-7"><label class="form-label" for="pizzaName">Name</label><input class="form-control" id="pizzaName" name="name" required></div><div class="col-md-5"><label class="form-label" for="pizzaCategory">Category</label><select class="form-select" id="pizzaCategory" name="categoryId" required><option th:each="category : ${pizzaCategories}" th:value="${category.id}" th:text="${category.name}">Category</option></select></div><div class="col-12"><label class="form-label" for="pizzaDescription">Description</label><textarea class="form-control" id="pizzaDescription" name="description" rows="2"></textarea></div><div class="col-sm-5"><label class="form-label" for="pizzaSortOrder">Sort order</label><input class="form-control" id="pizzaSortOrder" name="sortOrder" type="number" value="0"></div><div class="col-sm-7 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input" id="pizzaActive" name="active" type="checkbox" checked><label class="form-check-label" for="pizzaActive">Active</label></div></div><div class="col-12"><span class="form-label d-block">Default ingredients</span><div class="row g-2"><div class="col-sm-6" th:each="ingredient : ${ingredients}"><div class="form-check"><input class="form-check-input pizza-ingredient" type="checkbox" name="ingredientIds" th:id="${'pizzaIngredient' + ingredient.id}" th:value="${ingredient.id}"><label class="form-check-label" th:for="${'pizzaIngredient' + ingredient.id}" th:text="${ingredient.name}">Ingredient</label></div></div></div></div></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save pizza</button></div></form></div></div></div>
 
-<!-- Price Modal -->
-<div id="priceModal" class="modal">
-    <div class="modal-content">
-        <h2 id="priceModalTitle">Set Price</h2>
-        <form id="priceForm" method="post">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-            <input type="hidden" name="pizzaId" id="pricePizzaId">
-            <input type="hidden" name="menuItemId" id="priceMenuItemId">
-            
-            <div class="form-group">
-                <label>Branch</label>
-                <select name="branchId" id="priceBranchId" required>
-                    <option th:each="b : ${branches}" th:value="${b.id}" th:text="${b.name}"></option>
-                </select>
-            </div>
+<div class="modal fade" id="menuItemModal" tabindex="-1" aria-labelledby="menuItemModalTitle" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><form th:action="@{/admin/menu-items/save}" method="post"><div class="modal-header"><h2 class="modal-title fs-5" id="menuItemModalTitle">Add menu item</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="id" id="menuItemId"><div class="row g-3"><div class="col-md-7"><label class="form-label" for="menuItemName">Name</label><input class="form-control" id="menuItemName" name="name" required></div><div class="col-md-5"><label class="form-label" for="menuItemCategory">Category</label><select class="form-select" id="menuItemCategory" name="categoryId" required><option th:each="category : ${menuCategories}" th:value="${category.id}" th:text="${category.name}">Category</option></select></div><div class="col-12"><label class="form-label" for="menuItemDescription">Description</label><textarea class="form-control" id="menuItemDescription" name="description" rows="2"></textarea></div><div class="col-sm-4"><label class="form-label" for="menuItemSortOrder">Sort order</label><input class="form-control" id="menuItemSortOrder" name="sortOrder" type="number" value="0"></div><div class="col-sm-8 d-flex flex-wrap align-items-end gap-3 pb-2"><div class="form-check"><input class="form-check-input" id="menuItemActive" name="active" type="checkbox" checked><label class="form-check-label" for="menuItemActive">Active</label></div><div class="form-check"><input class="form-check-input" id="menuItem300ml" name="is300ml" type="checkbox"><label class="form-check-label" for="menuItem300ml">300 ml</label></div><div class="form-check"><input class="form-check-input" id="menuItem2l" name="is2l" type="checkbox"><label class="form-check-label" for="menuItem2l">2 L</label></div></div><div class="col-12"><span class="form-label d-block">Modifier groups</span><div class="row g-2"><div class="col-sm-6" th:each="group : ${modifierGroups}"><div class="form-check"><input class="form-check-input menu-modifier-group" type="checkbox" name="modifierGroupIds" th:id="${'menuModifierGroup' + group.id}" th:value="${group.id}"><label class="form-check-label" th:for="${'menuModifierGroup' + group.id}" th:text="${group.name}">Group</label></div></div></div></div></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save item</button></div></form></div></div></div>
 
-            <div id="toppingCategoryGroup" class="form-group" style="display:none;">
-                <label>Price Category (Toppings)</label>
-                <select name="priceCategoryId" id="priceCategoryId">
-                    <option th:each="pc : ${priceCategories}" th:value="${pc.id}" th:text="${pc.name}"></option>
-                </select>
-            </div>
+<div class="modal fade" id="priceModal" tabindex="-1" aria-labelledby="priceModalTitle" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><form id="priceForm" method="post"><div class="modal-header"><h2 class="modal-title fs-5" id="priceModalTitle">Set price</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><div class="row g-3"><div class="col-12"><label class="form-label" for="priceBranchId">Branch</label><select class="form-select" id="priceBranchId" name="branchId" required><option value="" disabled>Select a branch</option><option th:each="branch : ${branches}" th:value="${branch.id}" th:text="${branch.name}">Branch</option></select></div><div class="col-12" id="pricePizzaIdGroup"><label class="form-label" for="pricePizzaId">Pizza</label><select class="form-select" id="pricePizzaId" name="pizzaId"><option value="">Select a pizza</option><option th:each="pizza : ${pizzas}" th:value="${pizza.id}" th:text="${pizza.name}">Pizza</option></select></div><div class="col-12" id="priceMenuItemIdGroup"><label class="form-label" for="priceMenuItemId">Menu item</label><select class="form-select" id="priceMenuItemId" name="menuItemId"><option value="">Select an item</option><option th:each="item : ${menuItems}" th:value="${item.id}" th:text="${item.name}">Item</option></select></div><div class="col-12" id="priceCategoryGroup"><label class="form-label" for="priceCategoryId">Price category</label><select class="form-select" id="priceCategoryId" name="priceCategoryId"><option value="">Select a category</option><option th:each="category : ${priceCategories}" th:value="${category.id}" th:text="${category.name}">Category</option></select></div><div class="col-sm-6" id="priceSizeGroup"><label class="form-label" for="pricePizzaSizeId">Pizza size</label><select class="form-select" id="pricePizzaSizeId" name="pizzaSizeId"><option value="">Select a size</option><option th:each="size : ${pizzaSizes}" th:value="${size.id}" th:text="${size.cm + ' cm'}">Size</option></select></div><div class="col-sm-6"><label class="form-label" for="priceValue">Price (ZAR)</label><input class="form-control" id="priceValue" name="price" type="number" min="0" step="0.01" required></div></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save price</button></div></form></div></div></div>
 
-            <div id="pizzaSizeGroup" class="form-group" style="display:none;">
-                <label>Size</label>
-                <select name="pizzaSizeId" id="pricePizzaSizeId">
-                    <option th:each="s : ${pizzaSizes}" th:value="${s.id}" th:text="${s.cm} + 'cm'"></option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label>Price (R)</label>
-                <input type="number" step="0.01" name="price" id="priceValue" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Save Price</button>
-            <button type="button" class="btn btn-danger" onclick="closeModal('priceModal')">Cancel</button>
-        </form>
-    </div>
-</div>
+<div class="modal fade" id="taxonomyModal" tabindex="-1" aria-labelledby="taxonomyModalTitle" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><form id="taxonomyForm" method="post"><div class="modal-header"><h2 class="modal-title fs-5" id="taxonomyModalTitle">Catalog setting</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="id" id="taxonomyId"><div class="mb-3" id="taxonomyNameGroup"><label class="form-label" for="taxonomyName">Name</label><input class="form-control" id="taxonomyName" name="name"></div><div class="mb-3" id="taxonomyCmGroup"><label class="form-label" for="taxonomyCm">Size (cm)</label><input class="form-control" id="taxonomyCm" name="cm" type="number" min="1"></div><div class="mb-3"><label class="form-label" for="taxonomySortOrder">Sort order</label><input class="form-control" id="taxonomySortOrder" name="sortOrder" type="number" value="0"></div><div class="form-check"><input class="form-check-input" id="taxonomyActive" name="active" type="checkbox" checked><label class="form-check-label" for="taxonomyActive">Active</label></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></form></div></div></div>
 
-<script>
-    function showSection(id) {
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        event.currentTarget.classList.add('active');
-    }
+<div class="modal fade" id="ingredientModal" tabindex="-1" aria-labelledby="ingredientModalTitle" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><form th:action="@{/admin/ingredients/save}" method="post"><div class="modal-header"><h2 class="modal-title fs-5" id="ingredientModalTitle">Add ingredient</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="id" id="ingredientId"><div class="mb-3"><label class="form-label" for="ingredientName">Name</label><input class="form-control" id="ingredientName" name="name" required></div><div class="mb-3"><label class="form-label" for="ingredientPriceCategory">Price category</label><select class="form-select" id="ingredientPriceCategory" name="priceCategoryId" required><option th:each="category : ${priceCategories}" th:value="${category.id}" th:text="${category.name}">Category</option></select></div><div class="d-flex gap-4"><div class="form-check"><input class="form-check-input" id="ingredientActive" name="active" type="checkbox" checked><label class="form-check-label" for="ingredientActive">Active</label></div><div class="form-check"><input class="form-check-input" id="ingredientSeasonal" name="seasonal" type="checkbox"><label class="form-check-label" for="ingredientSeasonal">Seasonal</label></div></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save ingredient</button></div></form></div></div></div>
 
-    function openModal(id) {
-        document.getElementById(id).style.display = 'block';
-        if (id === 'pizzaModal') {
-            // Reset for new pizza
-            document.getElementById('pizzaId').value = '';
-            document.querySelector('#pizzaModal [name="name"]').value = '';
-            document.getElementById('pizzaDescription').value = '';
-            document.querySelector('#pizzaModal [name="sortOrder"]').value = 0;
-            document.querySelector('#pizzaModal [name="active"]').checked = true;
-            const checkboxes = document.querySelectorAll('.pizza-ingredient-checkbox');
-            checkboxes.forEach(cb => cb.checked = false);
-        }
-    }
+<div class="modal fade" id="modifierGroupModal" tabindex="-1" aria-labelledby="modifierGroupModalTitle" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><form th:action="@{/admin/modifier-groups/save}" method="post"><div class="modal-header"><h2 class="modal-title fs-5" id="modifierGroupModalTitle">Add modifier group</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="id" id="modifierGroupId"><div class="mb-3"><label class="form-label" for="modifierGroupName">Name</label><input class="form-control" id="modifierGroupName" name="name" required></div><div class="row g-3"><div class="col-6"><label class="form-label" for="modifierGroupMin">Minimum</label><input class="form-control" id="modifierGroupMin" name="minSelect" type="number" min="0" value="0"></div><div class="col-6"><label class="form-label" for="modifierGroupMax">Maximum</label><input class="form-control" id="modifierGroupMax" name="maxSelect" type="number" min="1" value="1"></div></div><div class="form-check mt-3"><input class="form-check-input" id="modifierGroupRequired" name="required" type="checkbox"><label class="form-check-label" for="modifierGroupRequired">Required selection</label></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save group</button></div></form></div></div></div>
 
-    function openPizzaEditFromButton(button) {
-        const ingredientIdsRaw = button.dataset.ingredientIds || '';
-        const ingredientIds = ingredientIdsRaw
-            .split(',')
-            .filter(Boolean)
-            .map(id => parseInt(id, 10));
+<div class="modal fade" id="modifierOptionModal" tabindex="-1" aria-labelledby="modifierOptionModalTitle" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><form th:action="@{/admin/modifier-options/save}" method="post"><div class="modal-header"><h2 class="modal-title fs-5" id="modifierOptionModalTitle">Add modifier option</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="id" id="modifierOptionId"><div class="mb-3"><label class="form-label" for="modifierOptionGroup">Group</label><select class="form-select" id="modifierOptionGroup" name="groupId" required><option th:each="group : ${modifierGroups}" th:value="${group.id}" th:text="${group.name}">Group</option></select></div><div class="mb-3"><label class="form-label" for="modifierOptionName">Name</label><input class="form-control" id="modifierOptionName" name="name" required></div><div class="mb-3"><label class="form-label" for="modifierOptionMenuItem">Linked menu item</label><select class="form-select" id="modifierOptionMenuItem" name="menuItemId"><option value="">None</option><option th:each="item : ${menuItems}" th:value="${item.id}" th:text="${item.name}">Item</option></select></div><div><label class="form-label" for="modifierOptionPrice">Additional price (ZAR)</label><input class="form-control" id="modifierOptionPrice" name="additionalPrice" type="number" step="0.01" value="0.00"></div></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save option</button></div></form></div></div></div>
 
-        openPizzaEdit(
-            parseInt(button.dataset.id, 10),
-            button.dataset.name || '',
-            parseInt(button.dataset.categoryId, 10),
-            button.dataset.description || '',
-            parseInt(button.dataset.sortOrder, 10),
-            button.dataset.active === 'true',
-            ingredientIds
-        );
-    }
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalTitle" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><form id="deleteForm" method="post"><div class="modal-header"><h2 class="modal-title fs-5" id="deleteModalTitle">Delete item</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><p class="mb-0">Delete <strong id="deleteItemName">this item</strong>? Existing order history is preserved.</p></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger">Delete</button></div></form></div></div></div>
 
-    function openPizzaEdit(id, name, categoryId, description, sortOrder, active, ingredientIds) {
-        document.getElementById('pizzaModal').style.display = 'block';
-        document.getElementById('pizzaId').value = id;
-        document.querySelector('#pizzaModal [name="name"]').value = name;
-        document.querySelector('#pizzaModal [name="categoryId"]').value = categoryId;
-        document.getElementById('pizzaDescription').value = description;
-        document.querySelector('#pizzaModal [name="sortOrder"]').value = sortOrder;
-        document.querySelector('#pizzaModal [name="active"]').checked = active;
-        
-        const checkboxes = document.querySelectorAll('.pizza-ingredient-checkbox');
-        checkboxes.forEach(cb => {
-            cb.checked = ingredientIds.includes(parseInt(cb.value));
-        });
-    }
-
-    function closeModal(id) {
-        document.getElementById(id).style.display = 'none';
-    }
-
-    function openPriceModal(id, type, branchId, sizeId, price) {
-        const modal = document.getElementById('priceModal');
-        const form = document.getElementById('priceForm');
-        const pizzaIdInput = document.getElementById('pricePizzaId');
-        const menuItemIdInput = document.getElementById('priceMenuItemId');
-        const sizeGroup = document.getElementById('pizzaSizeGroup');
-        const toppingGroup = document.getElementById('toppingCategoryGroup');
-        const branchSelect = document.getElementById('priceBranchId');
-        const sizeSelect = document.getElementById('pricePizzaSizeId');
-        const toppingSelect = document.getElementById('priceCategoryId');
-        const priceInput = document.getElementById('priceValue');
-
-        // Reset
-        pizzaIdInput.value = '';
-        menuItemIdInput.value = '';
-        toppingSelect.value = '';
-        priceInput.value = price || '';
-        if (branchId) branchSelect.value = branchId;
-        if (sizeId) sizeSelect.value = sizeId;
-
-        if (type === 'pizza') {
-            document.getElementById('priceModalTitle').innerText = 'Set Pizza Price';
-            form.action = '/admin/pizzas/price';
-            pizzaIdInput.value = id;
-            sizeGroup.style.display = 'block';
-            toppingGroup.style.display = 'none';
-        } else if (type === 'menuItem') {
-            document.getElementById('priceModalTitle').innerText = 'Set Menu Item Price';
-            form.action = '/admin/menu-items/price';
-            menuItemIdInput.value = id;
-            sizeGroup.style.display = 'none';
-            toppingGroup.style.display = 'none';
-        } else if (type === 'topping') {
-            document.getElementById('priceModalTitle').innerText = 'Set Topping Category Price';
-            form.action = '/admin/toppings/price';
-            if (id) toppingSelect.value = id;
-            sizeGroup.style.display = 'block';
-            toppingGroup.style.display = 'block';
-        }
-        modal.style.display = 'block';
-    }
-
-    window.onclick = function(event) {
-        if (event.target.className === 'modal') {
-            event.target.style.display = "none";
-        }
-    }
-</script>
-
+<script th:src="@{/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/js/stomp-client.js}"></script>
+<script th:src="@{/js/admin.js}"></script>
 </body>
 </html>

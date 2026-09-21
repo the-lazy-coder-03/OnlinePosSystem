@@ -100,14 +100,14 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Protect order and profile pages
-                        .requestMatchers("/order", "/profile/edit", "/profile/update").authenticated()
+                        .requestMatchers("/order", "/profile/edit", "/profile/update").hasRole("USER")
                         .requestMatchers("/admin/login").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
                         // Protect sensitive API endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/staff/create").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")
                         .requestMatchers("/api/orders/**").permitAll() // Needed for POS frontend
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/forgot-password").permitAll()
@@ -134,7 +134,8 @@ public class SecurityConfig {
                                 "/test",              // Test page
                                 "/css/**",
                                 "/js/**",
-                                "/images/**"
+                                "/images/**",
+                                "/webjars/**"
                         ).permitAll()
 
                         // All other requests authenticated
