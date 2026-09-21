@@ -935,7 +935,6 @@
     <aside class="sidebar" aria-label="Categories sidebar">
         <div class="sidebar-header">
             <h2>Categories</h2>
-            <div class="hint">Tap a category to filter items.</div>
         </div>
 
         <div class="catlist" id="categoryButtons">
@@ -943,7 +942,6 @@
         </div>
 
         <div class="sidebar-footer">
-            <div class="mini"><span>Active:</span> <strong id="activeCategoryLabel">Everything</strong></div>
             <div class="mini ordering-only"><span>Cart total:</span> <strong id="cartTotalMini">R0.00</strong></div>
 
             <button class="btn btn-cart ordering-only" id="btnSidebarCart" type="button">View Cart &amp; Total</button>
@@ -958,7 +956,7 @@
             <div class="content-header">
                 <div>
                     <h2 id="listTitle">Menu</h2>
-                    <div class="sub" id="listSub">Choose an item to customize.</div>
+                    <div class="sub" id="listSub" hidden></div>
                 </div>
 
                 <div class="right">
@@ -990,14 +988,14 @@
                 </div>
 
                 <div class="pizza-name" id="customizePizzaName">Pizza</div>
-                <div class="pizza-meta" id="customizePizzaMeta">Select size and toppings.</div>
+                <div class="pizza-meta" id="customizePizzaMeta" hidden></div>
             </div>
 
             <div class="customize-body" id="customizeBody">
                 <!-- Size -->
                 <div class="card" id="cardSizes">
                     <h3>Size</h3>
-                    <div class="sub">Choose one size (radio buttons).</div>
+                    <div class="sub" hidden></div>
                     <div id="sizeOptions"></div>
                 </div>
 
@@ -1011,14 +1009,14 @@
                 <!-- Default toppings -->
                 <div class="card" id="cardDefaults">
                     <h3>Default Toppings</h3>
-                    <div class="sub">These are included by default (checked).</div>
+                    <div class="sub" hidden></div>
                     <div id="defaultToppings"></div>
                 </div>
 
                 <!-- Extra toppings grouped -->
                 <div class="card" id="cardExtras">
                     <h3>Extra Toppings</h3>
-                    <div class="sub">Optional extras (grouped by category).</div>
+                    <div class="sub" hidden></div>
                     <div id="extraToppingsGroups"></div>
                 </div>
 
@@ -1031,14 +1029,13 @@
                             <div class="qty-val" id="qtyValue">1</div>
                             <button class="qty-btn" id="qtyPlus" type="button" aria-label="Increase quantity">+</button>
                         </div>
-                        <div style="color:var(--muted);font-weight:750;">Affects total price</div>
                     </div>
                 </div>
 
                 <!-- Quote status -->
                 <div class="card" id="cardQuote">
                     <h3>Live Price</h3>
-                    <div class="sub">Calculated via <code>/quote</code> (auto-updates).</div>
+                    <div class="sub" hidden></div>
                     <div id="quoteLines" style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;">
                         <div style="font-weight:850;color:var(--muted);">Base</div><div style="font-weight:950;" id="qBase">R0.00</div>
                         <div style="font-weight:850;color:var(--muted);">Base option</div><div style="font-weight:950;" id="qBaseOption">R0.00</div>
@@ -1328,9 +1325,6 @@
 
             const cats = render.categories();
             const counts = computeCategoryCounts();
-            const active = cats.find(c => c.key === state.ui.activeCategory);
-            const activeLabel = active ? active.label : "Everything";
-
             for (const cat of cats){
                 const btn = document.createElement("button");
                 btn.className = "catbtn" + (cat.key === state.ui.activeCategory ? " active" : "");
@@ -1340,8 +1334,6 @@
                 btn.addEventListener("click", () => actions.selectCategory(cat));
                 wrap.appendChild(btn);
             }
-
-            $("activeCategoryLabel").textContent = activeLabel;
         },
 
         list(){
@@ -1457,10 +1449,10 @@
                 return;
             }
 
-            setCustomizeCardHeader("cardSizes", "Size", "Choose one size (radio buttons).");
-            setCustomizeCardHeader("cardDefaults", "Default Toppings", "These are included by default (checked).");
-            setCustomizeCardHeader("cardExtras", "Extra Toppings", "Optional extras (grouped by category).");
-            setCustomizeCardHeader("cardQuote", "Live Price", "Calculated via /quote (auto-updates).");
+            setCustomizeCardHeader("cardSizes", "Size", "");
+            setCustomizeCardHeader("cardDefaults", "Default Toppings", "");
+            setCustomizeCardHeader("cardExtras", "Extra Toppings", "");
+            setCustomizeCardHeader("cardQuote", "Live Price", "");
             $("cardSizes").style.display = "";
             $("cardBaseOptions").style.display = "";
             $("cardDefaults").style.display = "";
@@ -1471,7 +1463,7 @@
             const d = state.customize.detail;
             if (!d){
                 $("customizePizzaName").textContent = "Loading…";
-                $("customizePizzaMeta").textContent = "Please wait.";
+                $("customizePizzaMeta").textContent = "";
                 $("sizeOptions").innerHTML = "";
                 $("baseOptions").innerHTML = "";
                 $("defaultToppings").innerHTML = "";
@@ -1480,11 +1472,9 @@
             }
 
             $("customizePizzaName").textContent = d.name || "Customize Pizza";
-            $("customizePizzaMeta").textContent = state.branch.id
-                ? `${state.branch.name} • ${MENU_ONLY ? "Menu details" : "Customize your pizza"}`
-                : (MENU_ONLY ? "Menu details" : "Customize your pizza");
+            $("customizePizzaMeta").textContent = "";
 
-            // Sizes (radio buttons required)
+            // Sizes
             $("sizeOptions").innerHTML = "";
             const sizes = normalizeSizes(d);
             if (!sizes.length){
@@ -1532,7 +1522,7 @@
                 }
             }
 
-            // Default toppings (checkboxes checked by default required)
+            // Default toppings
             $("defaultToppings").innerHTML = "";
             const defaults = normalizeDefaultToppings(d);
             if (!defaults.length){
@@ -1555,7 +1545,7 @@
                 }
             }
 
-            // Extra toppings grouped by category (required)
+            // Extra toppings grouped by category
             $("extraToppingsGroups").innerHTML = "";
             const groups = normalizeExtraToppingGroups(d, state.customize.defaultToppingIds);
             if (!groups.length){
@@ -1606,7 +1596,7 @@
 
             if (!item){
                 $("customizePizzaName").textContent = "Burger";
-                $("customizePizzaMeta").textContent = "Choose burger options.";
+                $("customizePizzaMeta").textContent = "";
                 $("sizeOptions").innerHTML = "";
                 $("defaultToppings").innerHTML = "";
                 $("extraToppingsGroups").innerHTML = "";
@@ -1622,9 +1612,7 @@
             }
 
             $("customizePizzaName").textContent = item.name || "Burger";
-            $("customizePizzaMeta").textContent = state.branch.id
-                ? `${state.branch.name} • ${MENU_ONLY ? "Menu details" : "Customize your burger"}`
-                : (MENU_ONLY ? "Menu details" : "Customize your burger");
+            $("customizePizzaMeta").textContent = "";
 
             const burgerVariants = getBurgerVariantFamily(item);
             const burgerToppings = getBurgerToppingsForMenuItem(item);
@@ -1639,7 +1627,7 @@
             const otherModifierGroups = groups.filter(group => !isSteakDonenessGroup(group));
             const proteinQty = burgerProteinQtyRequired(item);
 
-            setCustomizeCardHeader("cardSizes", "Burger Option", "Choose burger only or combo.");
+            setCustomizeCardHeader("cardSizes", "Burger Option", "");
             $("sizeOptions").innerHTML = "";
             if (burgerVariants.length > 1){
                 for (const variant of burgerVariants){
@@ -1666,7 +1654,7 @@
             setCustomizeCardHeader(
                 "cardDefaults",
                 proteinQty > 1 ? `Protein Choice (${proteinQty} portions)` : "Protein Choice",
-                "Choose one protein."
+                ""
             );
             $("defaultToppings").innerHTML = "";
             if (proteins.length){
@@ -1691,7 +1679,7 @@
                 $("cardDefaults").style.display = "none";
             }
 
-            setCustomizeCardHeader("cardExtras", "Burger Toppings", "Included toppings and optional extras.");
+            setCustomizeCardHeader("cardExtras", "Burger Toppings", "");
             const groupsEl = $("extraToppingsGroups");
             groupsEl.innerHTML = "";
 
@@ -1707,10 +1695,9 @@
                     const groupId = Number(g.groupId);
                     const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
                     const max = Number(g.maxSelect || 0);
-                    const hint = min > 0 ? `Required • Choose ${min}${max ? "–" + max : ""}` : (max ? `Choose up to ${max}` : "");
                     const groupName = safeText(g.name || "Options");
 
-                    appendTitle(hint ? `${groupName} • ${hint}` : groupName);
+                    appendTitle(groupName);
 
                     const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
                     const opts = Array.isArray(g.options) ? g.options : [];
@@ -1789,7 +1776,7 @@
             $("qtyValue").textContent = String(state.menuCustomize.qty);
             $("stickyQty").textContent = `${state.menuCustomize.qty} item${state.menuCustomize.qty === 1 ? "" : "s"}`;
 
-            setCustomizeCardHeader("cardQuote", "Live Price", "Calculated from your burger options.");
+            setCustomizeCardHeader("cardQuote", "Live Price", "");
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
             $("quoteError").style.display = "none";
             $("qBase").textContent = money(pricing.base);
@@ -1812,7 +1799,7 @@
 
             if (!item){
                 $("customizePizzaName").textContent = "Menu Item";
-                $("customizePizzaMeta").textContent = "Choose item options.";
+                $("customizePizzaMeta").textContent = "";
                 $("sizeOptions").innerHTML = "";
                 $("defaultToppings").innerHTML = "";
                 $("extraToppingsGroups").innerHTML = "";
@@ -1828,12 +1815,10 @@
             }
 
             $("customizePizzaName").textContent = getPastaDisplayName(item) || item.name || "Menu Item";
-            $("customizePizzaMeta").textContent = state.branch.id
-                ? `${state.branch.name} • ${MENU_ONLY ? "Menu details" : "Customize your item"}`
-                : (MENU_ONLY ? "Menu details" : "Customize your item");
+            $("customizePizzaMeta").textContent = "";
 
             if (pastaVariants.length){
-                setCustomizeCardHeader("cardSizes", "Size", "Choose one pasta size.");
+                setCustomizeCardHeader("cardSizes", "Size", "");
                 $("sizeOptions").innerHTML = "";
                 for (const variant of pastaVariants){
                     const variantId = Number(variant.menuItemId);
@@ -1856,7 +1841,7 @@
                 $("sizeOptions").innerHTML = "";
             }
 
-            setCustomizeCardHeader("cardExtras", "Options", "Choose any required or optional item options.");
+            setCustomizeCardHeader("cardExtras", "Options", "");
             const groupsEl = $("extraToppingsGroups");
             groupsEl.innerHTML = "";
             const groups = getVisibleMenuModifierGroups(item);
@@ -1866,11 +1851,10 @@
                     const groupId = Number(g.groupId);
                     const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
                     const max = Number(g.maxSelect || 0);
-                    const hint = min > 0 ? `Required • Choose ${min}${max ? "–" + max : ""}` : (max ? `Choose up to ${max}` : "");
                     const groupName = safeText(g.name || "Options");
                     const title = document.createElement("div");
                     title.className = "group-title";
-                    title.textContent = hint ? `${groupName} • ${hint}` : groupName;
+                    title.textContent = groupName;
                     groupsEl.appendChild(title);
 
                     const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
@@ -1901,7 +1885,7 @@
             $("qtyValue").textContent = String(state.menuCustomize.qty);
             $("stickyQty").textContent = `${state.menuCustomize.qty} item${state.menuCustomize.qty === 1 ? "" : "s"}`;
 
-            setCustomizeCardHeader("cardQuote", "Live Price", "Calculated from your item options.");
+            setCustomizeCardHeader("cardQuote", "Live Price", "");
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
             $("quoteError").style.display = "none";
             $("qBase").textContent = money(pricing.base);
@@ -2279,7 +2263,8 @@
             }
 
             $("listTitle").textContent = `${state.branch.name} Menu`;
-            $("listSub").textContent = MENU_ONLY ? "Browse menu items and prices." : "Tap an item to customize or add to your order.";
+            $("listSub").textContent = "";
+            $("listSub").hidden = true;
             $("searchInput").value = "";
             state.ui.search = "";
             state.ui.activeCategory = "all";
@@ -2842,7 +2827,11 @@
         const heading = card.querySelector("h3");
         const sub = card.querySelector(".sub");
         if (heading) heading.textContent = title;
-        if (sub) sub.textContent = subText;
+        if (sub){
+            const text = safeText(subText);
+            sub.textContent = text;
+            sub.hidden = !text;
+        }
     }
 
     function resetMenuCustomizeSelections(item){
@@ -3040,12 +3029,11 @@
             const groupId = Number(g.groupId);
             const min = Math.max(Number(g.minSelect || 0), g.required ? 1 : 0);
             const max = Number(g.maxSelect || 0);
-            const hint = min > 0 ? `Required • Choose ${min}${max ? "–" + max : ""}` : (max ? `Choose up to ${max}` : "");
 
             const title = document.createElement("div");
             title.className = "group-title";
             const groupName = safeText(g.name || "Options");
-            title.textContent = hint ? `${groupName} • ${hint}` : groupName;
+            title.textContent = groupName;
             groupsEl.appendChild(title);
 
             const selected = state.menuCustomize.selectedByGroup.get(groupId) || new Set();
@@ -3219,7 +3207,8 @@
             $("branchOverlayTitle").textContent = "View Menu";
             $("branchOverlayDesc").textContent = "Choose a branch to view its menu.";
             $("branchOverlayNote").textContent = "Choose a branch to continue.";
-            $("listSub").textContent = "Browse menu items and prices.";
+            $("listSub").textContent = "";
+            $("listSub").hidden = true;
             $("menuItemCancel").textContent = "Close";
         },
         showBranchOverlay(show){

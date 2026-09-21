@@ -671,7 +671,6 @@ ON CONFLICT (branch_id) DO UPDATE
 -- 8.2 Menu categories
 INSERT INTO menu_category (id, name, sort_order) VALUES
                                                      (1, 'Burgers', 10),
-                                                     (2, 'Burger Combos', 20),
                                                      (3, 'Pastas', 30),
                                                      (4, 'Cool Drinks', 40),
                                                      (5, 'Sides', 50),
@@ -726,15 +725,15 @@ INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALU
                                                                                 (207, 1, 'Dagwood', '150g burger with egg, cheese, bacon and one selected protein', FALSE, FALSE),
                                                                                 (208, 1, 'Hawaiian Burger', '150g burger with pineapple, cheese and one selected protein', FALSE, FALSE),
 
-                                                                                -- Burger Combos
-                                                                                (301, 2, 'Cheese Burger Combo', 'Cheese Burger, chips and a 300ml can', FALSE, FALSE),
-                                                                                (302, 2, 'Mega Burger Combo', 'Mega Burger, chips and a 300ml can', FALSE, FALSE),
-                                                                                (303, 2, 'Steak Burger Combo', 'Steak Burger, chips and a 300ml can', FALSE, FALSE),
-                                                                                (304, 2, 'Default Burger Combo', 'Burger, chips and a 300ml can', FALSE, FALSE),
-                                                                                (305, 2, 'Bacon and Cheese Burger Combo', 'Bacon & Cheese Burger, chips and a 300ml can', FALSE, FALSE),
-                                                                                (306, 2, 'Bacon and Egg Burger Combo', 'Legacy combo retained for order-history compatibility', FALSE, FALSE),
-                                                                                (307, 2, 'Dagwood Combo', 'Dagwood, chips and a 300ml can', FALSE, FALSE),
-                                                                                (308, 2, 'Hawaiian Burger Combo', 'Hawaiian Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                -- Burgers and combos
+                                                                                (301, 1, 'Cheese Burger Combo', 'Cheese Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (302, 1, 'Mega Burger Combo', 'Mega Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (303, 1, 'Steak Burger Combo', 'Steak Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (304, 1, 'Default Burger Combo', 'Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (305, 1, 'Bacon and Cheese Burger Combo', 'Bacon & Cheese Burger, chips and a 300ml can', FALSE, FALSE),
+                                                                                (306, 1, 'Bacon and Egg Burger Combo', 'Legacy combo retained for order-history compatibility', FALSE, FALSE),
+                                                                                (307, 1, 'Dagwood Combo', 'Dagwood, chips and a 300ml can', FALSE, FALSE),
+                                                                                (308, 1, 'Hawaiian Burger Combo', 'Hawaiian Burger, chips and a 300ml can', FALSE, FALSE),
 
                                                                                 -- Pastas
                                                                                 -- Legacy 401/402 rows are kept for historical FK compatibility but have no Kenridge price.
@@ -805,6 +804,14 @@ ON CONFLICT (id) DO UPDATE
         is_300ml = EXCLUDED.is_300ml,
         is_2l = EXCLUDED.is_2l,
         active = TRUE;
+
+-- Move any existing combo-category items before removing the obsolete category.
+UPDATE menu_item
+SET category_id = 1
+WHERE category_id = 2;
+
+DELETE FROM menu_category
+WHERE id = 2;
 
 -- 8.4 Branch menu prices
 -- Pete's Pizza Kenridge prices updated from the live Kenridge menu.

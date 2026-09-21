@@ -50,7 +50,7 @@ class MigrationSqlCatalogTest {
 
         assertThat(sql)
                 .contains("(208, 1, 'Hawaiian Burger'")
-                .contains("(308, 2, 'Hawaiian Burger Combo'")
+                .contains("(308, 1, 'Hawaiian Burger Combo'")
                 .contains("(208, 1, 1, TRUE),  -- Hawaiian Burger")
                 .contains("(308, 1, 1, TRUE)   -- Hawaiian Burger Combo")
                 .contains("(208, 201, TRUE, 101), -- Hawaiian Burger: Cheese")
@@ -63,6 +63,23 @@ class MigrationSqlCatalogTest {
                     .contains("(" + comboId + ", 1)")
                     .contains("(" + comboId + ", 2)");
         }
+    }
+
+    @Test
+    void movesCombosIntoBurgersAndRemovesTheComboCategory() throws IOException {
+        String sql = migrationSql();
+
+        assertThat(sql)
+                .doesNotContain("(2, 'Burger Combos'")
+                .contains("(301, 1, 'Cheese Burger Combo'")
+                .doesNotContain("(301, 2, 'Cheese Burger Combo'")
+                .contains("UPDATE menu_item\nSET category_id = 1\nWHERE category_id = 2;")
+                .contains("DELETE FROM menu_category\nWHERE id = 2;");
+
+        int moveIndex = sql.indexOf("UPDATE menu_item\nSET category_id = 1\nWHERE category_id = 2;");
+        int deleteIndex = sql.indexOf("DELETE FROM menu_category\nWHERE id = 2;");
+        assertThat(moveIndex).isGreaterThanOrEqualTo(0);
+        assertThat(deleteIndex).isGreaterThan(moveIndex);
     }
 
     @Test
