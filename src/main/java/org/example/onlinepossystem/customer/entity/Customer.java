@@ -61,7 +61,7 @@ public class Customer {
     @Column(name = "role")
     private String role = "USER";
 
-    @Column(name = "access_level", nullable = false)
+    @Column(name = "access_level", nullable = false, columnDefinition = "smallint")
     private Integer accessLevel = 0;
 
     // Default constructor

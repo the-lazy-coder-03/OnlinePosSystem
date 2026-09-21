@@ -101,6 +101,7 @@ class MigrationSqlCatalogTest {
         assertThat(sql)
                 .contains("access_level    smallint NOT NULL DEFAULT 0")
                 .contains("ADD COLUMN IF NOT EXISTS access_level smallint")
+                .contains("ALTER COLUMN access_level TYPE smallint USING access_level::smallint")
                 .contains("WHEN 'ADMIN' THEN 3")
                 .contains("WHEN 'SUPER_ADMIN' THEN 3")
                 .contains("WHEN 'DRIVER' THEN 4")

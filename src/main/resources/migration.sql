@@ -115,6 +115,7 @@ SET role = CASE access_level
     END;
 
 ALTER TABLE public.customers
+    ALTER COLUMN access_level TYPE smallint USING access_level::smallint,
     ALTER COLUMN access_level SET DEFAULT 0,
     ALTER COLUMN access_level SET NOT NULL;
 
