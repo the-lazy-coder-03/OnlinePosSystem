@@ -24,6 +24,7 @@ import java.util.HexFormat;
 import java.util.Locale;
 
 @Component
+@org.springframework.context.annotation.Profile("migrate")
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class MigrationSqlRunner implements CommandLineRunner {
     private static final Logger logger = LoggerFactory.getLogger(MigrationSqlRunner.class);

@@ -8,25 +8,31 @@ import org.example.onlinepossystem.customer.repository.CustomerRepository;
 import org.example.onlinepossystem.security.api.PasswordPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.example.onlinepossystem.customer.persistence.AccountBootstrapStore;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
+@Transactional(readOnly = true)
 public class CustomerService implements CustomerAccountReader, CustomerOrderRecorder {
 
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
     private final PasswordPolicy passwordPolicy;
+    private final AccountBootstrapStore accounts;
 
     public CustomerService(CustomerRepository customerRepository,
                            PasswordEncoder passwordEncoder,
-                           PasswordPolicy passwordPolicy) {
+                           PasswordPolicy passwordPolicy, AccountBootstrapStore accounts) {
         this.customerRepository = customerRepository;
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicy = passwordPolicy;
+        this.accounts = accounts;
     }
 
+    @Transactional
     public Customer registerCustomer(String firstName,
                                      String lastName,
                                      String email,
@@ -67,7 +73,7 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         customer.setRole("USER");
         customer.setAccessLevel(0);
 
-        return customerRepository.save(customer); // insert into DB
+        return accounts.register(customer);
     }
 
     @Override
@@ -81,6 +87,7 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
     }
 
     @Override
+    @Transactional
     public void recordOrderPlaced(Long customerId, LocalDateTime orderedAt) {
         customerRepository.findById(customerId).ifPresent(customer -> {
             customer.setLastOrderedAt(orderedAt);
@@ -89,13 +96,14 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
     }
 
     public boolean emailExists(String email) {
-        return customerRepository.findByEmail(email).isPresent();
+        return accounts.emailExists(email);
     }
 
     public boolean phoneExists(String phone) {
-        return customerRepository.findByPhone1(phone).isPresent();
+        return accounts.phoneExists(phone);
     }
 
+    @Transactional
     public Customer updateProfile(String email,
                                   String firstName,
                                   String lastName,

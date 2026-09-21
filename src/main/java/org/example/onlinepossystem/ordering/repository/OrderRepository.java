@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.Collection;
 
 @Repository
+@org.springframework.transaction.annotation.Transactional(readOnly = true)
 public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByBranchIdOrderByCreatedAtDesc(Integer branchId);
     List<Order> findByBranchIdAndStatusOrderByCreatedAtDesc(Integer branchId, String status);

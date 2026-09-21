@@ -1,11 +1,8 @@
 package org.example.onlinepossystem.customer.service;
 
-import org.example.onlinepossystem.customer.entity.Customer;
-import org.example.onlinepossystem.customer.entity.PasswordResetToken;
 import org.example.onlinepossystem.customer.api.PasswordResetOperations;
 import org.example.onlinepossystem.customer.notification.PasswordResetNotifier;
-import org.example.onlinepossystem.customer.repository.CustomerRepository;
-import org.example.onlinepossystem.customer.repository.PasswordResetTokenRepository;
+import org.example.onlinepossystem.customer.persistence.AccountBootstrapStore;
 import org.example.onlinepossystem.notification.email.NotificationDeliveryException;
 import org.example.onlinepossystem.security.api.PasswordPolicy;
 import org.example.onlinepossystem.security.api.RateLimiter;
@@ -34,8 +31,7 @@ public class PasswordResetService implements PasswordResetOperations {
     private static final Duration FORGOT_PASSWORD_WINDOW = Duration.ofMinutes(15);
     private static final int MAX_FORGOT_PASSWORD_ATTEMPTS = 5;
 
-    private final CustomerRepository customerRepository;
-    private final PasswordResetTokenRepository tokenRepository;
+    private final AccountBootstrapStore accounts;
     private final PasswordEncoder passwordEncoder;
     private final PasswordResetNotifier passwordResetNotifier;
     private final RateLimiter rateLimiter;
@@ -43,16 +39,14 @@ public class PasswordResetService implements PasswordResetOperations {
     private final PasswordPolicy passwordPolicy;
 
     public PasswordResetService(
-            CustomerRepository customerRepository,
-            PasswordResetTokenRepository tokenRepository,
+            AccountBootstrapStore accounts,
             PasswordEncoder passwordEncoder,
             PasswordResetNotifier passwordResetNotifier,
             RateLimiter rateLimiter,
             SecureRandom secureRandom,
             PasswordPolicy passwordPolicy
     ) {
-        this.customerRepository = customerRepository;
-        this.tokenRepository = tokenRepository;
+        this.accounts = accounts;
         this.passwordEncoder = passwordEncoder;
         this.passwordResetNotifier = passwordResetNotifier;
         this.rateLimiter = rateLimiter;
@@ -73,21 +67,14 @@ public class PasswordResetService implements PasswordResetOperations {
 
         logger.info("Password reset requested from IP {}", clientIp);
 
-        customerRepository.findByEmail(normalizedEmail).ifPresent(customer -> {
-            tokenRepository.deleteByCustomerAndUsedFalse(customer);
-
-            String rawToken = generateToken();
-            PasswordResetToken resetToken = new PasswordResetToken();
-            resetToken.setCustomer(customer);
-            resetToken.setTokenHash(hashToken(rawToken));
-            resetToken.setExpiresAt(LocalDateTime.now().plus(RESET_EXPIRY));
-            tokenRepository.save(resetToken);
-
+        String rawToken = generateToken();
+        String tokenHash = hashToken(rawToken);
+        accounts.createReset(normalizedEmail, tokenHash, LocalDateTime.now().plus(RESET_EXPIRY)).ifPresent(recipient -> {
             try {
-                passwordResetNotifier.sendResetLink(customer.getEmail(), rawToken);
+                passwordResetNotifier.sendResetLink(recipient, rawToken);
             } catch (NotificationDeliveryException ex) {
-                tokenRepository.deleteByCustomerAndUsedFalse(customer);
-                logger.warn("Password reset email could not be delivered for customer ID {}", customer.getId());
+                accounts.cancelReset(tokenHash);
+                logger.warn("Password reset email could not be delivered");
             }
         });
 
@@ -110,18 +97,10 @@ public class PasswordResetService implements PasswordResetOperations {
             throw new IllegalArgumentException(passwordPolicy.validationMessage());
         }
 
-        PasswordResetToken resetToken = tokenRepository.findByTokenHashAndUsedFalse(hashToken(token))
-                .filter(t -> t.getExpiresAt().isAfter(LocalDateTime.now()))
-                .orElseThrow(() -> new IllegalArgumentException("Reset link is invalid or has expired."));
-
-        Customer customer = resetToken.getCustomer();
-        customer.setPassword(passwordEncoder.encode(newPassword));
-        customerRepository.save(customer);
-
-        resetToken.setUsed(true);
-        tokenRepository.save(resetToken);
-        tokenRepository.deleteByCustomerAndUsedFalse(customer);
-        logger.info("Password reset completed for customer ID {}", customer.getId());
+        if (!accounts.consumeReset(hashToken(token), passwordEncoder.encode(newPassword))) {
+            throw new IllegalArgumentException("Reset link is invalid or has expired.");
+        }
+        logger.info("Password reset completed");
     }
 
     private String generateToken() {

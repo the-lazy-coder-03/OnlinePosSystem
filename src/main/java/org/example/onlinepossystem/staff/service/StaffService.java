@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class StaffService implements StaffDirectory, StaffOperations {
 
     private final StaffRepository staffRepository;

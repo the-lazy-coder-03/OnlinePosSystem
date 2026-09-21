@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@org.springframework.context.annotation.Profile("dev")
 public class Database implements CommandLineRunner {
 
     private final DataSource dataSource;
@@ -44,7 +45,7 @@ public class Database implements CommandLineRunner {
             if (conn != null && !conn.isClosed()) {
                 System.out.println("✅ Connected to database successfully!");
 
-                syncStaffFromFile();
+                // Legacy staff credentials are no longer used for authentication.
                 catalogSeeder.seedMenuData();
             } else {
                 System.out.println("❌ Failed to connect to database");
