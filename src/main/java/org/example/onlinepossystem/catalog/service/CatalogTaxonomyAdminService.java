@@ -43,62 +43,58 @@ public class CatalogTaxonomyAdminService {
     }
 
     @Transactional
-    public void savePizzaCategory(Integer id, String name, Integer sortOrder,
-                                  Map<String, String> parameters, String actor) {
+    public void savePizzaCategory(Integer id, String name, Map<String, String> parameters, String actor) {
         PizzaCategory category = id == null
                 ? new PizzaCategory()
                 : pizzaCategoryRepository.findById(id).orElseGet(PizzaCategory::new);
         if (category.getId() == null) {
             category.setId(CatalogAdminSupport.nextId(pizzaCategoryRepository.findAll(), PizzaCategory::getId));
+            category.setSortOrder(pizzaCategoryRepository.nextSortOrder());
         }
         category.setName(CatalogAdminSupport.cleanText(name));
-        category.setSortOrder(sortOrder == null ? 0 : sortOrder);
         category.setActive(parameters.containsKey("active"));
         pizzaCategoryRepository.save(category);
         logger.info("Admin action=savePizzaCategory pizzaCategoryId={} admin={}", category.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
-    public void saveMenuCategory(Integer id, String name, Integer sortOrder,
-                                 Map<String, String> parameters, String actor) {
+    public void saveMenuCategory(Integer id, String name, Map<String, String> parameters, String actor) {
         MenuCategory category = id == null
                 ? new MenuCategory()
                 : menuCategoryRepository.findById(id).orElseGet(MenuCategory::new);
         if (category.getId() == null) {
             category.setId(CatalogAdminSupport.nextId(menuCategoryRepository.findAll(), MenuCategory::getId));
+            category.setSortOrder(menuCategoryRepository.nextSortOrder());
         }
         category.setName(CatalogAdminSupport.cleanText(name));
-        category.setSortOrder(sortOrder == null ? 0 : sortOrder);
         category.setActive(parameters.containsKey("active"));
         menuCategoryRepository.save(category);
         logger.info("Admin action=saveMenuCategory menuCategoryId={} admin={}", category.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
-    public void savePizzaSize(Integer id, Integer cm, Integer sortOrder,
-                              Map<String, String> parameters, String actor) {
+    public void savePizzaSize(Integer id, Integer cm, Map<String, String> parameters, String actor) {
         PizzaSize size = id == null ? new PizzaSize() : pizzaSizeRepository.findById(id).orElseGet(PizzaSize::new);
         if (size.getId() == null) {
             size.setId(CatalogAdminSupport.nextId(pizzaSizeRepository.findAll(), PizzaSize::getId));
+            size.setSortOrder(pizzaSizeRepository.nextSortOrder());
         }
         size.setCm(cm);
-        size.setSortOrder(sortOrder == null ? 0 : sortOrder);
         size.setActive(parameters.containsKey("active"));
         pizzaSizeRepository.save(size);
         logger.info("Admin action=savePizzaSize pizzaSizeId={} admin={}", size.getId(), CatalogAdminSupport.actorName(actor));
     }
 
     @Transactional
-    public void savePriceCategory(Integer id, String name, Integer sortOrder,
-                                  Map<String, String> parameters, String actor) {
+    public void savePriceCategory(Integer id, String name, Map<String, String> parameters, String actor) {
         PriceCategory category = id == null
                 ? new PriceCategory()
                 : priceCategoryRepository.findById(id).orElseGet(PriceCategory::new);
         if (category.getId() == null) {
             category.setId(CatalogAdminSupport.nextId(priceCategoryRepository.findAll(), PriceCategory::getId));
+            category.setSortOrder(priceCategoryRepository.nextSortOrder());
         }
         category.setName(CatalogAdminSupport.cleanText(name));
-        category.setSortOrder(sortOrder == null ? 0 : sortOrder);
         category.setActive(parameters.containsKey("active"));
         priceCategoryRepository.save(category);
         logger.info("Admin action=savePriceCategory priceCategoryId={} admin={}", category.getId(), CatalogAdminSupport.actorName(actor));

@@ -1,5 +1,6 @@
 package org.example.onlinepossystem.catalog.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,6 +28,21 @@ final class CatalogAdminSupport {
             throw new IllegalArgumentException("Price cannot be negative");
         }
         return Optional.of(price);
+    }
+
+    static double requiredPrice(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("A price is required for every branch and selected size.");
+        }
+        try {
+            BigDecimal price = new BigDecimal(raw.trim());
+            if (price.signum() < 0 || price.scale() > 2 || price.compareTo(new BigDecimal("99999999.99")) > 0) {
+                throw new IllegalArgumentException("Prices must be between 0.00 and 99999999.99 with at most two decimal places.");
+            }
+            return price.doubleValue();
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Enter a valid numeric price.", ex);
+        }
     }
 
     static String cleanText(String value) {

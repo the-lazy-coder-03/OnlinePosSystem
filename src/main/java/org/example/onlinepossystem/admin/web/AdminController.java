@@ -52,11 +52,10 @@ public class AdminController {
                             @RequestParam String name,
                             @RequestParam Integer categoryId,
                             @RequestParam(required = false) String description,
-                            @RequestParam(required = false) Integer sortOrder,
                             @RequestParam(required = false) List<Integer> ingredientIds,
                             @RequestParam Map<String, String> params,
                             Authentication authentication) {
-        catalogAdministration.savePizza(id, name, categoryId, description, sortOrder, ingredientIds, params, actor(authentication));
+        catalogAdministration.savePizza(id, name, categoryId, description, ingredientIds, params, actor(authentication));
         return "redirect:/admin#items";
     }
 
@@ -84,11 +83,10 @@ public class AdminController {
                                @RequestParam String name,
                                @RequestParam Integer categoryId,
                                @RequestParam(required = false) String description,
-                               @RequestParam(required = false) Integer sortOrder,
                                @RequestParam(required = false) List<Integer> modifierGroupIds,
                                @RequestParam Map<String, String> params,
                                Authentication authentication) {
-        catalogAdministration.saveMenuItem(id, name, categoryId, description, sortOrder, modifierGroupIds, params, actor(authentication));
+        catalogAdministration.saveMenuItem(id, name, categoryId, description, modifierGroupIds, params, actor(authentication));
         return "redirect:/admin#items";
     }
 
@@ -124,10 +122,9 @@ public class AdminController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String savePizzaCategory(@RequestParam(required = false) Integer id,
                                     @RequestParam String name,
-                                    @RequestParam(required = false) Integer sortOrder,
                                     @RequestParam Map<String, String> params,
                                     Authentication authentication) {
-        catalogAdministration.savePizzaCategory(id, name, sortOrder, params, actor(authentication));
+        catalogAdministration.savePizzaCategory(id, name, params, actor(authentication));
         return "redirect:/admin#categories";
     }
 
@@ -135,10 +132,9 @@ public class AdminController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String saveMenuCategory(@RequestParam(required = false) Integer id,
                                    @RequestParam String name,
-                                   @RequestParam(required = false) Integer sortOrder,
                                    @RequestParam Map<String, String> params,
                                    Authentication authentication) {
-        catalogAdministration.saveMenuCategory(id, name, sortOrder, params, actor(authentication));
+        catalogAdministration.saveMenuCategory(id, name, params, actor(authentication));
         return "redirect:/admin#categories";
     }
 
@@ -146,10 +142,9 @@ public class AdminController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String savePizzaSize(@RequestParam(required = false) Integer id,
                                 @RequestParam Integer cm,
-                                @RequestParam(required = false) Integer sortOrder,
                                 @RequestParam Map<String, String> params,
                                 Authentication authentication) {
-        catalogAdministration.savePizzaSize(id, cm, sortOrder, params, actor(authentication));
+        catalogAdministration.savePizzaSize(id, cm, params, actor(authentication));
         return "redirect:/admin#categories";
     }
 
@@ -157,10 +152,9 @@ public class AdminController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     public String savePriceCategory(@RequestParam(required = false) Integer id,
                                     @RequestParam String name,
-                                    @RequestParam(required = false) Integer sortOrder,
                                     @RequestParam Map<String, String> params,
                                     Authentication authentication) {
-        catalogAdministration.savePriceCategory(id, name, sortOrder, params, actor(authentication));
+        catalogAdministration.savePriceCategory(id, name, params, actor(authentication));
         return "redirect:/admin#categories";
     }
 

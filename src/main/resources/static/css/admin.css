@@ -370,6 +370,49 @@ body.admin-body {
     margin: 0 0 7px;
 }
 
+.order-items {
+    margin: 0 0 10px;
+}
+
+.order-items-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #344054;
+}
+
+.order-item-list {
+    display: grid;
+    gap: 8px;
+}
+
+.order-item {
+    padding: 9px 10px;
+    border: 1px solid #e4e7ec;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+.order-item-title {
+    color: #182230;
+    font-weight: 700;
+}
+
+.order-item-details {
+    margin: 5px 0 0;
+    padding-left: 18px;
+    color: #667085;
+}
+
+.order-item-details li {
+    margin: 2px 0;
+    overflow-wrap: anywhere;
+}
+
+.order-items-empty {
+    margin: 0;
+    color: var(--admin-muted);
+}
+
 .empty-state {
     padding: 34px;
     border: 1px dashed #aeb8c4;

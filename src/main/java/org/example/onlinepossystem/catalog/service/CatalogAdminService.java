@@ -38,9 +38,9 @@ public class CatalogAdminService implements CatalogAdministration {
     }
 
     @Override
-    public void savePizza(Integer id, String name, Integer categoryId, String description, Integer sortOrder,
+    public void savePizza(Integer id, String name, Integer categoryId, String description,
                           List<Integer> ingredientIds, Map<String, String> parameters, String actor) {
-        pizzaAdminService.savePizza(id, name, categoryId, description, sortOrder, ingredientIds, parameters, actor);
+        pizzaAdminService.savePizza(id, name, categoryId, description, ingredientIds, parameters, actor);
     }
 
     @Override
@@ -54,9 +54,9 @@ public class CatalogAdminService implements CatalogAdministration {
     }
 
     @Override
-    public void saveMenuItem(Integer id, String name, Integer categoryId, String description, Integer sortOrder,
+    public void saveMenuItem(Integer id, String name, Integer categoryId, String description,
                              List<Integer> modifierGroupIds, Map<String, String> parameters, String actor) {
-        menuAdminService.saveMenuItem(id, name, categoryId, description, sortOrder, modifierGroupIds, parameters, actor);
+        menuAdminService.saveMenuItem(id, name, categoryId, description, modifierGroupIds, parameters, actor);
     }
 
     @Override
@@ -76,27 +76,23 @@ public class CatalogAdminService implements CatalogAdministration {
     }
 
     @Override
-    public void savePizzaCategory(Integer id, String name, Integer sortOrder,
-                                  Map<String, String> parameters, String actor) {
-        taxonomyAdminService.savePizzaCategory(id, name, sortOrder, parameters, actor);
+    public void savePizzaCategory(Integer id, String name, Map<String, String> parameters, String actor) {
+        taxonomyAdminService.savePizzaCategory(id, name, parameters, actor);
     }
 
     @Override
-    public void saveMenuCategory(Integer id, String name, Integer sortOrder,
-                                 Map<String, String> parameters, String actor) {
-        taxonomyAdminService.saveMenuCategory(id, name, sortOrder, parameters, actor);
+    public void saveMenuCategory(Integer id, String name, Map<String, String> parameters, String actor) {
+        taxonomyAdminService.saveMenuCategory(id, name, parameters, actor);
     }
 
     @Override
-    public void savePizzaSize(Integer id, Integer cm, Integer sortOrder,
-                              Map<String, String> parameters, String actor) {
-        taxonomyAdminService.savePizzaSize(id, cm, sortOrder, parameters, actor);
+    public void savePizzaSize(Integer id, Integer cm, Map<String, String> parameters, String actor) {
+        taxonomyAdminService.savePizzaSize(id, cm, parameters, actor);
     }
 
     @Override
-    public void savePriceCategory(Integer id, String name, Integer sortOrder,
-                                  Map<String, String> parameters, String actor) {
-        taxonomyAdminService.savePriceCategory(id, name, sortOrder, parameters, actor);
+    public void savePriceCategory(Integer id, String name, Map<String, String> parameters, String actor) {
+        taxonomyAdminService.savePriceCategory(id, name, parameters, actor);
     }
 
     @Override

@@ -163,7 +163,7 @@
         body.className = "order-card-body";
         appendLine(body, "Customer", order.customerName || "Guest");
         appendLine(body, "Type", order.orderType || "N/A");
-        appendLine(body, "Items", itemSummary(order));
+        appendOrderItems(body, order);
         if ((order.orderType || "").toLowerCase() === "delivery") {
             appendLine(body, "Address", addressSummary(order));
         }
@@ -251,6 +251,19 @@
             button.addEventListener("click", () => populatePizzaModal(button.dataset));
         });
         document.getElementById("addPizzaButton")?.addEventListener("click", () => populatePizzaModal({}));
+        document.querySelectorAll("[data-pizza-size-toggle]").forEach(input => {
+            input.addEventListener("change", updatePizzaPriceInputs);
+        });
+        document.querySelector("#pizzaModal form")?.addEventListener("submit", event => {
+            if (document.getElementById("pizzaId").value) return;
+            const sizes = [...document.querySelectorAll("[data-pizza-size-toggle]")];
+            if (sizes.some(input => input.checked)) return;
+            event.preventDefault();
+            if (sizes.length) {
+                sizes[0].setCustomValidity("Select at least one pizza size.");
+                sizes[0].reportValidity();
+            }
+        });
         document.querySelectorAll("[data-menu-edit]").forEach(button => {
             button.addEventListener("click", () => populateMenuModal(button.dataset));
         });
@@ -283,10 +296,31 @@
         setValue("pizzaName", data.name || "");
         setValue("pizzaCategory", data.categoryId || "");
         setValue("pizzaDescription", data.description || "");
-        setValue("pizzaSortOrder", data.sortOrder || "0");
         setChecked("pizzaActive", data.active !== "false");
         setCheckedValues(".pizza-ingredient", data.ingredientIds || "");
+        document.querySelectorAll("[data-pizza-size-toggle]").forEach(input => input.checked = false);
+        document.querySelectorAll("[data-pizza-price-size-id]").forEach(input => input.value = "");
+        toggle("pizzaCreationPrices", !data.id);
+        updatePizzaPriceInputs();
         setText("pizzaModalTitle", data.id ? "Edit pizza" : "Add pizza");
+    }
+
+    function updatePizzaPriceInputs() {
+        const creating = !document.getElementById("pizzaId").value;
+        const selected = new Set([...document.querySelectorAll("[data-pizza-size-toggle]:checked")]
+            .map(input => input.dataset.sizeId));
+        document.querySelectorAll("[data-pizza-size-toggle]").forEach(input => {
+            input.disabled = !creating;
+            input.setCustomValidity("");
+        });
+        document.querySelectorAll("[data-pizza-price-size-id]").forEach(input => {
+            const enabled = creating && selected.has(input.dataset.pizzaPriceSizeId);
+            input.disabled = !enabled;
+            input.required = enabled;
+        });
+        document.querySelectorAll("[data-pizza-size-price-row]").forEach(row => {
+            row.classList.toggle("d-none", !creating || !selected.has(row.dataset.pizzaSizePriceRow));
+        });
     }
 
     function populateMenuModal(data) {
@@ -294,11 +328,16 @@
         setValue("menuItemName", data.name || "");
         setValue("menuItemCategory", data.categoryId || "");
         setValue("menuItemDescription", data.description || "");
-        setValue("menuItemSortOrder", data.sortOrder || "0");
         setChecked("menuItemActive", data.active !== "false");
         setChecked("menuItem300ml", data.is300ml === "true");
         setChecked("menuItem2l", data.is2l === "true");
         setCheckedValues(".menu-modifier-group", data.modifierGroupIds || "");
+        toggle("menuItemCreationPrices", !data.id);
+        document.querySelectorAll("[data-create-menu-price]").forEach(input => {
+            input.value = "";
+            input.disabled = Boolean(data.id);
+            input.required = !data.id;
+        });
         setText("menuItemModalTitle", data.id ? "Edit menu item" : "Add menu item");
     }
 
@@ -325,7 +364,6 @@
         setValue("taxonomyId", data.id || "");
         setValue("taxonomyName", data.name || "");
         setValue("taxonomyCm", data.cm || "");
-        setValue("taxonomySortOrder", data.sortOrder || "0");
         setChecked("taxonomyActive", data.active !== "false");
         toggle("taxonomyNameGroup", data.kind !== "size");
         toggle("taxonomyCmGroup", data.kind === "size");
@@ -432,11 +470,93 @@
         parent.appendChild(line);
     }
 
-    function itemSummary(order) {
-        const items = [];
-        (order.menuItems || []).forEach(item => items.push(`${item.qty || 1}× ${item.menuItemName || "Menu item"}`));
-        (order.pizzaItems || []).forEach(item => items.push(`${item.qty || 1}× ${item.pizzaName || "Pizza"}`));
-        return items.join(", ") || "No items";
+    function appendOrderItems(parent, order) {
+        const section = document.createElement("div");
+        section.className = "order-items";
+
+        const label = document.createElement("strong");
+        label.className = "order-items-label";
+        label.textContent = "Items";
+        section.appendChild(label);
+
+        const list = document.createElement("div");
+        list.className = "order-item-list";
+
+        const items = [
+            ...(order.menuItems || []).map(renderMenuOrderItem),
+            ...(order.pizzaItems || []).map(renderPizzaOrderItem)
+        ];
+
+        if (items.length) {
+            items.forEach(item => list.appendChild(item));
+        } else {
+            const empty = document.createElement("p");
+            empty.className = "order-items-empty";
+            empty.textContent = "No items";
+            list.appendChild(empty);
+        }
+
+        section.appendChild(list);
+        parent.appendChild(section);
+    }
+
+    function renderMenuOrderItem(item) {
+        const details = (item.extras || [])
+            .filter(extra => extra && extra.name)
+            .map(extra => quantityLabel(extra.qty, extra.name));
+        if (item.notes) details.push(`Notes: ${item.notes}`);
+
+        return renderOrderItem(
+            `${item.qty || 1}× ${item.menuItemName || "Menu item"}`,
+            details
+        );
+    }
+
+    function renderPizzaOrderItem(item) {
+        const size = item.pizzaSizeCm ? `${item.pizzaSizeCm}cm` : null;
+        const title = [
+            `${item.qty || 1}× ${item.pizzaName || "Pizza"}`,
+            size ? `(${size})` : null
+        ].filter(Boolean).join(" ");
+
+        const details = [];
+        if (item.pizzaBaseOptionName) {
+            details.push(`Base: ${item.pizzaBaseOptionName}`);
+        }
+        (item.extras || [])
+            .filter(extra => extra && extra.ingredientName)
+            .forEach(extra => details.push(`Extra topping: ${quantityLabel(extra.qty, extra.ingredientName)}`));
+        if (item.notes) details.push(`Notes: ${item.notes}`);
+
+        return renderOrderItem(title, details);
+    }
+
+    function renderOrderItem(title, details) {
+        const item = document.createElement("div");
+        item.className = "order-item";
+
+        const heading = document.createElement("div");
+        heading.className = "order-item-title";
+        heading.textContent = title;
+        item.appendChild(heading);
+
+        if (details.length) {
+            const detailList = document.createElement("ul");
+            detailList.className = "order-item-details";
+            details.forEach(detail => {
+                const row = document.createElement("li");
+                row.textContent = detail;
+                detailList.appendChild(row);
+            });
+            item.appendChild(detailList);
+        }
+
+        return item;
+    }
+
+    function quantityLabel(qty, name) {
+        const quantity = Number(qty || 1);
+        return quantity > 1 ? `${quantity}× ${name}` : name;
     }
 
     function addressSummary(order) {

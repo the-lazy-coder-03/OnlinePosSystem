@@ -47,9 +47,19 @@ public class MenuCatalogAdminService {
     }
 
     @Transactional
-    public void saveMenuItem(Integer id, String name, Integer categoryId, String description, Integer sortOrder,
+    public void saveMenuItem(Integer id, String name, Integer categoryId, String description,
                              List<Integer> modifierGroupIds, Map<String, String> parameters, String actor) {
-        MenuItem menuItem = id == null ? new MenuItem() : menuItemRepository.findById(id).orElseGet(MenuItem::new);
+        boolean creating = id == null;
+        if (creating) {
+            List<BranchView> branches = branchLookup.findAll();
+            if (branches.isEmpty()) {
+                throw new IllegalArgumentException("At least one branch is required to price a menu item.");
+            }
+            for (BranchView branch : branches) {
+                CatalogAdminSupport.requiredPrice(parameters.get("menuPrice_" + branch.id()));
+            }
+        }
+        MenuItem menuItem = creating ? new MenuItem() : menuItemRepository.findById(id).orElseThrow();
         if (menuItem.getId() == null) {
             menuItem.setId(CatalogAdminSupport.nextId(menuItemRepository.findAll(), MenuItem::getId));
         }
@@ -58,7 +68,9 @@ public class MenuCatalogAdminService {
         menuItem.setCategory(category);
         menuItem.setName(CatalogAdminSupport.cleanText(name));
         menuItem.setDescription(CatalogAdminSupport.cleanText(description));
-        menuItem.setSortOrder(sortOrder == null ? 0 : sortOrder);
+        if (creating) {
+            menuItem.setSortOrder(menuItemRepository.nextSortOrderForCategory(categoryId));
+        }
         menuItem.setActive(parameters.containsKey("active"));
         menuItem.setIs300ml(parameters.containsKey("is300ml"));
         menuItem.setIs2l(parameters.containsKey("is2l"));

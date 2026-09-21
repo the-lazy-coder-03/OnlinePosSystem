@@ -154,7 +154,9 @@ class OrderServicePlacementTest {
         assertThat(response.getPizzaItems()).hasSize(1);
         OrderResponseDTO.PizzaItemDTO pizzaItem = response.getPizzaItems().get(0);
         assertThat(pizzaItem.getPizzaId()).isEqualTo(fixture.pizza().getId());
+        assertThat(pizzaItem.getPizzaName()).isEqualTo(fixture.pizza().getName());
         assertThat(pizzaItem.getPizzaSizeId()).isEqualTo(fixture.size().getId());
+        assertThat(pizzaItem.getPizzaSizeCm()).isEqualTo(fixture.size().getCm());
         assertThat(pizzaItem.getQty()).isEqualTo(2);
         assertThat(pizzaItem.getBasePriceAtTime()).isEqualTo(119.99);
         assertThat(pizzaItem.getPizzaBaseOptionId()).isEqualTo(fixture.baseOption().getId());
@@ -194,6 +196,7 @@ class OrderServicePlacementTest {
         assertThat(response.getMenuItems()).hasSize(1);
         OrderResponseDTO.MenuItemDTO item = response.getMenuItems().get(0);
         assertThat(item.getMenuItemId()).isEqualTo(fixture.menuItem().getId());
+        assertThat(item.getMenuItemName()).isEqualTo(fixture.menuItem().getName());
         assertThat(item.getQty()).isEqualTo(3);
         assertThat(item.getUnitPriceAtTime()).isEqualTo(49.95);
         assertThat(item.getExtras()).extracting(OrderResponseDTO.MenuItemExtraDTO::getName)

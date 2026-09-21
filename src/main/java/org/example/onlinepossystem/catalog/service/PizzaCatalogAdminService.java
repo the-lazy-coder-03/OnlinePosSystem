@@ -58,9 +58,28 @@ public class PizzaCatalogAdminService {
     }
 
     @Transactional
-    public void savePizza(Integer id, String name, Integer categoryId, String description, Integer sortOrder,
+    public void savePizza(Integer id, String name, Integer categoryId, String description,
                           List<Integer> ingredientIds, Map<String, String> parameters, String actor) {
-        Pizza pizza = id == null ? new Pizza() : pizzaRepository.findById(id).orElseGet(Pizza::new);
+        boolean creating = id == null;
+        if (id == null) {
+            List<PizzaSize> selectedSizes = pizzaSizeRepository.findAll().stream()
+                    .filter(PizzaSize::isActive)
+                    .filter(size -> parameters.containsKey("pizzaSize_" + size.getId()))
+                    .toList();
+            if (selectedSizes.isEmpty()) {
+                throw new IllegalArgumentException("Select at least one active pizza size.");
+            }
+            List<BranchView> branches = branchLookup.findAll();
+            if (branches.isEmpty()) {
+                throw new IllegalArgumentException("At least one branch is required to price a pizza.");
+            }
+            for (BranchView branch : branches) {
+                for (PizzaSize size : selectedSizes) {
+                    CatalogAdminSupport.requiredPrice(parameters.get("pizzaPrice_" + branch.id() + "_" + size.getId()));
+                }
+            }
+        }
+        Pizza pizza = creating ? new Pizza() : pizzaRepository.findById(id).orElseThrow();
         if (pizza.getId() == null) {
             pizza.setId(CatalogAdminSupport.nextId(pizzaRepository.findAll(), Pizza::getId));
         }
@@ -69,12 +88,14 @@ public class PizzaCatalogAdminService {
         pizza.setCategory(category);
         pizza.setName(CatalogAdminSupport.cleanText(name));
         pizza.setDescription(CatalogAdminSupport.cleanText(description));
-        pizza.setSortOrder(sortOrder == null ? 0 : sortOrder);
+        if (creating) {
+            pizza.setSortOrder(pizzaRepository.nextSortOrderForCategory(categoryId));
+        }
         pizza.setActive(parameters.containsKey("active"));
 
         Pizza savedPizza = pizzaRepository.save(pizza);
         replaceDefaultIngredients(savedPizza, ingredientIds);
-        savePriceMatrix(savedPizza, parameters);
+        savePriceMatrix(savedPizza, parameters, creating);
         logger.info("Admin action=savePizza pizzaId={} admin={}", savedPizza.getId(), CatalogAdminSupport.actorName(actor));
     }
 
@@ -108,9 +129,12 @@ public class PizzaCatalogAdminService {
         }
     }
 
-    private void savePriceMatrix(Pizza pizza, Map<String, String> parameters) {
+    private void savePriceMatrix(Pizza pizza, Map<String, String> parameters, boolean creating) {
         for (BranchView branch : branchLookup.findAll()) {
             for (PizzaSize size : pizzaSizeRepository.findAll()) {
+                if (creating && (!size.isActive() || !parameters.containsKey("pizzaSize_" + size.getId()))) {
+                    continue;
+                }
                 String key = "pizzaPrice_" + branch.id() + "_" + size.getId();
                 CatalogAdminSupport.parsePrice(parameters.get(key))
                         .ifPresent(price -> savePrice(branch.id(), pizza, size, price));

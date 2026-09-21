@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Transactional
@@ -94,11 +95,13 @@ class CatalogAdminServiceTest {
     @Test
     void saveMenuCategoryCreatesAndUpdatesCategory() {
         String suffix = suffix();
+        int expectedSortOrder = menuCategoryRepository.findAll().stream()
+                .mapToInt(category -> category.getSortOrder() == null ? 0 : category.getSortOrder())
+                .max().orElse(0) + 1;
 
         catalogAdminService.saveMenuCategory(
                 null,
                 "  Admin Menu Category " + suffix + "  ",
-                21,
                 Map.of("active", "on"),
                 null
         );
@@ -107,14 +110,13 @@ class CatalogAdminServiceTest {
         catalogAdminService.saveMenuCategory(
                 created.getId(),
                 "Updated Admin Menu Category " + suffix,
-                31,
                 Map.of(),
                 null
         );
         MenuCategory updated = menuCategoryRepository.findById(created.getId()).orElseThrow();
 
         assertThat(updated.getName()).isEqualTo("Updated Admin Menu Category " + suffix);
-        assertThat(updated.getSortOrder()).isEqualTo(31);
+        assertThat(updated.getSortOrder()).isEqualTo(expectedSortOrder);
         assertThat(updated.isActive()).isFalse();
     }
 
@@ -127,6 +129,15 @@ class CatalogAdminServiceTest {
                 "Admin Menu Item Category " + suffix,
                 1
         ));
+        MenuCategory otherCategory = menuCategoryRepository.saveAndFlush(new MenuCategory(
+                nextId("menu_category", "id"),
+                "Admin Other Menu Category " + suffix,
+                1
+        ));
+        menuItemRepository.saveAndFlush(new MenuItem(
+                nextId("menu_item", "id"), otherCategory, "Existing high-order item " + suffix,
+                null, 99, false, false
+        ));
         ModifierGroup modifierGroup = modifierGroupRepository.saveAndFlush(new ModifierGroup(
                 nextId("modifier_group", "id"),
                 "Admin Modifier Group " + suffix,
@@ -137,14 +148,16 @@ class CatalogAdminServiceTest {
         Map<String, String> params = new HashMap<>();
         params.put("active", "on");
         params.put("is300ml", "on");
-        params.put("menuPrice_" + branch.getId(), "64.50");
+        branchRepository.findAll().forEach(currentBranch -> params.put(
+                "menuPrice_" + currentBranch.getId(),
+                currentBranch.getId().equals(branch.getId()) ? "64.50" : "0.00"
+        ));
 
         catalogAdminService.saveMenuItem(
                 null,
                 "  Admin Menu Item " + suffix + "  ",
                 category.getId(),
                 "  Saved from service  ",
-                12,
                 List.of(modifierGroup.getId()),
                 params,
                 null
@@ -152,15 +165,37 @@ class CatalogAdminServiceTest {
         MenuItem saved = findMenuItem("Admin Menu Item " + suffix);
 
         assertThat(saved.getDescription()).isEqualTo("Saved from service");
-        assertThat(saved.getSortOrder()).isEqualTo(12);
+        assertThat(saved.getSortOrder()).isEqualTo(1);
         assertThat(saved.isActive()).isTrue();
         assertThat(saved.isIs300ml()).isTrue();
         assertThat(branchMenuItemPriceRepository.findByBranchIdAndMenuItemId(branch.getId(), saved.getId()))
                 .map(BranchMenuItemPrice::getPrice)
                 .contains(64.50);
+        for (Branch otherBranch : branchRepository.findAll()) {
+            if (!otherBranch.getId().equals(branch.getId())) {
+                assertThat(branchMenuItemPriceRepository.findByBranchIdAndMenuItemId(otherBranch.getId(), saved.getId()))
+                        .map(BranchMenuItemPrice::getPrice)
+                        .contains(0.0);
+            }
+        }
         assertThat(menuItemModifierGroupRepository.findByMenuItemId(saved.getId()))
                 .extracting(MenuItemModifierGroup::getGroupId)
                 .containsExactly(modifierGroup.getId());
+
+        int originalSortOrder = saved.getSortOrder();
+        catalogAdminService.saveMenuItem(
+                saved.getId(),
+                "Updated Admin Menu Item " + suffix,
+                otherCategory.getId(),
+                "Updated description",
+                List.of(modifierGroup.getId()),
+                params,
+                null
+        );
+        assertThat(menuItemRepository.findById(saved.getId()).orElseThrow().getSortOrder())
+                .isEqualTo(originalSortOrder);
+        assertThat(menuItemRepository.findById(saved.getId()).orElseThrow().getCategory().getId())
+                .isEqualTo(otherCategory.getId());
     }
 
     @Test
@@ -171,6 +206,15 @@ class CatalogAdminServiceTest {
                 nextId("pizza_category", "pizza_category_id"),
                 "Admin Pizza Category " + suffix,
                 1
+        ));
+        PizzaCategory otherCategory = pizzaCategoryRepository.saveAndFlush(new PizzaCategory(
+                nextId("pizza_category", "pizza_category_id"),
+                "Admin Other Pizza Category " + suffix,
+                1
+        ));
+        pizzaRepository.saveAndFlush(new Pizza(
+                nextId("pizza", "pizza_id"), otherCategory, "Existing high-order pizza " + suffix,
+                null, 99
         ));
         PizzaSize size = pizzaSizeRepository.saveAndFlush(new PizzaSize(
                 nextId("pizza_size", "pizza_size_id"),
@@ -190,14 +234,21 @@ class CatalogAdminServiceTest {
         ));
         Map<String, String> params = new HashMap<>();
         params.put("active", "on");
-        params.put("pizzaPrice_" + branch.getId() + "_" + size.getId(), "142.75");
+        params.put("pizzaSize_" + size.getId(), "on");
+        PizzaSize unselectedSize = pizzaSizeRepository.findAll().stream()
+                .filter(candidate -> !candidate.getId().equals(size.getId()))
+                .findFirst().orElseThrow();
+        branchRepository.findAll().forEach(currentBranch -> {
+            params.put("pizzaPrice_" + currentBranch.getId() + "_" + size.getId(),
+                    currentBranch.getId().equals(branch.getId()) ? "142.75" : "123.45");
+            params.put("pizzaPrice_" + currentBranch.getId() + "_" + unselectedSize.getId(), "50.00");
+        });
 
         catalogAdminService.savePizza(
                 null,
                 "  Admin Pizza " + suffix + "  ",
                 category.getId(),
                 "  Saved pizza  ",
-                9,
                 List.of(ingredient.getId()),
                 params,
                 null
@@ -205,7 +256,7 @@ class CatalogAdminServiceTest {
         Pizza saved = findPizza("Admin Pizza " + suffix);
 
         assertThat(saved.getDescription()).isEqualTo("Saved pizza");
-        assertThat(saved.getSortOrder()).isEqualTo(9);
+        assertThat(saved.getSortOrder()).isEqualTo(1);
         assertThat(saved.isActive()).isTrue();
         assertThat(pizzaDefaultIngredientRepository.findByPizzaId(saved.getId()))
                 .extracting(PizzaDefaultIngredient::getIngredient)
@@ -214,8 +265,122 @@ class CatalogAdminServiceTest {
         assertThat(branchPizzaPriceRepository.findByBranchIdAndPizzaIdAndPizzaSizeId(branch.getId(), saved.getId(), size.getId()))
                 .map(price -> price.getPrice())
                 .contains(142.75);
+        for (Branch otherBranch : branchRepository.findAll()) {
+            if (!otherBranch.getId().equals(branch.getId())) {
+                assertThat(branchPizzaPriceRepository.findByBranchIdAndPizzaIdAndPizzaSizeId(
+                        otherBranch.getId(), saved.getId(), size.getId()))
+                        .map(price -> price.getPrice()).contains(123.45);
+            }
+            assertThat(branchPizzaPriceRepository.findByBranchIdAndPizzaIdAndPizzaSizeId(
+                    otherBranch.getId(), saved.getId(), unselectedSize.getId())).isEmpty();
+        }
         assertThat(pizzaAllowedSizeRepository.existsById(new PizzaAllowedSize.PizzaAllowedSizeId(saved.getId(), size.getId())))
                 .isTrue();
+        assertThat(pizzaAllowedSizeRepository.existsById(new PizzaAllowedSize.PizzaAllowedSizeId(saved.getId(), unselectedSize.getId())))
+                .isFalse();
+
+        int originalSortOrder = saved.getSortOrder();
+        catalogAdminService.savePizza(
+                saved.getId(),
+                "Updated Admin Pizza " + suffix,
+                otherCategory.getId(),
+                "Updated pizza",
+                List.of(ingredient.getId()),
+                params,
+                null
+        );
+        assertThat(pizzaRepository.findById(saved.getId()).orElseThrow().getSortOrder())
+                .isEqualTo(originalSortOrder);
+        assertThat(pizzaRepository.findById(saved.getId()).orElseThrow().getCategory().getId())
+                .isEqualTo(otherCategory.getId());
+    }
+
+    @Test
+    void newSortableTaxonomyRecordsUseNextTableOrder() {
+        String suffix = suffix();
+
+        int expectedPizzaCategoryOrder = pizzaCategoryRepository.findAll().stream()
+                .mapToInt(category -> category.getSortOrder() == null ? 0 : category.getSortOrder())
+                .max().orElse(0) + 1;
+        catalogAdminService.savePizzaCategory(null, "Auto Pizza Category " + suffix, Map.of("active", "on"), null);
+        PizzaCategory pizzaCategory = pizzaCategoryRepository.findAll().stream()
+                .filter(category -> category.getName().equals("Auto Pizza Category " + suffix))
+                .findFirst().orElseThrow();
+        assertThat(pizzaCategory.getSortOrder()).isEqualTo(expectedPizzaCategoryOrder);
+
+        int expectedSizeOrder = pizzaSizeRepository.findAll().stream()
+                .mapToInt(size -> size.getSortOrder() == null ? 0 : size.getSortOrder())
+                .max().orElse(0) + 1;
+        catalogAdminService.savePizzaSize(null, nextId("pizza_size", "cm"), Map.of("active", "on"), null);
+        PizzaSize pizzaSize = pizzaSizeRepository.findAll().stream()
+                .filter(size -> size.getSortOrder() == expectedSizeOrder)
+                .findFirst().orElseThrow();
+        assertThat(pizzaSize.getSortOrder()).isEqualTo(expectedSizeOrder);
+
+        int expectedPriceCategoryOrder = priceCategoryRepository.findAll().stream()
+                .mapToInt(category -> category.getSortOrder() == null ? 0 : category.getSortOrder())
+                .max().orElse(0) + 1;
+        catalogAdminService.savePriceCategory(null, "Auto Price Category " + suffix,
+                Map.of("active", "on"), null);
+        PriceCategory priceCategory = priceCategoryRepository.findAll().stream()
+                .filter(category -> category.getName().equals("Auto Price Category " + suffix))
+                .findFirst().orElseThrow();
+        assertThat(priceCategory.getSortOrder()).isEqualTo(expectedPriceCategoryOrder);
+    }
+
+    @Test
+    void newMenuItemRequiresValidPriceForEveryBranch() {
+        String suffix = suffix();
+        MenuCategory category = menuCategoryRepository.saveAndFlush(new MenuCategory(
+                nextId("menu_category", "id"), "Price validation menu " + suffix, 1));
+        Branch branch = branchRepository.findAll().get(0);
+        Map<String, String> validPrices = new HashMap<>();
+        branchRepository.findAll().forEach(currentBranch ->
+                validPrices.put("menuPrice_" + currentBranch.getId(), "10.00"));
+
+        for (String invalid : List.of("missing", "-1.00", "not-a-price", "1.234")) {
+            Map<String, String> params = new HashMap<>(validPrices);
+            if ("missing".equals(invalid)) {
+                params.remove("menuPrice_" + branch.getId());
+            } else {
+                params.put("menuPrice_" + branch.getId(), invalid);
+            }
+            String name = "Unpriced menu " + invalid + suffix;
+            assertThatThrownBy(() -> catalogAdminService.saveMenuItem(
+                    null, name, category.getId(), null, null, params, null))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(menuItemRepository.findAll()).noneMatch(item -> name.equals(item.getName()));
+        }
+    }
+
+    @Test
+    void newPizzaRequiresSelectedSizeAndValidPricesForEveryBranch() {
+        String suffix = suffix();
+        PizzaCategory category = pizzaCategoryRepository.saveAndFlush(new PizzaCategory(
+                nextId("pizza_category", "pizza_category_id"), "Price validation pizza " + suffix, 1));
+        PizzaSize size = pizzaSizeRepository.findAll().stream().filter(PizzaSize::isActive).findFirst().orElseThrow();
+        Branch branch = branchRepository.findAll().get(0);
+        Map<String, String> validPrices = new HashMap<>();
+        validPrices.put("pizzaSize_" + size.getId(), "on");
+        branchRepository.findAll().forEach(currentBranch ->
+                validPrices.put("pizzaPrice_" + currentBranch.getId() + "_" + size.getId(), "50.00"));
+
+        for (String invalid : List.of("no-size", "missing", "-1.00", "not-a-price", "1.234")) {
+            Map<String, String> params = new HashMap<>(validPrices);
+            String priceKey = "pizzaPrice_" + branch.getId() + "_" + size.getId();
+            if ("no-size".equals(invalid)) {
+                params.remove("pizzaSize_" + size.getId());
+            } else if ("missing".equals(invalid)) {
+                params.remove(priceKey);
+            } else {
+                params.put(priceKey, invalid);
+            }
+            String name = "Unpriced pizza " + invalid + suffix;
+            assertThatThrownBy(() -> catalogAdminService.savePizza(
+                    null, name, category.getId(), null, null, params, null))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(pizzaRepository.findAll()).noneMatch(pizza -> name.equals(pizza.getName()));
+        }
     }
 
     private Branch createBranch(String name) {
