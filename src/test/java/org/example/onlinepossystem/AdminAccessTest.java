@@ -96,6 +96,21 @@ public class AdminAccessTest {
     }
 
     @Test
+    @WithMockUser(username = "branch-admin", roles = {"ADMIN"})
+    public void testBranchAdminCannotCreateStaffAccounts() throws Exception {
+        mockMvc.perform(post("/api/staff/create")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Branch Staff",
+                                  "branch": "Kenridge",
+                                  "pin": "1234"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     public void testAdminLoginSuccess() throws Exception {
         mockMvc.perform(post("/login")
                 .with(csrf())

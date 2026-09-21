@@ -106,7 +106,7 @@ public class SecurityConfig {
 
                         // Protect sensitive API endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/staff/create").hasRole("ADMIN")
+                        .requestMatchers("/api/staff/create").hasRole("SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")
                         .requestMatchers("/api/orders/**").permitAll() // Needed for POS frontend
                         .requestMatchers("/api/auth/login").permitAll()
