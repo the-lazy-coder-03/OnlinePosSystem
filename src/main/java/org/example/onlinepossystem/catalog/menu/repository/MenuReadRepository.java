@@ -19,7 +19,9 @@ public interface MenuReadRepository extends JpaRepository<MenuItem, Integer> {
                 mi.description,
                 mc.id,
                 mc.name,
-                bmp.price
+                bmp.price,
+                mi.is300ml,
+                mi.is2l
             )
             from MenuItem mi
             join mi.category mc
@@ -58,6 +60,7 @@ public interface MenuReadRepository extends JpaRepository<MenuItem, Integer> {
             from ModifierOption mo
             where mo.groupId in :groupIds
             order by mo.groupId,
+                case when mo.groupId = 1 then mo.additionalPrice else 0 end,
                 case when mo.groupId = 5 then mo.id else 0 end,
                 mo.name
             """)

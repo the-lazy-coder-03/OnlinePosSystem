@@ -61,7 +61,7 @@ class MigrationSqlCatalogTest {
         for (int comboId = 301; comboId <= 308; comboId++) {
             assertThat(sql)
                     .contains("(" + comboId + ", 1)")
-                    .contains("(" + comboId + ", 2)");
+                    .doesNotContain("(" + comboId + ", 2)");
         }
     }
 
@@ -74,6 +74,7 @@ class MigrationSqlCatalogTest {
                 .contains("(301, 1, 'Cheese Burger Combo'")
                 .doesNotContain("(301, 2, 'Cheese Burger Combo'")
                 .contains("UPDATE menu_item\nSET category_id = 1\nWHERE category_id = 2;")
+                .contains("DELETE FROM menu_item_modifier_group\nWHERE group_id = 2\n  AND menu_item_id IN (301, 302, 303, 304, 305, 306, 307, 308);")
                 .contains("DELETE FROM menu_category\nWHERE id = 2;");
 
         int moveIndex = sql.indexOf("UPDATE menu_item\nSET category_id = 1\nWHERE category_id = 2;");

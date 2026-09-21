@@ -1278,14 +1278,14 @@ WHERE group_id = 7
 
 INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES
                                                                   (203, 5),
-                                                                  (301, 1), (301, 2),
-                                                                  (302, 1), (302, 2),
-                                                                  (303, 1), (303, 2), (303, 5),
-                                                                  (304, 1), (304, 2),
-                                                                  (305, 1), (305, 2),
-                                                                  (306, 1), (306, 2),
-                                                                  (307, 1), (307, 2),
-                                                                  (308, 1), (308, 2),
+                                                                  (301, 1),
+                                                                  (302, 1),
+                                                                  (303, 1), (303, 5),
+                                                                  (304, 1),
+                                                                  (305, 1),
+                                                                  (306, 1),
+                                                                  (307, 1),
+                                                                  (308, 1),
                                                                   (501, 2), (501, 3),
                                                                   (502, 2), (502, 3),
                                                                   (901, 6), (901, 7),
@@ -1308,6 +1308,12 @@ INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES
                                                                   (1006, 11),
                                                                   (1007, 11)
 ON CONFLICT (menu_item_id, group_id) DO NOTHING;
+
+-- Burger combos include chips; only the drink is selectable.
+-- Remove side links created by older migration runs without touching order history.
+DELETE FROM menu_item_modifier_group
+WHERE group_id = 2
+  AND menu_item_id IN (301, 302, 303, 304, 305, 306, 307, 308);
 
 -- Rib sides are included; chip-extra mappings remain disabled.
 DELETE FROM menu_item_modifier_group

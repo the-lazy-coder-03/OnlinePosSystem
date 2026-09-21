@@ -10,6 +10,8 @@ public record MenuItemDetail(
         Integer categoryId,
         String categoryName,
         BigDecimal price,
+        boolean is300ml,
+        boolean is2l,
         List<ModifierGroupItem> modifierGroups,
         List<BurgerToppingItem> burgerToppings
 ) {

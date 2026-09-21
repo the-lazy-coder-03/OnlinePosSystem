@@ -6,6 +6,8 @@ public record MenuItemRow(
         String description,
         Integer categoryId,
         String categoryName,
-        Double price
+        Double price,
+        boolean is300ml,
+        boolean is2l
 ) {
 }

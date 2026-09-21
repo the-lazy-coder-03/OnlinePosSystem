@@ -205,6 +205,37 @@ class OrderServicePlacementTest {
     }
 
     @Test
+    void burgerComboAcceptsDrinkButRejectsSideSelection() {
+        ComboFixture fixture = createComboFixture();
+
+        OrderResponseDTO response = orderOperations.placeOrder(request(
+                fixture.branch().getName(),
+                menuItem(
+                        fixture.combo().getId(),
+                        1,
+                        customization(fixture.drink().getId(), 1, "modifierOption")
+                )
+        ));
+
+        assertThat(response.getMenuItems()).singleElement().satisfies(item ->
+                assertThat(item.getExtras()).extracting(OrderResponseDTO.MenuItemExtraDTO::getName)
+                        .containsExactly(fixture.drink().getName())
+        );
+
+        assertThatThrownBy(() -> orderOperations.placeOrder(request(
+                fixture.branch().getName(),
+                menuItem(
+                        fixture.combo().getId(),
+                        1,
+                        customization(fixture.drink().getId(), 1, "modifierOption"),
+                        customization(fixture.side().getId(), 1, "modifierOption")
+                )
+        )))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not available for the selected menu item");
+    }
+
+    @Test
     void rejectsModifierOptionThatIsNotLinkedToTheOrderedMenuItem() {
         MenuFixture orderedItem = createMenuFixture();
         MenuFixture unrelatedItem = createMenuFixture();
@@ -486,6 +517,61 @@ class OrderServicePlacementTest {
         menuItemModifierGroupRepository.saveAndFlush(new MenuItemModifierGroup(item.getId(), group.getId()));
         branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch.getId(), item, 49.95));
         return new MenuFixture(branch, item, option);
+    }
+
+    private ComboFixture createComboFixture() {
+        String suffix = suffix();
+        Branch branch = createBranch("Combo Branch " + suffix);
+        MenuCategory category = menuCategoryRepository.saveAndFlush(new MenuCategory(
+                nextId("menu_category", "id"),
+                "Combo Category " + suffix,
+                1
+        ));
+        MenuItem combo = menuItemRepository.saveAndFlush(new MenuItem(
+                nextId("menu_item", "id"),
+                category,
+                "Test Burger Combo " + suffix,
+                "Burger combo with chips",
+                1,
+                false,
+                false
+        ));
+        branchMenuItemPriceRepository.saveAndFlush(new BranchMenuItemPrice(branch.getId(), combo, 100.00));
+
+        ModifierGroup drinkGroup = modifierGroupRepository.saveAndFlush(new ModifierGroup(
+                1,
+                "Choose your drink",
+                true,
+                1,
+                1
+        ));
+        ModifierGroup sideGroup = modifierGroupRepository.saveAndFlush(new ModifierGroup(
+                2,
+                "Choose your side",
+                true,
+                1,
+                1
+        ));
+        ModifierOption drink = new ModifierOption(
+                nextId("modifier_option", "id"),
+                drinkGroup.getId(),
+                "Included drink " + suffix,
+                null
+        );
+        drink.setAdditionalPrice(BigDecimal.ZERO);
+        modifierOptionRepository.saveAndFlush(drink);
+        ModifierOption side = new ModifierOption(
+                nextId("modifier_option", "id"),
+                sideGroup.getId(),
+                "Onion Rings " + suffix,
+                null
+        );
+        side.setAdditionalPrice(BigDecimal.ZERO);
+        modifierOptionRepository.saveAndFlush(side);
+
+        // A combo is linked to drinks only. Chips are included and are not a modifier choice.
+        menuItemModifierGroupRepository.saveAndFlush(new MenuItemModifierGroup(combo.getId(), drinkGroup.getId()));
+        return new ComboFixture(branch, combo, drink, side);
     }
 
     private BurgerFixture createBurgerFixture() {
@@ -786,6 +872,9 @@ class OrderServicePlacementTest {
     }
 
     private record MenuFixture(Branch branch, MenuItem menuItem, ModifierOption modifierOption) {
+    }
+
+    private record ComboFixture(Branch branch, MenuItem combo, ModifierOption drink, ModifierOption side) {
     }
 
     private record BurgerFixture(

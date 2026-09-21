@@ -109,6 +109,8 @@ public class MenuService {
                     row.categoryId(),
                     row.categoryName(),
                     toBigDecimal(row.price()),
+                    row.is300ml(),
+                    row.is2l(),
                     groups,
                     burgerToppingItems
             ));

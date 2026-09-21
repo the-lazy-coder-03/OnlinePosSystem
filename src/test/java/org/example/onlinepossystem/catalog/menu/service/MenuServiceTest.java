@@ -25,11 +25,11 @@ class MenuServiceTest {
     @Test
     void keepsRepositoryMenuOrderAndIncludesZeroPricedItems() {
         when(menuReadRepository.findMenuItemsForBranch(1)).thenReturn(List.of(
-                new MenuItemRow(201, "Cheese Burger", "Burger", 1, "Burgers", 82.00),
-                new MenuItemRow(401, "Chicken Alfredo Medium", "Medium portion", 3, "Pastas", 0.00),
-                new MenuItemRow(101, "Coke 300ml", "Coke can", 4, "Cool Drinks", 20.00),
-                new MenuItemRow(601, "Chips Small", "Small chips", 5, "Sides", 48.00),
-                new MenuItemRow(501, "Ribs 400g", "Ribs with one side choice", 8, "Ribs", 159.00)
+                new MenuItemRow(201, "Cheese Burger", "Burger", 1, "Burgers", 82.00, false, false),
+                new MenuItemRow(401, "Chicken Alfredo Medium", "Medium portion", 3, "Pastas", 0.00, false, false),
+                new MenuItemRow(101, "Coke 300ml", "Coke can", 4, "Cool Drinks", 20.00, true, false),
+                new MenuItemRow(601, "Chips Small", "Small chips", 5, "Sides", 48.00, false, false),
+                new MenuItemRow(501, "Ribs 400g", "Ribs with one side choice", 8, "Ribs", 159.00, false, false)
         ));
         when(menuReadRepository.findModifierGroupsForMenuItems(List.of(201, 401, 101, 601, 501)))
                 .thenReturn(List.of());
@@ -61,7 +61,7 @@ class MenuServiceTest {
     @Test
     void returnsRibSideChoiceBeforeRibExtrasAndChipExtras() {
         when(menuReadRepository.findMenuItemsForBranch(1)).thenReturn(List.of(
-                new MenuItemRow(501, "Ribs 400g", "Ribs with one side choice", 8, "Ribs", 159.00)
+                new MenuItemRow(501, "Ribs 400g", "Ribs with one side choice", 8, "Ribs", 159.00, false, false)
         ));
         when(menuReadRepository.findModifierGroupsForMenuItems(List.of(501))).thenReturn(List.of(
                 new ModifierGroupRow(501, 2, "Choose your side", true, 1, 1),

@@ -230,6 +230,32 @@
             color:#fff;
             border: 1px solid rgba(255,255,255,.25);
         }
+        .cooldrink-filters{
+            display:flex;
+            flex-direction:row;
+            align-items:center;
+            justify-content:center;
+            gap: 10px;
+            flex: 0 0 auto;
+            margin-left: auto;
+        }
+        .cooldrink-filter{
+            display:flex;
+            align-items:center;
+            gap: 4px;
+            color: var(--blue-800);
+            font-size: .72rem;
+            font-weight: 850;
+            line-height: 1;
+            white-space: nowrap;
+            cursor:pointer;
+        }
+        .cooldrink-filter input{
+            width: 14px;
+            height: 14px;
+            margin: 0;
+            accent-color: var(--blue-650);
+        }
 
         .sidebar-footer{
             padding: 12px 12px 14px;
@@ -538,6 +564,9 @@
         }
 
         .group-title{
+            display:flex;
+            align-items:center;
+            gap: 12px;
             margin: 16px 4px 6px;
             color: var(--blue-800);
             font-weight: 950;
@@ -1113,6 +1142,7 @@
         ui: {
             view: "list",                  // "list" | "customize" | "summary"
             activeCategory: "all",
+            coolDrinkSizeFilter: new Set(), // "can" and/or "2l"
             search: "",
             orderNotice: null
         },
@@ -1197,6 +1227,12 @@
         return (s ?? "").toString();
     }
 
+    function toBooleanFlag(value){
+        if (typeof value === "boolean") return value;
+        if (typeof value === "number") return value === 1;
+        return ["true", "1", "yes", "on"].includes(safeText(value).trim().toLowerCase());
+    }
+
     function branchNameFromId(branchId){
         const id = Number(branchId);
         if (id === 1) return "Kenridge";
@@ -1252,6 +1288,7 @@
             state.data.menuItems = [];
             state.data.byId = new Map();
             state.ui.activeCategory = "all";
+            state.ui.coolDrinkSizeFilter = new Set();
             state.ui.search = "";
             view.show("list");
             render.updateTopBar();
@@ -1381,7 +1418,13 @@
                 if (!items.length) return;
                 const heading = document.createElement("div");
                 heading.className = "group-title";
-                heading.textContent = title;
+                const headingLabel = document.createElement("span");
+                headingLabel.textContent = title;
+                heading.appendChild(headingLabel);
+                const activeCategory = render.categories().find(category => category.key === state.ui.activeCategory);
+                if (isCooldrinkCategory({ label: title }) && isCooldrinkCategory(activeCategory)){
+                    appendCooldrinkFilters(heading);
+                }
                 body.appendChild(heading);
 
                 for (const m of items){
@@ -1395,11 +1438,9 @@
                     const pastaVariants = getPastaVariantFamily(m);
                     const hasPastaVariants = pastaVariants.length > 0;
                     const directAddItem = !MENU_ONLY && isDirectAddMenuItem(m);
-                    const pricedVariants = hasBurgerVariants ? burgerVariants : pastaVariants;
-                    const hasMultiplePrices = pricedVariants.length > 1;
-                    const variantBasePrice = pricedVariants.length
-                        ? Math.min(...pricedVariants.map(v => Number(v.basePrice || 0)).filter(Number.isFinite))
-                        : Number(m.basePrice || 0);
+                    const visiblePricing = getMenuItemVisiblePriceInfo(m, { burgerVariants, pastaVariants });
+                    const hasMultiplePrices = visiblePricing.hasMultiplePrices;
+                    const variantBasePrice = visiblePricing.startingPrice;
                     const displayName = hasPastaVariants ? getPastaDisplayName(m) : m.name;
                     const menuDescription = getMenuItemDescriptionForList(m, {
                         isBurger,
@@ -2942,6 +2983,39 @@
         return "";
     }
 
+    function getMenuItemVisiblePriceInfo(item, context = {}){
+        const burgerVariants = Array.isArray(context.burgerVariants)
+            ? context.burgerVariants
+            : getBurgerVariantFamily(item);
+        const pastaVariants = Array.isArray(context.pastaVariants)
+            ? context.pastaVariants
+            : getPastaVariantFamily(item);
+        const pricedVariants = burgerVariants.length > 1 ? burgerVariants : pastaVariants;
+        const variantPrices = pricedVariants
+            .map(variant => Number(variant.basePrice))
+            .filter(Number.isFinite);
+        const fallbackPrice = Number(item?.basePrice);
+        const startingPrice = variantPrices.length
+            ? Math.min(...variantPrices)
+            : (Number.isFinite(fallbackPrice) ? fallbackPrice : 0);
+
+        return {
+            startingPrice,
+            hasMultiplePrices: pricedVariants.length > 1
+        };
+    }
+
+    function compareBurgerMenuItemsByVisiblePrice(a, b){
+        const aPrice = getMenuItemVisiblePriceInfo(a).startingPrice;
+        const bPrice = getMenuItemVisiblePriceInfo(b).startingPrice;
+        if (aPrice !== bPrice) return aPrice - bPrice;
+
+        const byName = safeText(a?.name).localeCompare(safeText(b?.name));
+        if (byName !== 0) return byName;
+
+        return Number(a?.menuItemId || 0) - Number(b?.menuItemId || 0);
+    }
+
     function isBurgerComboItem(item){
         const name = safeText(item?.name).toLowerCase();
         const categoryName = safeText(item?.categoryName).toLowerCase();
@@ -2949,7 +3023,7 @@
     }
 
     function getBurgerVariantLabel(item){
-        return isBurgerComboItem(item) ? "Burger combo" : "Burger only";
+        return isBurgerComboItem(item) ? "Burger combo" : "Individual burger";
     }
 
     function getBurgerVariantFamily(item){
@@ -3001,6 +3075,36 @@
     function isCooldrinkMenuItem(item){
         const categoryName = safeText(item?.categoryName).toLowerCase();
         return categoryName.includes("cool drink") || categoryName.includes("cooldrink");
+    }
+
+    function isCooldrinkCategory(category){
+        const categoryName = safeText(category?.label ?? category?.categoryName).toLowerCase();
+        return categoryName.includes("cool drink") || categoryName.includes("cooldrink");
+    }
+
+    function matchesCooldrinkSizeFilter(item){
+        if (!state.ui.coolDrinkSizeFilter.size) return true;
+        return (state.ui.coolDrinkSizeFilter.has("can") && item.is300ml)
+            || (state.ui.coolDrinkSizeFilter.has("2l") && item.is2l);
+    }
+
+    function appendCooldrinkFilters(heading){
+        const filters = document.createElement("div");
+        filters.className = "cooldrink-filters";
+        for (const option of [{ key: "can", label: "Can" }, { key: "2l", label: "2L" }]){
+            const label = document.createElement("label");
+            label.className = "cooldrink-filter";
+            label.innerHTML = `<input type="checkbox" data-cooldrink-size="${option.key}" /> <span>${option.label}</span>`;
+            const input = label.querySelector("input");
+            input.checked = state.ui.coolDrinkSizeFilter.has(option.key);
+            input.addEventListener("change", () => {
+                if (input.checked) state.ui.coolDrinkSizeFilter.add(option.key);
+                else state.ui.coolDrinkSizeFilter.delete(option.key);
+                render.list();
+            });
+            filters.appendChild(label);
+        }
+        heading.appendChild(filters);
     }
 
     function isRibMenuItem(item){
@@ -3089,6 +3193,8 @@
     function getVisibleMenuModifierGroups(item){
         const groups = Array.isArray(item?.modifierGroups) ? item.modifierGroups : [];
         return groups.filter(group => {
+            // Burger combos include chips; only their drink group is selectable.
+            if (isBurgerComboItem(item) && isRibSideGroup(group)) return false;
             if (!isChipExtrasGroup(group)) return true;
             return hasSelectedRibChipSide(item);
         });
@@ -3284,6 +3390,8 @@
         const id = m.menuItemId ?? m.id ?? m.menu_item_id;
         const name = m.name ?? m.menuItemName ?? "Item";
         const price = m.price ?? m.basePrice ?? m.base_price ?? 0;
+        const is300ml = toBooleanFlag(m.is300ml ?? m.isIs300ml ?? m.is_300ml);
+        const is2l = toBooleanFlag(m.is2l ?? m.isIs2l ?? m.is_2l);
         const catIdRaw = m.categoryId ?? m.category_id ?? null;
         const catName = m.categoryName ?? m.category ?? "Other";
         const groups = Array.isArray(m.modifierGroups) ? m.modifierGroups : [];
@@ -3312,6 +3420,8 @@
             shortDescription: safeText(m.description ?? m.shortDescription ?? ""),
             categoryId: catId,
             categoryName: safeText(catName).trim(),
+            is300ml,
+            is2l,
             modifierGroups: groups,
             burgerToppings
         };
@@ -3628,6 +3738,11 @@
             map.get(id).items.push(m);
         }
         const out = Array.from(map.values());
+        for (const group of out){
+            if (group.items.some(isBurgerMenuItem)){
+                group.items.sort(compareBurgerMenuItemsByVisiblePrice);
+            }
+        }
         return out;
     }
 
@@ -3648,6 +3763,7 @@
     function getFilteredLists(){
         const cat = state.ui.activeCategory;
         const q = (state.ui.search || "").toLowerCase();
+        const activeCategory = render.categories().find(category => category.key === cat);
 
         let favourites = state.data.favouritePizzas.filter(p => matchesSearchPizza(p, q));
         let supremes = state.data.supremePizzas.filter(p => matchesSearchPizza(p, q));
@@ -3667,6 +3783,9 @@
         }
 
         menuItems = menuItems.filter(m => shouldShowMenuListItem(m, cat));
+        if (isCooldrinkCategory(activeCategory)){
+            menuItems = menuItems.filter(matchesCooldrinkSizeFilter);
+        }
 
         favourites.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
         supremes.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
@@ -3684,7 +3803,8 @@
             return Number(item.menuItemId) === Number(pastaVariants[0].menuItemId);
         }
         if (!isBurgerComboItem(item)) return true;
-        if (activeCategory === `menu-${Number(item.categoryId)}`) return true;
+        // Show a combo only when it has no matching individual burger. Otherwise
+        // the combo remains available through the burger's variant selector.
         return !getBurgerVariantFamily(item).some(v => !isBurgerComboItem(v));
     }
 

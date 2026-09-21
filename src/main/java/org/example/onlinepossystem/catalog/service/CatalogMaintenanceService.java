@@ -19,6 +19,7 @@ public class CatalogMaintenanceService implements CatalogMaintenance {
         upsertModifierGroup(4, "Chip extras", false, 0, 2);
         upsertModifierOption(13, 4, "Extra Chip Sauce", null, BigDecimal.ZERO);
         upsertModifierOption(14, 4, "Extra Rib Sauce", null, BigDecimal.ZERO);
+        unlinkBurgerComboSideChoices();
         unlinkModifierGroup(601, 4);
         unlinkModifierGroup(602, 4);
         unlinkModifierGroup(603, 4);
@@ -87,5 +88,13 @@ public class CatalogMaintenanceService implements CatalogMaintenance {
                 menuItemId,
                 groupId
         );
+    }
+
+    private void unlinkBurgerComboSideChoices() {
+        jdbcTemplate.update("""
+                DELETE FROM menu_item_modifier_group
+                WHERE group_id = 2
+                  AND menu_item_id IN (301, 302, 303, 304, 305, 306, 307, 308)
+                """);
     }
 }
