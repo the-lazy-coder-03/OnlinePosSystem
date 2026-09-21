@@ -375,9 +375,8 @@
         }
         .row-actions{
             display:flex;
-            flex-direction: column;
-            align-items:flex-end;
-            gap: 8px;
+            align-items:center;
+            gap: 10px;
             flex-shrink: 0;
         }
         .row-add-btn{
@@ -1410,6 +1409,10 @@
                         ? Math.min(...pricedVariants.map(v => Number(v.basePrice || 0)).filter(Number.isFinite))
                         : Number(m.basePrice || 0);
                     const displayName = hasPastaVariants ? getPastaDisplayName(m) : m.name;
+                    const menuDescription = getMenuItemDescriptionForList(m, {
+                        isBurger,
+                        hasPastaVariants
+                    });
                     if (directAddItem) row.classList.add("row-direct-add");
                     row.innerHTML = `
                         <div class="row-top">
@@ -1419,7 +1422,7 @@
                             ${directAddItem ? `<button type="button" class="row-add-btn" data-menu-add="${Number(m.menuItemId)}">Add to cart</button>` : ""}
                           </div>
                         </div>
-                        <div class="row-sub">${escapeHtml(m.shortDescription || m.description || (isBurger ? "Tap to customize burger options." : (MENU_ONLY ? "View item details." : "Tap to add to your order.")))}</div>
+                        ${menuDescription ? `<div class="row-sub">${escapeHtml(menuDescription)}</div>` : ""}
                         ${directAddItem ? "" : `<div class="row-cta">${MENU_ONLY ? ((hasModifiers || isBurger || hasBurgerToppings || hasBurgerVariants || hasPastaVariants) ? "View options" : "View details") : (isBurger ? "Click to customize" : (hasPastaVariants ? "Click to choose size and options" : (hasModifiers ? "Click to choose options" : "Click to add")))}</div>`}
                     `;
                     const addButton = row.querySelector("[data-menu-add]");
@@ -1954,7 +1957,9 @@
             }
 
             $("menuItemTitle").textContent = item.name || "Menu Item";
-            $("menuItemDesc").textContent = item.description || item.categoryName || "";
+            $("menuItemDesc").textContent = shouldShowMenuItemDescription(item)
+                ? (item.shortDescription || item.description || "")
+                : "";
 
             const groupsEl = $("menuItemGroups");
             groupsEl.innerHTML = "";
@@ -2931,6 +2936,23 @@
         return burgerToppings.length > 0;
     }
 
+    function shouldShowMenuItemDescription(item){
+        if (!item) return false;
+        const categoryName = safeText(item.categoryName).toLowerCase();
+        return isBurgerMenuItem(item) || categoryName.includes("pasta");
+    }
+
+    function getMenuItemDescriptionForList(item, context = {}){
+        const canShowDescription = Boolean(context.isBurger || context.hasPastaVariants || shouldShowMenuItemDescription(item));
+        if (!canShowDescription) return "";
+
+        const existingDescription = item.shortDescription || item.description || "";
+        if (existingDescription) return existingDescription;
+        if (context.isBurger) return "Tap to customize burger options.";
+        if (context.hasPastaVariants) return MENU_ONLY ? "View pasta options." : "Click to choose size and options.";
+        return "";
+    }
+
     function isBurgerComboItem(item){
         const name = safeText(item?.name).toLowerCase();
         const categoryName = safeText(item?.categoryName).toLowerCase();
@@ -3256,7 +3278,7 @@
             ? topsRaw.map(t => typeof t === "string" ? t : (t.name ?? t.toppingName ?? t.topping_name)).filter(Boolean)
             : [];
 
-        const toppingsPreview = tops.length ? ("Toppings: " + tops.slice(0, 12).join(", ") + (tops.length > 12 ? "…" : "")) : "";
+        const toppingsPreview = tops.length ? (tops.slice(0, 12).join(", ") + (tops.length > 12 ? "…" : "")) : "";
 
         return {
             pizzaId: Number(pizzaId),
@@ -3818,7 +3840,7 @@
             const detailLine = isPizza
                 ? [
                     it.pizzaBaseOptionName ? ("Base: " + escapeHtml(it.pizzaBaseOptionName)) : "",
-                    tops ? ("Toppings: " + escapeHtml(tops)) : "No toppings selected."
+                    tops ? escapeHtml(tops) : "No toppings selected."
                   ].filter(Boolean).join(" • ")
                 : (mods ? ("Modifiers: " + escapeHtml(mods)) : "No modifiers selected.");
             const pricingLine = isPizza
