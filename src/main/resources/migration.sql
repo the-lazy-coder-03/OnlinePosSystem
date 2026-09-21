@@ -1027,10 +1027,11 @@ INSERT INTO burger_component (
       (203, 'Pineapple',           'extra_topping', TRUE, FALSE),
       (204, 'Egg',                 'extra_topping', TRUE, FALSE),
       (205, 'Avo',                 'extra_topping', TRUE, TRUE),
-      (206, '5 x Onion Rings',     'extra_topping', TRUE, FALSE),
-      (207, 'Pepper Sauce',        'extra_topping', TRUE, FALSE),
-      (208, 'Mushroom Sauce',      'extra_topping', TRUE, FALSE),
-      (209, 'Cheese Sauce',        'extra_topping', TRUE, FALSE)
+      -- Retained for historical order references, but no longer offered as burger extras.
+      (206, '5 x Onion Rings',     'extra_topping', FALSE, FALSE),
+      (207, 'Pepper Sauce',        'extra_topping', FALSE, FALSE),
+      (208, 'Mushroom Sauce',      'extra_topping', FALSE, FALSE),
+      (209, 'Cheese Sauce',        'extra_topping', FALSE, FALSE)
 ON CONFLICT (component_id) DO UPDATE
     SET name = EXCLUDED.name,
         component_type = EXCLUDED.component_type,
@@ -1182,7 +1183,7 @@ INSERT INTO modifier_group (id, name, required, min_select, max_select) VALUES
                                                                             (4, 'Chip extras', FALSE, 0, 2),
                                                                             (5, 'Steak doneness', TRUE, 1, 1),
                                                                             (6, 'Choose included kiddies sauce', TRUE, 1, 1),
-                                                                            (7, 'Kiddies burger extras', FALSE, 0, 8),
+                                                                            (7, 'Kiddies burger extras', FALSE, 0, 4),
                                                                             (8, 'Choose pasta type', TRUE, 1, 1),
                                                                             (9, 'Cheesy Mac Medium Extra', FALSE, 0, 1),
                                                                             (10, 'Cheesy Mac Large Extra', FALSE, 0, 1),
@@ -1250,10 +1251,6 @@ INSERT INTO modifier_option (id, group_id, name, menu_item_id, additional_price)
                                                                                      (47, 7, 'Add Bacon', NULL, 19.00),
                                                                                      (48, 7, 'Add Egg', NULL, 14.00),
                                                                                      (49, 7, 'Add Avo', NULL, 19.00),
-                                                                                     (50, 7, 'Add 5 x Onion Rings', NULL, 28.00),
-                                                                                     (51, 7, 'Add Pepper Sauce', NULL, 35.00),
-                                                                                     (52, 7, 'Add Mushroom Sauce', NULL, 35.00),
-                                                                                     (53, 7, 'Add Cheese Sauce', NULL, 35.00),
 
                                                                                      -- Toasted sandwich extras
                                                                                      (54, 11, 'Add Cheese', NULL, 14.00),
@@ -1265,6 +1262,12 @@ ON CONFLICT (id) DO UPDATE
         name = EXCLUDED.name,
         menu_item_id = EXCLUDED.menu_item_id,
         additional_price = EXCLUDED.additional_price;
+
+-- Remove burger-only choices that older migration runs added to the Kiddies Burger.
+-- Order history stores generic extra snapshots, so these catalog rows can be removed safely.
+DELETE FROM modifier_option
+WHERE group_id = 7
+  AND id IN (50, 51, 52, 53);
 
 INSERT INTO menu_item_modifier_group (menu_item_id, group_id) VALUES
                                                                   (203, 5),

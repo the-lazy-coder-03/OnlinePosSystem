@@ -105,11 +105,11 @@ class MigrationSqlCatalogTest {
     }
 
     @Test
-    void restoresRibSidesAndAddsSandwichAndKiddiesExtras() throws IOException {
+    void keepsRibSidesAndOnlyTheRequestedSandwichAndKiddiesExtras() throws IOException {
         String sql = migrationSql();
 
         assertThat(sql)
-                .contains("(7, 'Kiddies burger extras', FALSE, 0, 8)")
+                .contains("(7, 'Kiddies burger extras', FALSE, 0, 4)")
                 .contains("(11, 'Toasted sandwich extras', FALSE, 0, 4)")
                 .contains("(501, 2), (501, 3)")
                 .contains("(502, 2), (502, 3)")
@@ -120,17 +120,34 @@ class MigrationSqlCatalogTest {
                 .contains("(47, 7, 'Add Bacon', NULL, 19.00)")
                 .contains("(48, 7, 'Add Egg', NULL, 14.00)")
                 .contains("(49, 7, 'Add Avo', NULL, 19.00)")
-                .contains("(50, 7, 'Add 5 x Onion Rings', NULL, 28.00)")
-                .contains("(51, 7, 'Add Pepper Sauce', NULL, 35.00)")
-                .contains("(52, 7, 'Add Mushroom Sauce', NULL, 35.00)")
-                .contains("(53, 7, 'Add Cheese Sauce', NULL, 35.00)")
                 .contains("(54, 11, 'Add Cheese', NULL, 14.00)")
                 .contains("(57, 11, 'Add Avo', NULL, 19.00)")
-                .doesNotContain("id IN (50, 51, 52, 53)");
+                .contains("WHERE group_id = 7\n  AND id IN (50, 51, 52, 53)")
+                .doesNotContain("(50, 7, 'Add 5 x Onion Rings'")
+                .doesNotContain("(51, 7, 'Add Pepper Sauce'")
+                .doesNotContain("(52, 7, 'Add Mushroom Sauce'")
+                .doesNotContain("(53, 7, 'Add Cheese Sauce'");
 
         for (int sandwichId = 1001; sandwichId <= 1007; sandwichId++) {
             assertThat(sql).contains("(" + sandwichId + ", 11)");
         }
+    }
+
+    @Test
+    void deactivatesOnionRingsAndPremiumSaucesOnlyForBurgerComponents() throws IOException {
+        String sql = migrationSql();
+
+        assertThat(sql)
+                .contains("(3,   'BBQ Sauce',           'extra_topping',   TRUE, FALSE)")
+                .contains("(206, '5 x Onion Rings',     'extra_topping', FALSE, FALSE)")
+                .contains("(207, 'Pepper Sauce',        'extra_topping', FALSE, FALSE)")
+                .contains("(208, 'Mushroom Sauce',      'extra_topping', FALSE, FALSE)")
+                .contains("(209, 'Cheese Sauce',        'extra_topping', FALSE, FALSE)")
+                .contains("(604, 5, '5 x Onion Rings'")
+                .contains("(623, 5, 'Pepper Sauce'")
+                .contains("(624, 5, 'Mushroom Sauce'")
+                .contains("(625, 5, 'Cheese Sauce'")
+                .contains("(25, 3, '5 x Onion Rings', 604, 28.00)");
     }
 
     @Test

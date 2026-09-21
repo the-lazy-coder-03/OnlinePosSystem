@@ -2549,16 +2549,12 @@
             const item = state.data.menuItems.find(m => Number(m.menuItemId) === id);
             if (!item) return;
 
-            const groups = getVisibleMenuModifierGroups(item);
-            const burgerToppings = getBurgerToppingsForMenuItem(item);
-            const burgerVariants = getBurgerVariantFamily(item);
-            const pastaVariants = getPastaVariantFamily(item);
             if (isBurgerMenuItem(item)){
                 actions.openBurgerCustomize(item.menuItemId);
                 return;
             }
-            if (!MENU_ONLY && !groups.length && !burgerToppings.length && burgerVariants.length <= 1 && !pastaVariants.length){
-                actions.addMenuItemDirect(item);
+            if (!MENU_ONLY && !hasMenuCustomizations(item)){
+                // Direct-add items are intentionally actionable only through their inline button.
                 return;
             }
             state.customize.sessionId += 1;

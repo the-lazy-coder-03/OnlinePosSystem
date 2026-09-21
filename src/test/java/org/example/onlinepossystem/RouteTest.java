@@ -59,6 +59,8 @@ public class RouteTest {
                 .andExpect(content().string(containsString("function getSelectedModifierOptionNames(item, selectedByGroup)")))
                 .andExpect(content().string(containsString("const directAddItem = !MENU_ONLY && isDirectAddMenuItem(m);")))
                 .andExpect(content().string(containsString("row-add-btn")))
+                .andExpect(content().string(containsString("if (!MENU_ONLY && !hasMenuCustomizations(item))")))
+                .andExpect(content().string(containsString("if (addButton)")))
                 .andExpect(content().string(containsString("function hasSelectedRibChipSide(item)")))
                 .andExpect(content().string(containsString("p.toppingsPreview || p.shortDescription")))
                 .andExpect(content().string(containsString("Click to choose size and options")))
