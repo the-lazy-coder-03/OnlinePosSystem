@@ -2,9 +2,11 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS — Kenridge Orders</title>
     <style>
         body {
+            box-sizing: border-box;
             font-family: Arial, sans-serif;
             background-color: #e6f0ff;
             margin: 0;
@@ -15,6 +17,7 @@
         }
 
         .container {
+            box-sizing: border-box;
             background-color: #fff;
             border-radius: 15px;
             padding: 30px;
@@ -171,6 +174,26 @@
         ======================== */
         #queueSection { display: none; }
         #singleOrderSection { display: none; }
+
+        @media (max-width: 600px) {
+            body { display: block; }
+            .container {
+                width: 100%;
+                min-height: 100dvh;
+                max-width: none;
+                margin: 0;
+                padding: 16px;
+                border-radius: 0;
+                box-shadow: none;
+            }
+            h2 { font-size: 1.4rem; }
+            .orderMain { align-items: flex-start; flex-wrap: wrap; }
+            .orderItem, .orderCard { overflow-wrap: anywhere; }
+            .topButtons { gap: 8px; }
+            .topButtons button { flex: 1; min-width: 0; }
+            button, .orderItem button { min-height: 44px; padding: 12px 14px; font-size: 1rem; }
+            .orderActions button { flex: 1 1 130px; }
+        }
 
     </style>
 </head>

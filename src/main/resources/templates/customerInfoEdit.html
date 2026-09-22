@@ -2,6 +2,7 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Account Details — Pete’s Pizza</title>
     <style>
         /* =========================
@@ -217,6 +218,52 @@
 
         .tab-content.active {
             display: block;
+        }
+
+        @media (max-width: 700px) {
+            header { padding: 16px; }
+            header h1 { font-size: 1.75rem; }
+            header p { font-size: 1rem; }
+            .main-container {
+                display: block;
+                width: 100%;
+                height: auto;
+                margin: 0;
+                padding: 12px;
+                box-sizing: border-box;
+            }
+            .sidebar {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                width: 100%;
+                height: auto;
+                padding: 10px;
+                margin-bottom: 12px;
+                overflow-x: auto;
+                border-radius: 8px;
+            }
+            .sidebar h3 { display: none; }
+            .sidebar button {
+                flex: 0 0 auto;
+                width: auto;
+                min-height: 44px;
+                padding: 10px 14px;
+                margin: 0;
+                text-align: center;
+                white-space: nowrap;
+                border-radius: 8px;
+            }
+            .content {
+                height: auto;
+                min-height: 50dvh;
+                padding: 16px;
+                overflow: visible;
+                border-radius: 8px;
+            }
+            .order-card .subsection { flex-wrap: wrap; }
+            .order-card .subsection span.value { overflow-wrap: anywhere; }
+            input[type="text"], input[type="email"], input[type="password"], select { font-size: 16px; }
         }
 
     </style>
