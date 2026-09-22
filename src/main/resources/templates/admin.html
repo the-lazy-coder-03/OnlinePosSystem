@@ -159,12 +159,33 @@
             </section>
 
             <section id="accounts" class="admin-panel" aria-labelledby="accountsHeading" th:if="${superAdmin}">
-                <div class="panel-heading"><div><h2 id="accountsHeading">Admin Accounts</h2><p>Find registered users and assign their access level. Changes apply after their next sign-in.</p></div></div>
+                <div class="panel-heading"><div><h2 id="accountsHeading">Admin Accounts</h2><p>Find registered users and assign their access level. Changes apply after their next sign-in.</p></div><button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#addAdminModal"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Add admin</button></div>
+                <div class="alert alert-success" role="status" th:if="${param.accountCreated != null}">Admin account created.</div>
+                <div class="alert alert-danger" role="alert" th:if="${param.accountError != null and param.accountError[0] == 'email'}">That email is already registered.</div>
+                <div class="alert alert-danger" role="alert" th:if="${param.accountError != null and param.accountError[0] == 'password'}">Password must be at least 8 characters and include uppercase, lowercase, number, and special character.</div>
+                <div class="alert alert-danger" role="alert" th:if="${param.accountError != null and param.accountError[0] == 'invalid'}">Check the name, email, and access level.</div>
                 <form id="accountSearchForm" class="toolbar" role="search"><div class="flex-grow-1"><label class="form-label" for="accountQuery">Name, email or phone</label><input class="form-control" id="accountQuery" type="search" autocomplete="off" placeholder="Search registered accounts"></div><button class="btn btn-primary" type="submit"><i class="bi bi-search me-1"></i>Search</button></form>
                 <div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Current access</th><th>Assign level</th></tr></thead><tbody id="accountResults"><tr><td colspan="5" class="text-center text-secondary py-4">Loading accounts...</td></tr></tbody></table></div></div>
             </section>
         </div>
     </main>
+</div>
+
+<div class="modal fade" id="addAdminModal" tabindex="-1" aria-labelledby="addAdminModalTitle" aria-hidden="true" th:if="${superAdmin}">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form th:action="@{/admin/accounts}" method="post">
+        <div class="modal-header"><h2 class="modal-title fs-5" id="addAdminModalTitle">Add admin</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <div class="row g-3">
+                <div class="col-sm-6"><label class="form-label" for="newAdminFirstName">First name</label><input class="form-control" id="newAdminFirstName" name="firstName" maxlength="255" autocomplete="given-name" required></div>
+                <div class="col-sm-6"><label class="form-label" for="newAdminLastName">Last name</label><input class="form-control" id="newAdminLastName" name="lastName" maxlength="255" autocomplete="family-name" required></div>
+                <div class="col-12"><label class="form-label" for="newAdminEmail">Email</label><input class="form-control" id="newAdminEmail" name="email" type="email" maxlength="255" autocomplete="email" required></div>
+                <div class="col-12"><label class="form-label" for="newAdminPassword">Password</label><input class="form-control" id="newAdminPassword" name="password" type="password" minlength="8" autocomplete="new-password" required></div>
+                <div class="col-12"><label class="form-label" for="newAdminAccessLevel">Access level</label><select class="form-select" id="newAdminAccessLevel" name="accessLevel" required><option value="1">Kenridge admin</option><option value="2">Uitzicht admin</option><option value="3">Super admin</option></select></div>
+            </div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Create admin</button></div>
+    </form></div></div>
 </div>
 
 <div class="modal fade" id="pizzaModal" tabindex="-1" aria-labelledby="pizzaModalTitle" aria-hidden="true">

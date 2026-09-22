@@ -23,6 +23,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     // Search by email
     Optional<Customer> findByEmail(String email);
 
+    boolean existsByEmailIgnoreCase(String email);
+
     // Search by phone1
     Optional<Customer> findByPhone1(String phone1);
 
