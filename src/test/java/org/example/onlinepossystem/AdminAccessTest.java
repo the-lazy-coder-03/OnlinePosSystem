@@ -1,6 +1,8 @@
 package org.example.onlinepossystem;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.onlinepossystem.security.api.RateLimiter;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,6 +32,14 @@ public class AdminAccessTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private RateLimiter rateLimiter;
+
+    @BeforeEach
+    void resetLoginLimit() {
+        rateLimiter.reset("login:127.0.0.1");
+    }
 
     @Test
     public void testAdminPanelRedirectsToLoginWhenNotAuthenticated() throws Exception {

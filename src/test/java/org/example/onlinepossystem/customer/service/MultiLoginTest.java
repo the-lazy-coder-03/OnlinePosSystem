@@ -3,6 +3,8 @@ package org.example.onlinepossystem.customer.service;
 import org.example.onlinepossystem.customer.entity.Customer;
 import org.example.onlinepossystem.customer.api.AccountAccessAdministration;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
+import org.example.onlinepossystem.security.api.RateLimiter;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -45,6 +47,14 @@ public class MultiLoginTest {
 
     @Autowired
     private AccountAccessAdministration accessAdministration;
+
+    @Autowired
+    private RateLimiter rateLimiter;
+
+    @BeforeEach
+    void resetLoginLimit() {
+        rateLimiter.reset("login:127.0.0.1");
+    }
 
     @Test
     public void namedSuperAdminCanOpenOrderPageAndPlaceOwnOrder() throws Exception {
