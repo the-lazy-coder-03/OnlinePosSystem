@@ -20,6 +20,7 @@
         <nav class="admin-nav nav nav-pills flex-column" role="tablist" aria-orientation="vertical">
             <button class="nav-link active" type="button" data-admin-panel="overview" role="tab" aria-selected="true"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i><span data-panel-title="overview">Overview</span></button>
             <button class="nav-link" type="button" data-admin-panel="orders" role="tab" aria-selected="false"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i><span data-panel-title="orders">Live Orders</span></button>
+            <button class="nav-link" type="button" data-admin-panel="users" role="tab" aria-selected="false"><i class="bi bi-person-lines-fill" aria-hidden="true"></i><span data-panel-title="users">Users</span></button>
             <button class="nav-link" type="button" data-admin-panel="items" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-box-seam" aria-hidden="true"></i><span data-panel-title="items">Items</span></button>
             <button class="nav-link" type="button" data-admin-panel="pricing" role="tab" aria-selected="false"><i class="bi bi-tags" aria-hidden="true"></i><span data-panel-title="pricing">Pricing</span></button>
             <button class="nav-link" type="button" data-admin-panel="categories" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-ui-checks-grid" aria-hidden="true"></i><span data-panel-title="categories">Categories &amp; Sizes</span></button>
@@ -43,6 +44,7 @@
         <div class="offcanvas-body p-0"><nav class="admin-nav nav nav-pills flex-column" role="tablist" aria-orientation="vertical">
             <button class="nav-link active" type="button" data-admin-panel="overview" role="tab" aria-selected="true"><i class="bi bi-grid-1x2-fill"></i>Overview</button>
             <button class="nav-link" type="button" data-admin-panel="orders" role="tab" aria-selected="false"><i class="bi bi-receipt-cutoff"></i>Live Orders</button>
+            <button class="nav-link" type="button" data-admin-panel="users" role="tab" aria-selected="false"><i class="bi bi-person-lines-fill"></i>Users</button>
             <button class="nav-link" type="button" data-admin-panel="items" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-box-seam"></i>Items</button>
             <button class="nav-link" type="button" data-admin-panel="pricing" role="tab" aria-selected="false"><i class="bi bi-tags"></i>Pricing</button>
             <button class="nav-link" type="button" data-admin-panel="categories" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-ui-checks-grid"></i>Categories &amp; Sizes</button>
@@ -80,6 +82,7 @@
                 <div class="admin-section"><div class="section-title"><h3>Branch comparison</h3></div><div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Branch</th><th>Pending</th><th>Preparing</th><th>Completed</th><th>Rejected</th><th>Revenue</th></tr></thead><tbody id="branchSummaryBody"><tr><td colspan="6" class="text-center text-secondary py-4">Loading sales summary...</td></tr></tbody></table></div></div></div>
                 <div class="admin-section"><div class="section-title"><h3>Workspace shortcuts</h3></div><div class="quick-links">
                     <a class="quick-link" href="#orders" data-admin-panel="orders"><i class="bi bi-receipt-cutoff"></i><span>Open live orders</span></a>
+                    <a class="quick-link" href="#users" data-admin-panel="users"><i class="bi bi-person-lines-fill"></i><span>View users</span></a>
                     <a class="quick-link" href="#pricing" data-admin-panel="pricing"><i class="bi bi-tags"></i><span>Manage pricing</span></a>
                     <a class="quick-link" href="#items" data-admin-panel="items" th:if="${superAdmin}"><i class="bi bi-box-seam"></i><span>Manage items</span></a>
                     <a class="quick-link" href="#accounts" data-admin-panel="accounts" th:if="${superAdmin}"><i class="bi bi-people"></i><span>Manage access</span></a>
@@ -89,6 +92,30 @@
             <section id="orders" class="admin-panel" aria-labelledby="ordersHeading">
                 <div class="panel-heading"><div><h2 id="ordersHeading">Live Orders</h2><p>Pending and in-progress orders for your permitted branch scope.</p></div><button class="btn btn-outline-primary" type="button" id="adminOrdersRefresh"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button></div>
                 <div class="order-list" id="adminOrderList"><div class="empty-state">Loading live orders...</div></div>
+            </section>
+
+            <section id="users" class="admin-panel" aria-labelledby="usersHeading">
+                <div id="usersListView">
+                    <div class="panel-heading"><div><h2 id="usersHeading">Users</h2><p>Registered customer records and contact details.</p></div></div>
+                    <form id="usersSearchForm" class="toolbar" role="search">
+                        <div class="flex-grow-1"><label class="form-label" for="usersQuery">Name, email or phone</label><input class="form-control" id="usersQuery" type="search" autocomplete="off" placeholder="Search users"></div>
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-search me-1" aria-hidden="true"></i>Search</button>
+                    </form>
+                    <div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table">
+                        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Access</th><th>Last order</th><th class="text-end">Record</th></tr></thead>
+                        <tbody id="usersResults"><tr><td colspan="6" class="text-center text-secondary py-4">Loading users...</td></tr></tbody>
+                    </table></div></div>
+                    <div id="usersPagination" class="users-pagination"></div>
+                </div>
+                <div id="userDetailView" class="d-none">
+                    <div class="panel-heading"><div><button id="userBackButton" class="btn btn-sm btn-outline-secondary mb-3" type="button"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Users</button><h2 id="userDetailName">User record</h2><p id="userDetailAccess"></p></div></div>
+                    <div class="admin-section"><div class="section-title"><h3>Profile</h3></div><dl id="userProfile" class="user-profile-grid"></dl></div>
+                    <div class="admin-section"><div class="section-title"><h3>Past orders</h3></div><div id="userOrders" class="user-order-list"></div><div id="userOrdersPagination" class="users-pagination"></div></div>
+                    <div class="admin-section"><div class="section-title"><h3>Staff notes</h3></div>
+                        <form id="userNoteForm" class="user-note-form"><label class="form-label" for="userNoteBody">Add note</label><textarea id="userNoteBody" class="form-control" maxlength="2000" rows="3" required></textarea><div class="d-flex align-items-center gap-3 mt-2"><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Add note</button><span id="userNoteError" class="text-danger small" role="alert"></span></div></form>
+                        <div id="userNotes" class="user-note-list"></div><div id="userNotesPagination" class="users-pagination"></div>
+                    </div>
+                </div>
             </section>
 
             <section id="items" class="admin-panel" aria-labelledby="itemsHeading" th:if="${superAdmin}">

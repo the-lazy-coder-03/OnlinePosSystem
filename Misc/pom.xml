@@ -26,6 +26,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-messaging</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>com.resend</groupId>
             <artifactId>resend-java</artifactId>
             <version>4.26.0</version>
@@ -65,12 +70,6 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
 
@@ -164,4 +163,18 @@
         </plugins>
     </build>
 
+    <profiles>
+        <profile>
+            <id>rls-it</id>
+            <build><plugins><plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <configuration>
+                    <argLine>-Dnet.bytebuddy.experimental=true</argLine>
+                    <failIfNoTests>true</failIfNoTests>
+                </configuration>
+                <executions><execution><goals><goal>integration-test</goal><goal>verify</goal></goals></execution></executions>
+            </plugin></plugins></build>
+        </profile>
+    </profiles>
 </project>

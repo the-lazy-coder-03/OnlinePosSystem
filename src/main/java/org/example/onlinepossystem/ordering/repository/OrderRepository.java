@@ -2,6 +2,7 @@ package org.example.onlinepossystem.ordering.repository;
 
 import org.example.onlinepossystem.ordering.entity.Order;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,6 +17,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByBranchIdAndStatusOrderByCreatedAtDesc(Integer branchId, String status);
     List<Order> findAllByOrderByCreatedAtDesc();
     List<Order> findByCustomerIdOrderByCreatedAtDesc(Long customerId, Pageable pageable);
+    Page<Order> findAllByCustomerIdOrderByCreatedAtDescIdDesc(Long customerId, Pageable pageable);
+    Page<Order> findAllByCustomerIdAndBranchIdOrderByCreatedAtDescIdDesc(
+            Long customerId, Integer branchId, Pageable pageable);
     List<Order> findByCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
             LocalDateTime start, LocalDateTime end);
     List<Order> findByBranchIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(

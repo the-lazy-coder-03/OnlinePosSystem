@@ -28,7 +28,7 @@ class WebSocketConfigTest {
     void branchAdminCanSubscribeOnlyToTheirBranchTopic() {
         AccountAccessReader accessReader = mock(AccountAccessReader.class);
         when(accessReader.findByUsername("kenridge-admin")).thenReturn(new AccountAccess(1));
-        ChannelInterceptor interceptor = interceptor(new WebSocketConfig(accessReader));
+        ChannelInterceptor interceptor = interceptor(new WebSocketConfig(accessReader, mock(AccountWebSocketSessions.class)));
 
         Message<?> ownBranch = subscription("/topic/admin/branches/1/orders", "kenridge-admin");
         assertThat(interceptor.preSend(ownBranch, mock(MessageChannel.class))).isSameAs(ownBranch);
@@ -44,7 +44,7 @@ class WebSocketConfigTest {
     void superAdminCanSubscribeToCombinedTopic() {
         AccountAccessReader accessReader = mock(AccountAccessReader.class);
         when(accessReader.findByUsername("super-admin")).thenReturn(new AccountAccess(3));
-        ChannelInterceptor interceptor = interceptor(new WebSocketConfig(accessReader));
+        ChannelInterceptor interceptor = interceptor(new WebSocketConfig(accessReader, mock(AccountWebSocketSessions.class)));
         Message<?> combined = subscription("/topic/admin/orders", "super-admin");
 
         assertThat(interceptor.preSend(combined, mock(MessageChannel.class))).isSameAs(combined);

@@ -61,6 +61,7 @@ public class Customer {
     @Column(name = "role")
     private String role = "USER";
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.SMALLINT)
     @Column(name = "access_level", nullable = false, columnDefinition = "smallint")
     private Integer accessLevel = 0;
 

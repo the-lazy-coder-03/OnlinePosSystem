@@ -61,9 +61,15 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    @ResponseStatus(HttpStatus.CONFLICT)
-    public String handleDataIntegrityViolation(DataIntegrityViolationException ex, Model model) {
+    public String handleDataIntegrityViolation(DataIntegrityViolationException ex, Model model, HttpServletResponse response) {
+        if (isDatabaseAuthorizationFailure(ex)) {
+            response.setStatus(403);
+            model.addAttribute("status", 403);
+            model.addAttribute("message", "You do not have permission to perform this action.");
+            return "error";
+        }
         logger.error("Data integrity violation", ex);
+        response.setStatus(409);
         model.addAttribute("status", 409);
         model.addAttribute("message", "That request could not be completed because it conflicts with existing data.");
         return "error";
@@ -91,10 +97,23 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public String handleGeneralException(Exception ex, Model model) {
+    public String handleGeneralException(Exception ex, Model model, HttpServletResponse response) {
+        if (isDatabaseAuthorizationFailure(ex)) {
+            response.setStatus(403);
+            model.addAttribute("status", 403);
+            model.addAttribute("message", "You do not have permission to perform this action.");
+            return "error";
+        }
         logger.error("Unhandled exception occurred", ex);
         model.addAttribute("status", 500);
         model.addAttribute("message", "An unexpected error occurred. Please try again later.");
         return "error";
     }
+    private boolean isDatabaseAuthorizationFailure(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.sql.SQLException sql && "42501".equals(sql.getSQLState())) return true;
+        }
+        return false;
+    }
+
 }

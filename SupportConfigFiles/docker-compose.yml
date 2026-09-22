@@ -20,22 +20,64 @@ services:
     build:
       context: ..
       dockerfile: SupportConfigFiles/Dockerfile
-    env_file:
-      - .env
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     expose:
       - "8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-online_pos_system}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-pos_app}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in SupportConfigFiles/.env}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-pos_runtime}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set the restricted runtime password}
+      SPRING_PROFILES_ACTIVE: default
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-7200}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      APP_BASE_URL: ${APP_BASE_URL:-https://crowdcam.co.za}
+      RESEND_API_KEY: ${RESEND_API_KEY:-${MAIL_API:-}}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@email.crowdcam.co.za}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       SERVER_PORT: 8080
       SERVER_ADDRESS: 0.0.0.0
-      STAFF_CONFIG_PATH: /app/config/staff-config.json
+
+  provision:
+    image: postgres:16-alpine
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGDATABASE: ${POSTGRES_DB:-online_pos_system}
+      PGUSER: ${POSTGRES_USER:-pos_app}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set the database administrator password}
+      MIGRATION_DATASOURCE_USERNAME: ${MIGRATION_DATASOURCE_USERNAME:-pos_owner}
+      MIGRATION_DATASOURCE_PASSWORD: ${MIGRATION_DATASOURCE_PASSWORD:?Set the migration password}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-pos_runtime}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set the runtime password}
     volumes:
-      - ../Misc/staff-config.json:/app/config/staff-config.json:ro
+      - ../scripts:/work/scripts:ro
+    entrypoint: ["bash", "/work/scripts/provision-rls.sh"]
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: SupportConfigFiles/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: migrate
+      MIGRATION_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-online_pos_system}
+      MIGRATION_DATASOURCE_USERNAME: ${MIGRATION_DATASOURCE_USERNAME:?Set the migration owner username}
+      MIGRATION_DATASOURCE_PASSWORD: ${MIGRATION_DATASOURCE_PASSWORD:?Set the migration owner password}
+      RLS_RUNTIME_ROLE: ${SPRING_DATASOURCE_USERNAME:-pos_runtime}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set the restricted runtime password}
+      RUN_MIGRATION_SQL: ${RUN_MIGRATION_SQL:-true}
 
   nginx:
     image: nginx:1.27-alpine

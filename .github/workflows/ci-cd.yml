@@ -16,11 +16,26 @@ concurrency:
 
 jobs:
   build:
-    name: Build
+    name: Build and test
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-test-only
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+
     env:
-      SPRING_PROFILES_ACTIVE: dev
+      RLS_TEST_ADMIN_URL: jdbc:postgresql://localhost:5432/postgres
+      RLS_TEST_ADMIN_USERNAME: postgres
+      RLS_TEST_ADMIN_PASSWORD: ci-test-only
+      SPRING_PROFILES_ACTIVE: postgres-test
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
       JWT_SECRET: ci-only-secret-must-be-at-least-32-characters-long
@@ -39,12 +54,14 @@ jobs:
           cache: maven
           cache-dependency-path: Misc/pom.xml
 
-      # TEMPORARY:
-      # Tests are completely skipped because the current test suite
-      # contains outdated constructor dependencies.
-      # maven.test.skip=true skips both test compilation and execution.
-      - name: Build jar without tests
-        run: ./Misc/mvnw -f Misc/pom.xml -B package -Dmaven.test.skip=true
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run PostgreSQL tests and verify package
+        run: ./scripts/test-postgres.sh -B verify -Prls-it
+
+      - name: Build jar
+        run: ./Misc/mvnw -f Misc/pom.xml -B package -DskipTests
 
   deploy:
     name: Deploy to Azure VM
@@ -70,7 +87,10 @@ jobs:
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
           SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+          MIGRATION_DATASOURCE_USERNAME: ${{ secrets.MIGRATION_DATASOURCE_USERNAME }}
+          MIGRATION_DATASOURCE_PASSWORD: ${{ secrets.MIGRATION_DATASOURCE_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -87,12 +107,21 @@ jobs:
 
           db_name="${POSTGRES_DB:-online_pos_system}"
           db_user="${POSTGRES_USER:-pos_app}"
-          db_password="${POSTGRES_PASSWORD:-${SPRING_DATASOURCE_PASSWORD:-}}"
+          db_password="${POSTGRES_PASSWORD:-}"
 
-          if [[ -z "$db_password" || -z "$JWT_SECRET" || -z "$ADMIN_PASSWORD" || -z "${RESEND_API_KEY:-${MAIL_API:-}}" ]]; then
+          runtime_user="${SPRING_DATASOURCE_USERNAME:-pos_runtime}"
+          runtime_password="${SPRING_DATASOURCE_PASSWORD:-}"
+          migration_user="${MIGRATION_DATASOURCE_USERNAME:-}"
+          migration_password="${MIGRATION_DATASOURCE_PASSWORD:-}"
+
+          if [[ -z "$runtime_password" || -z "$migration_user" || -z "$migration_password" || -z "$db_password" || -z "$JWT_SECRET" || -z "$ADMIN_PASSWORD" || -z "${RESEND_API_KEY:-${MAIL_API:-}}" ]]; then
             echo "A complete runtime secret set was not provided; deployment will keep the existing server .env file."
             echo "created=false" >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+          if [[ "$runtime_user" == "$migration_user" || "$runtime_user" == "$db_user" || "$migration_user" == "$db_user" ]]; then
+            echo "Database administrator, migration owner, and runtime accounts must be separate" >&2
+            exit 1
           fi
 
           {
@@ -100,8 +129,12 @@ jobs:
             echo "POSTGRES_USER=${db_user}"
             echo "POSTGRES_PASSWORD=${db_password}"
             echo "SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${db_name}"
-            echo "SPRING_DATASOURCE_USERNAME=${db_user}"
-            echo "SPRING_DATASOURCE_PASSWORD=${db_password}"
+            echo "SPRING_DATASOURCE_USERNAME=${runtime_user}"
+            echo "SPRING_DATASOURCE_PASSWORD=${runtime_password}"
+            echo "MIGRATION_DATASOURCE_URL=jdbc:postgresql://db:5432/${db_name}"
+            echo "MIGRATION_DATASOURCE_USERNAME=${migration_user}"
+            echo "MIGRATION_DATASOURCE_PASSWORD=${migration_password}"
+            echo "RLS_RUNTIME_ROLE=${runtime_user}"
             echo "SERVER_ADDRESS=0.0.0.0"
             echo "SERVER_PORT=8080"
             echo "HTTP_PORT=80"
@@ -142,10 +175,7 @@ jobs:
           AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
         run: |
           remote_env="/tmp/online-pos-system-${GITHUB_SHA}.env"
-
-          scp \
-            -i ~/.ssh/online-pos-azure \
-            -P "${AZURE_VM_PORT:-22}" \
+          scp -i ~/.ssh/online-pos-azure -P "${AZURE_VM_PORT:-22}" \
             runtime/online-pos-system.env \
             "${AZURE_VM_USER}@${AZURE_VM_HOST}:${remote_env}"
 
@@ -159,91 +189,57 @@ jobs:
         run: |
           remote_env="/tmp/online-pos-system-${GITHUB_SHA}.env"
           remote_app_dir="${REMOTE_APP_DIR:-/home/${AZURE_VM_USER}/OnlinePosSystem}"
-
           quoted_remote_env="$(printf '%q' "$remote_env")"
           quoted_remote_app_dir="$(printf '%q' "$remote_app_dir")"
           quoted_branch="$(printf '%q' "$GITHUB_REF_NAME")"
           quoted_sha="$(printf '%q' "$GITHUB_SHA")"
           quoted_runtime_env_created="$(printf '%q' "$RUNTIME_ENV_CREATED")"
 
-          ssh \
-            -i ~/.ssh/online-pos-azure \
-            -p "${AZURE_VM_PORT:-22}" \
-            "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
+          ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
             "REMOTE_ENV=${quoted_remote_env} REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} RUNTIME_ENV_CREATED=${quoted_runtime_env_created} bash -s" <<'REMOTE'
-
           set -euo pipefail
 
           compose() {
-            docker compose \
-              --env-file SupportConfigFiles/.env \
-              -f SupportConfigFiles/docker-compose.yml \
-              -p onlinepossystem \
-              "$@"
+            docker compose --env-file SupportConfigFiles/.env -f SupportConfigFiles/docker-compose.yml -p onlinepossystem "$@"
           }
 
-          test -d "$REMOTE_APP_DIR/.git" || {
-            echo "Remote app directory is not a git repository: $REMOTE_APP_DIR"
-            exit 1
-          }
-
-          command -v git >/dev/null 2>&1 || {
-            echo "git is not installed on the server"
-            exit 1
-          }
-
-          command -v docker >/dev/null 2>&1 || {
-            echo "docker is not installed on the server"
-            exit 1
-          }
+          test -d "$REMOTE_APP_DIR/.git" || (echo "Remote app directory is not a git repository: $REMOTE_APP_DIR" && exit 1)
+          command -v git >/dev/null 2>&1 || (echo "git is not installed on the server" && exit 1)
+          command -v docker >/dev/null 2>&1 || (echo "docker is not installed on the server" && exit 1)
 
           cd "$REMOTE_APP_DIR"
-
           git fetch origin "$DEPLOY_BRANCH"
           git checkout "$DEPLOY_BRANCH"
           git pull --ff-only origin "$DEPLOY_BRANCH"
 
           mkdir -p SupportConfigFiles
-
           if [[ "$RUNTIME_ENV_CREATED" == "true" ]]; then
-            test -f "$REMOTE_ENV" || {
-              echo "Uploaded environment file missing: $REMOTE_ENV"
-              exit 1
-            }
-
+            test -f "$REMOTE_ENV" || (echo "Uploaded environment file missing: $REMOTE_ENV" && exit 1)
             mv "$REMOTE_ENV" SupportConfigFiles/.env
           fi
 
-          test -f SupportConfigFiles/.env || {
-            echo "SupportConfigFiles/.env is missing on the server"
-            exit 1
-          }
-
+          test -f SupportConfigFiles/.env || (echo "SupportConfigFiles/.env is missing on the server" && exit 1)
           chmod 600 SupportConfigFiles/.env
 
-          compose up -d --build
+          compose up -d db
+          compose build app migrate
+          # Stop the old runtime before changing ownership or enforcing RLS.
+          compose stop app
+          compose run --rm provision
+          compose run --rm migrate
+          compose up -d app nginx certbot-renew
 
           for i in $(seq 1 60); do
-            if curl \
-              --fail \
-              --silent \
-              --show-error \
-              --max-time 10 \
+            if curl --fail --silent --show-error --max-time 10 \
               --resolve crowdcam.co.za:443:127.0.0.1 \
               https://crowdcam.co.za/ >/dev/null; then
-
               compose ps
               exit 0
             fi
-
             sleep 2
           done
 
-          echo "Application did not become healthy in time."
-
           compose ps || true
           compose logs --tail=160 app nginx || true
-
           exit 1
-
           REMOTE

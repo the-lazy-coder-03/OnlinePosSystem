@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.security.config;
 
 import org.example.onlinepossystem.security.JwtAuthenticationFilter;
+import org.example.onlinepossystem.security.AccountPrincipalRefreshFilter;
 import org.example.onlinepossystem.security.LoggingAuthenticationFailureHandler;
 import org.example.onlinepossystem.security.LoginRateLimitFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -89,11 +90,12 @@ public class SecurityConfig {
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new AccountPrincipalRefreshFilter(userDetailsService), JwtAuthenticationFilter.class)
                 .securityContext(context -> context
                         .securityContextRepository(securityContextRepository)
                 )
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/**", "/h2-console/**")
+                        .ignoringRequestMatchers("/api/**")
                 )
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.sameOrigin())
@@ -108,7 +110,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/staff/create").hasRole("SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")
-                        .requestMatchers("/api/orders/**").permitAll() // Needed for POS frontend
+                        .requestMatchers(HttpMethod.GET, "/api/orders/menu").permitAll()
+                        .requestMatchers("/api/orders", "/api/orders/**").hasRole("ADMIN")
+                        .requestMatchers("/input-orders", "/orders", "/InputOrders", "/InputOrders.html").hasRole("ADMIN")
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/forgot-password").permitAll()
                         .requestMatchers("/api/auth/reset-password").permitAll()
@@ -127,10 +131,6 @@ public class SecurityConfig {
                                 "/register",
                                 "/forgot-password",
                                 "/reset-password",
-                                "/input-orders",      // POS frontend page
-                                "/orders",            // Alias for POS frontend
-                                "/InputOrders",       // Case sensitive alias
-                                "/InputOrders.html",  // Direct file alias
                                 "/test",              // Test page
                                 "/css/**",
                                 "/js/**",
@@ -143,9 +143,19 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(exceptions -> exceptions
                         .defaultAuthenticationEntryPointFor(
+                                (request, response, exception) -> response.sendError(401, "Authentication is required"),
+                                new AntPathRequestMatcher("/api/**")
+                        )
+                        .defaultAuthenticationEntryPointFor(new LoginUrlAuthenticationEntryPoint("/admin/login"),
+                                new org.springframework.security.web.util.matcher.OrRequestMatcher(
+                                        new AntPathRequestMatcher("/input-orders"), new AntPathRequestMatcher("/orders"),
+                                        new AntPathRequestMatcher("/InputOrders"), new AntPathRequestMatcher("/InputOrders.html")))
+                        .defaultAuthenticationEntryPointFor(
                                 new LoginUrlAuthenticationEntryPoint("/admin/login"),
                                 new AntPathRequestMatcher("/admin/**")
                         )
+                        .defaultAuthenticationEntryPointFor(new LoginUrlAuthenticationEntryPoint("/login"),
+                                org.springframework.security.web.util.matcher.AnyRequestMatcher.INSTANCE)
                 )
                 .formLogin(form -> form
                         .loginPage("/login")
@@ -154,8 +164,7 @@ public class SecurityConfig {
                         .passwordParameter("password")
                         .failureHandler(authenticationFailureHandler)
                         .successHandler(authenticationSuccessHandler)
-                        .defaultSuccessUrl("/", false)
-                        .permitAll()
+                                                .permitAll()
                 )
                 .logout(logout -> logout
                         .logoutSuccessUrl("/")

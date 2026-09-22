@@ -289,6 +289,70 @@ body.admin-body {
     white-space: nowrap;
 }
 
+.users-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 12px 0 22px;
+}
+
+.user-result-row { cursor: pointer; }
+.user-result-row:hover td { background: #f0f5fb; }
+
+.user-profile-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px 24px;
+    margin: 0;
+    padding: 18px 0;
+    border-top: 1px solid var(--admin-line);
+    border-bottom: 1px solid var(--admin-line);
+}
+
+.user-profile-grid dt {
+    color: var(--admin-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.user-profile-grid dd {
+    margin: 3px 0 0;
+    overflow-wrap: anywhere;
+}
+
+.user-order {
+    border-bottom: 1px solid var(--admin-line);
+}
+
+.user-order summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 13px 0;
+    cursor: pointer;
+}
+
+.user-order-content {
+    padding: 0 0 15px 16px;
+}
+
+.user-order-content p { margin-bottom: 5px; }
+.user-note-form { max-width: 760px; margin-bottom: 20px; }
+.user-note-list { border-top: 1px solid var(--admin-line); }
+.user-note { padding: 12px 0; border-bottom: 1px solid var(--admin-line); }
+.user-note p { margin: 5px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 700px) {
+    .user-profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .user-order summary { align-items: flex-start; flex-direction: column; gap: 2px; }
+}
+
+@media (max-width: 420px) {
+    .user-profile-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 .admin-table td {
     padding: 11px 12px;
     color: #344054;
