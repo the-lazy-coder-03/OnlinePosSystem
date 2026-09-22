@@ -5,6 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.example.onlinepossystem.security.api.RateLimiter;
+import org.example.onlinepossystem.security.api.RequestClientIp;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.DefaultRedirectStrategy;
@@ -29,6 +31,11 @@ public class RoleAwareAuthenticationSuccessHandler implements AuthenticationSucc
 
     private final RequestCache requestCache = new HttpSessionRequestCache();
     private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
+    private final RateLimiter rateLimiter;
+
+    public RoleAwareAuthenticationSuccessHandler(RateLimiter rateLimiter) {
+        this.rateLimiter = rateLimiter;
+    }
 
     @Override
     public void onAuthenticationSuccess(
@@ -46,6 +53,8 @@ public class RoleAwareAuthenticationSuccessHandler implements AuthenticationSucc
             response.sendRedirect("/admin/login?error");
             return;
         }
+
+        rateLimiter.reset("login:" + RequestClientIp.resolve(request));
 
         SavedRequest savedRequest = requestCache.getRequest(request, response);
         String savedTarget = savedRequest == null ? null : safeTarget(savedRequest.getRedirectUrl());
