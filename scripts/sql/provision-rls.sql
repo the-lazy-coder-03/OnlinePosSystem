@@ -12,6 +12,7 @@ SELECT format('ALTER ROLE %I NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOR
 SELECT format('ALTER ROLE %I NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION NOINHERIT LOGIN PASSWORD %L', :'runtime_name', :'runtime_password') \gexec
 SELECT format('REVOKE %I FROM %I', :'owner_name', :'runtime_name') \gexec
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I, %I', current_database(), :'owner_name', :'runtime_name') \gexec
+SELECT format('GRANT CREATE ON DATABASE %I TO %I', current_database(), :'owner_name') \gexec
 SELECT format('REVOKE CREATE ON DATABASE %I FROM PUBLIC, %I', current_database(), :'runtime_name') \gexec
 SELECT format('ALTER SCHEMA public OWNER TO %I', :'owner_name') \gexec
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
