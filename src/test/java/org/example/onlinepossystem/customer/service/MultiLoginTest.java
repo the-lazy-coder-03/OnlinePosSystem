@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.customer.service;
 
 import org.example.onlinepossystem.customer.entity.Customer;
+import org.example.onlinepossystem.customer.api.AccountAccessAdministration;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -39,6 +41,41 @@ public class MultiLoginTest {
 
     @Autowired
     private CustomerRepository customerRepository;
+
+    @Autowired
+    private AccountAccessAdministration accessAdministration;
+
+    @Test
+    public void namedSuperAdminCanOpenOrderPageAndPlaceOwnOrder() throws Exception {
+        String email = "named-super-order@example.com";
+        Customer customer = customerService.registerCustomer(
+                "Named", "Admin", email, "Password1!", "0712345699", null,
+                "12", "Main Street", "Kenridge", null, "Kenridge Branch", "7550"
+        );
+        accessAdministration.assignAccessLevel(customer.getId(), 3);
+        UserDetails principal = userDetailsService.loadUserByUsername(email);
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/order").with(user(principal)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("PlaceOrder"));
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(user(principal))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"customerName\":\"Named Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNumber());
+    }
+
+    @Test
+    public void environmentSuperAdminCannotPlaceCustomerOrder() throws Exception {
+        UserDetails principal = userDetailsService.loadUserByUsername("admin");
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/order").with(user(principal)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(user(principal))
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"customerName\":\"Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     public void testLoginWithEmailOrPhone() {

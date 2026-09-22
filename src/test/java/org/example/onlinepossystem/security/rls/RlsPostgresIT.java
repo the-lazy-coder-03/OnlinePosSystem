@@ -1,5 +1,6 @@
 package org.example.onlinepossystem.security.rls;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
@@ -60,6 +61,7 @@ class RlsPostgresIT {
     private long customerB;
     private long branchOne;
     private long branchTwo;
+    private long namedSuperAdmin;
     private long driver;
     private long orderA;
     private long orderB;
@@ -129,6 +131,7 @@ class RlsPostgresIT {
             customerB = insert(c, "INSERT INTO customers(email,password,access_level,role) VALUES ('b@example.com','{noop}customer-pass',0,'USER') RETURNING id");
             branchOne = insert(c, "INSERT INTO customers(email,password,access_level,role) VALUES ('one@example.com','{noop}admin-pass',1,'ADMIN') RETURNING id");
             branchTwo = insert(c, "INSERT INTO customers(email,password,access_level,role) VALUES ('two@example.com','{noop}admin-pass',2,'ADMIN') RETURNING id");
+            namedSuperAdmin = insert(c, "INSERT INTO customers(email,password,access_level,role) VALUES ('super@example.com','{noop}admin-pass',3,'SUPER_ADMIN') RETURNING id");
             driver = insert(c, "INSERT INTO customers(email,password,access_level,role) VALUES ('driver@example.com','{noop}driver-pass',4,'DRIVER') RETURNING id");
             orderA = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) VALUES (1,"+customerA+",'Pending',CURRENT_TIMESTAMP,'pickup') RETURNING order_id");
             orderB = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) VALUES (2,"+customerB+",'Pending',CURRENT_TIMESTAMP,'pickup') RETURNING order_id");
@@ -408,6 +411,10 @@ class RlsPostgresIT {
     void publicMenuCustomerOrderHistoryAndBranchAdminApiSmoke() throws Exception {
         var customer = accounts.loadUserByUsername("a@example.com");
         var branchAdmin = accounts.loadUserByUsername("one@example.com");
+        var namedSuper = accounts.loadUserByUsername("super@example.com");
+        var environmentAdmin = accounts.loadUserByUsername("environment-admin");
+        var driverAccount = accounts.loadUserByUsername("driver@example.com");
+        String orderRequest = "{\"customerName\":\"Named Admin\",\"branchName\":\"Uitzicht\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}";
         mvc.perform(get("/api/orders/menu").param("branch", "Kenridge"))
                 .andExpect(status().isOk());
         mvc.perform(post("/api/orders").with(user(customer)).contentType(MediaType.APPLICATION_JSON)
@@ -415,6 +422,29 @@ class RlsPostgresIT {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber());
         mvc.perform(get("/profile/edit").with(user(customer)))
                 .andExpect(status().isOk());
+        mvc.perform(get("/order").with(user(namedSuper)))
+                .andExpect(status().isOk()).andExpect(view().name("PlaceOrder"));
+        var superOrder = mvc.perform(post("/api/orders").with(user(namedSuper))
+                        .contentType(MediaType.APPLICATION_JSON).content(orderRequest))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber())
+                .andReturn();
+        long superOrderId = application.getBean(ObjectMapper.class)
+                .readTree(superOrder.getResponse().getContentAsString()).path("id").asLong();
+        try (Connection c = ownerConnection(); var statement = c.prepareStatement(
+                "SELECT customer_id, branch_id FROM customer_order WHERE order_id=?")) {
+            statement.setLong(1, superOrderId);
+            try (var result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getLong("customer_id")).isEqualTo(namedSuperAdmin);
+                assertThat(result.getLong("branch_id")).isEqualTo(2);
+            }
+        }
+        for (var blocked : List.of(branchAdmin, driverAccount, environmentAdmin)) {
+            mvc.perform(get("/order").with(user(blocked))).andExpect(status().isForbidden());
+            mvc.perform(post("/api/orders").with(user(blocked))
+                    .contentType(MediaType.APPLICATION_JSON).content(orderRequest))
+                    .andExpect(status().isForbidden());
+        }
         mvc.perform(get("/api/admin/orders").with(user(branchAdmin)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].branchId").value(1));
         mvc.perform(get("/api/admin/orders").with(user(branchAdmin)).param("branchId", "2"))
