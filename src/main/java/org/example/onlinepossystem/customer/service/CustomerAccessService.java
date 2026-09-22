@@ -51,6 +51,7 @@ public class CustomerAccessService implements AccountAccessReader, AccountAccess
     public List<AccountAccessSummary> search(String query) {
         String needle = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
         return customerRepository.findAll().stream()
+                .filter(customer -> !customer.isEnvironmentAdmin())
                 .filter(customer -> needle.isEmpty() || searchableText(customer).contains(needle))
                 .sorted(Comparator.comparing(Customer::getEmail, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .limit(50)
@@ -64,6 +65,9 @@ public class CustomerAccessService implements AccountAccessReader, AccountAccess
         AccountAccess validated = new AccountAccess(accessLevel);
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Customer not found with ID: " + customerId));
+        if (customer.isEnvironmentAdmin()) {
+            throw new java.util.NoSuchElementException("Customer not found with ID: " + customerId);
+        }
         customer.setAccessLevel(validated.level());
         customer.setRole(roleFor(validated.level()));
         customerRepository.save(customer);

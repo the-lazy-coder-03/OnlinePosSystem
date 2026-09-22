@@ -14,9 +14,9 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     @Query("""
             select c from Customer c
-            where :query = '' or lower(concat(coalesce(c.firstName, ''), ' ', coalesce(c.lastName, ''), ' ',
+            where c.environmentAdmin = false and (:query = '' or lower(concat(coalesce(c.firstName, ''), ' ', coalesce(c.lastName, ''), ' ',
                     coalesce(c.email, ''), ' ', coalesce(c.phone1, ''), ' ', coalesce(c.phone2, '')))
-                    like concat('%', :query, '%')
+                    like concat('%', :query, '%'))
             """)
     Page<Customer> searchForAdmin(@Param("query") String query, Pageable pageable);
 
@@ -24,6 +24,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     Optional<Customer> findByEmail(String email);
 
     boolean existsByEmailIgnoreCase(String email);
+
+    Optional<Customer> findByEnvironmentAdminTrue();
 
     // Search by phone1
     Optional<Customer> findByPhone1(String phone1);

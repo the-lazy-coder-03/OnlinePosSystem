@@ -68,6 +68,7 @@ public class AdminCustomerRecordService implements CustomerRecordLookup {
 
     private Customer findCustomer(Long id) {
         return customers.findById(id)
+                .filter(customer -> !customer.isEnvironmentAdmin())
                 .orElseThrow(() -> new NoSuchElementException("Customer not found with ID: " + id));
     }
 

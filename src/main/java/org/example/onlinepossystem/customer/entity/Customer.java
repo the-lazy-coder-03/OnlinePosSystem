@@ -65,6 +65,9 @@ public class Customer {
     @Column(name = "access_level", nullable = false, columnDefinition = "smallint")
     private Integer accessLevel = 0;
 
+    @Column(name = "environment_admin", nullable = false)
+    private boolean environmentAdmin;
+
     // Default constructor
     public Customer() {}
 
@@ -121,4 +124,7 @@ public class Customer {
 
     public Integer getAccessLevel() { return accessLevel; }
     public void setAccessLevel(Integer accessLevel) { this.accessLevel = accessLevel; }
+
+    public boolean isEnvironmentAdmin() { return environmentAdmin; }
+    public void setEnvironmentAdmin(boolean environmentAdmin) { this.environmentAdmin = environmentAdmin; }
 }

@@ -10,6 +10,7 @@ import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.example.onlinepossystem.security.api.AccountPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -49,6 +50,10 @@ public class OrderController {
             @Valid @RequestBody OrderRequestDTO request,
             Authentication authentication
     ) {
+        if (authentication != null && authentication.getPrincipal() instanceof AccountPrincipal principal
+                && principal.environmentAdmin()) {
+            return ResponseEntity.ok(orderOperations.placeOrderForEnvironmentAdmin(request));
+        }
         String customerEmail = authentication == null ? null : authentication.getName();
         return ResponseEntity.ok(orderOperations.placeOrderForCustomer(request, customerEmail));
     }

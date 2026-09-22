@@ -102,14 +102,15 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Protect order and profile pages
-                        .requestMatchers("/order", "/profile/edit", "/profile/update").hasRole("USER")
+                        .requestMatchers("/order", "/profile/edit").hasAnyRole("USER", "SUPER_ADMIN")
+                        .requestMatchers("/profile/update").hasRole("USER")
                         .requestMatchers("/admin/login").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
                         // Protect sensitive API endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/staff/create").hasRole("SUPER_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasAnyRole("USER", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/orders/menu").permitAll()
                         .requestMatchers("/api/orders", "/api/orders/**").hasRole("ADMIN")
                         .requestMatchers("/input-orders", "/orders", "/InputOrders", "/InputOrders.html").hasRole("ADMIN")

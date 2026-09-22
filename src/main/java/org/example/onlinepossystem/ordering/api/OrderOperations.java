@@ -9,6 +9,7 @@ public interface OrderOperations {
     OrderResponseDTO placeOrder(OrderRequestDTO request);
 
     OrderResponseDTO placeOrderForCustomer(OrderRequestDTO request, String customerEmail);
+    OrderResponseDTO placeOrderForEnvironmentAdmin(OrderRequestDTO request);
 
     List<OrderResponseDTO> getOrdersByBranch(String branchName);
 

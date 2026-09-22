@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS public.customers (
                                                 last_name       varchar(255),
                                                 role            varchar(255) NOT NULL DEFAULT 'USER',
                                                 access_level    smallint NOT NULL DEFAULT 0,
+                                                environment_admin boolean NOT NULL DEFAULT false,
 
                                                 CONSTRAINT customers_pkey PRIMARY KEY (id),
                                                 CONSTRAINT customers_email_key UNIQUE (email),
@@ -95,6 +96,12 @@ ALTER TABLE public.customers
 
 ALTER TABLE public.customers
     ADD COLUMN IF NOT EXISTS access_level smallint;
+
+ALTER TABLE public.customers
+    ADD COLUMN IF NOT EXISTS environment_admin boolean NOT NULL DEFAULT false;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customers_environment_admin
+    ON public.customers (environment_admin) WHERE environment_admin;
 
 UPDATE public.customers
 SET access_level = CASE upper(replace(coalesce(role, 'USER'), 'ROLE_', ''))
