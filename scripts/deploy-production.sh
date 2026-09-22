@@ -8,7 +8,7 @@ set -Eeuo pipefail
 : "${REMOTE_ENV:?REMOTE_ENV is required}"
 
 PUBLIC_HOST="${PUBLIC_HOST:-crowdcam.co.za}"
-ROLLBACK_TAG="onlinepossystem-app:rollback-${DEPLOY_SHA}"
+ROLLBACK_TAG="onlinepossystem-app:rollback"
 OLD_CONTAINER_ID=""
 OLD_IMAGE_ID=""
 ROLLBACK_AVAILABLE=false
@@ -76,6 +76,8 @@ if [[ -n "$OLD_CONTAINER_ID" ]]; then
   OLD_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$OLD_CONTAINER_ID")"
   if docker image inspect "$OLD_IMAGE_ID" >/dev/null 2>&1; then
     docker tag "$OLD_IMAGE_ID" "$ROLLBACK_TAG"
+  elif docker image inspect "$ROLLBACK_TAG" >/dev/null 2>&1; then
+    echo "Using the existing rollback image because the running container image metadata is unavailable."
   else
     docker commit --pause=false "$OLD_CONTAINER_ID" "$ROLLBACK_TAG" >/dev/null
   fi
