@@ -15,8 +15,13 @@ public class RlsConfiguration {
     @Bean
     public JpaTransactionManager transactionManager(EntityManagerFactory entityManagerFactory,
                                                    RlsContextInitializer initializer) {
-        JpaTransactionManager manager = new JpaTransactionManager(entityManagerFactory);
-        manager.setJpaDialect(new RlsJpaDialect(initializer));
-        return manager;
+        return new JpaTransactionManager(entityManagerFactory) {
+            @Override
+            public void afterPropertiesSet() {
+                super.afterPropertiesSet();
+                // JpaTransactionManager resets the dialect from the factory during initialization.
+                setJpaDialect(new RlsJpaDialect(initializer));
+            }
+        };
     }
 }

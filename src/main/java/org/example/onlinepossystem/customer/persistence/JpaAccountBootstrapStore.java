@@ -11,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-/** H2-only adapter. PostgreSQL runtime startup rejects disabled RLS. */
+/** Test-only adapter for the disposable PostgreSQL suite; runtime requires RLS. */
 @Repository
 @Transactional
 @ConditionalOnProperty(name = "app.rls.enabled", havingValue = "false")

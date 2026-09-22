@@ -396,6 +396,249 @@
         setText("modifierOptionModalTitle", data.id ? "Edit modifier option" : "Add modifier option");
     }
 
+    let usersQuery = "";
+    let usersPage = 0;
+    let selectedUserId = null;
+
+    function setupUsers() {
+        const form = document.getElementById("usersSearchForm");
+        if (!form) return;
+        form.addEventListener("submit", event => {
+            event.preventDefault();
+            usersQuery = document.getElementById("usersQuery").value.trim();
+            usersPage = 0;
+            loadUsers();
+        });
+        document.getElementById("userBackButton").addEventListener("click", () => {
+            selectedUserId = null;
+            toggle("usersListView", true);
+            toggle("userDetailView", false);
+            loadUsers();
+        });
+        document.getElementById("userNoteForm").addEventListener("submit", addUserNote);
+        loadUsers();
+    }
+
+    async function getAdminJson(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Request failed with ${response.status}`);
+        return response.json();
+    }
+
+    function showTableMessage(body, message, className = "text-secondary") {
+        body.replaceChildren();
+        const row = body.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 6;
+        cell.className = `text-center ${className} py-4`;
+        cell.textContent = message;
+    }
+
+    async function loadUsers() {
+        const body = document.getElementById("usersResults");
+        showTableMessage(body, "Loading users...");
+        document.getElementById("usersPagination").replaceChildren();
+        try {
+            const params = new URLSearchParams({query: usersQuery, page: String(usersPage)});
+            const result = await getAdminJson(`/api/admin/customers?${params}`);
+            body.replaceChildren();
+            if (!result.items.length) showTableMessage(body, "No matching users.");
+            result.items.forEach(user => body.appendChild(userRow(user)));
+            renderPagination("usersPagination", result, page => {
+                usersPage = page;
+                loadUsers();
+            });
+        } catch (error) {
+            console.error(error);
+            showTableMessage(body, "Users could not be loaded.", "text-danger");
+        }
+    }
+
+    function userRow(user) {
+        const row = document.createElement("tr");
+        row.className = "user-result-row";
+        row.addEventListener("click", () => openUser(user.id));
+        const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unnamed user";
+        [name, user.email || "—", user.phone1 || "—", user.accessLabel,
+            displayDate(user.lastOrderedAt)].forEach(value => {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            row.appendChild(cell);
+        });
+        const action = document.createElement("td");
+        action.className = "text-end";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "btn btn-sm btn-outline-primary";
+        button.textContent = "View";
+        button.setAttribute("aria-label", `View ${name}`);
+        button.addEventListener("click", event => {
+            event.stopPropagation();
+            openUser(user.id);
+        });
+        action.appendChild(button);
+        row.appendChild(action);
+        return row;
+    }
+
+    function renderPagination(containerId, result, onPage) {
+        const container = document.getElementById(containerId);
+        container.replaceChildren();
+        if (result.totalItems === 0) return;
+        const label = document.createElement("span");
+        label.className = "text-secondary small";
+        label.textContent = `Page ${result.page + 1} of ${result.totalPages} · ${result.totalItems} total`;
+        const controls = document.createElement("div");
+        controls.className = "btn-group btn-group-sm";
+        [["Previous", result.page - 1, result.page === 0],
+            ["Next", result.page + 1, result.page + 1 >= result.totalPages]].forEach(([text, page, disabled]) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn btn-outline-secondary";
+            button.textContent = text;
+            button.disabled = disabled;
+            button.addEventListener("click", () => onPage(page));
+            controls.appendChild(button);
+        });
+        container.append(label, controls);
+    }
+
+    async function openUser(id) {
+        selectedUserId = id;
+        toggle("usersListView", false);
+        toggle("userDetailView", true);
+        setText("userDetailName", "Loading user...");
+        document.getElementById("userProfile").replaceChildren();
+        document.getElementById("userOrders").replaceChildren();
+        document.getElementById("userNotes").replaceChildren();
+        setText("userNoteError", "");
+        document.getElementById("userNoteBody").value = "";
+        try {
+            const user = await getAdminJson(`/api/admin/customers/${id}`);
+            if (selectedUserId !== id) return;
+            const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Unnamed user";
+            setText("userDetailName", name);
+            setText("userDetailAccess", `${user.accessLabel} · Level ${user.accessLevel}`);
+            const profile = document.getElementById("userProfile");
+            [["Email", user.email], ["Primary phone", user.phone1], ["Secondary phone", user.phone2],
+                ["House number", user.houseNumber], ["Street", user.street], ["Area", user.area],
+                ["Complex", user.complexName], ["City", user.city], ["Postal code", user.postalCode],
+                ["Preferred store", user.preferredStore], ["Last order", displayDate(user.lastOrderedAt)]].forEach(([label, value]) => {
+                const field = document.createElement("div");
+                const term = document.createElement("dt");
+                term.textContent = label;
+                const description = document.createElement("dd");
+                description.textContent = value || "—";
+                field.append(term, description);
+                profile.appendChild(field);
+            });
+            loadUserOrders(0);
+            loadUserNotes(0);
+        } catch (error) {
+            console.error(error);
+            setText("userDetailName", "User could not be loaded");
+        }
+    }
+
+    async function loadUserOrders(page) {
+        const id = selectedUserId;
+        const container = document.getElementById("userOrders");
+        container.textContent = "Loading orders...";
+        try {
+            const result = await getAdminJson(`/api/admin/customers/${id}/orders?page=${page}`);
+            if (selectedUserId !== id) return;
+            container.replaceChildren();
+            if (!result.items.length) container.textContent = "No linked orders in your branch scope.";
+            result.items.forEach(entry => container.appendChild(historicalOrder(entry)));
+            renderPagination("userOrdersPagination", result, loadUserOrders);
+        } catch (error) {
+            console.error(error);
+            container.textContent = "Orders could not be loaded.";
+        }
+    }
+
+    function historicalOrder(entry) {
+        const order = entry.order;
+        const details = document.createElement("details");
+        details.className = "user-order";
+        const summary = document.createElement("summary");
+        const identity = document.createElement("span");
+        identity.textContent = `#${order.id} · ${order.branchName || "Branch"} · ${displayDate(order.createdAt)}`;
+        const status = document.createElement("span");
+        status.className = "text-secondary";
+        status.textContent = `${normalizedStatus(order.status)} · ${currency(entry.total)}`;
+        summary.append(identity, status);
+        details.appendChild(summary);
+        const content = document.createElement("div");
+        content.className = "user-order-content";
+        appendLine(content, "Type", order.orderType || "—");
+        appendOrderItems(content, order);
+        appendLine(content, "Order address", [order.houseNumber, order.street, order.area,
+            order.complexName, order.city, order.postalCode].filter(Boolean).join(", ") || "—");
+        if (order.notes) appendLine(content, "Order notes", order.notes);
+        details.appendChild(content);
+        return details;
+    }
+
+    async function loadUserNotes(page) {
+        const id = selectedUserId;
+        const container = document.getElementById("userNotes");
+        container.textContent = "Loading notes...";
+        try {
+            const result = await getAdminJson(`/api/admin/customers/${id}/notes?page=${page}`);
+            if (selectedUserId !== id) return;
+            container.replaceChildren();
+            if (!result.items.length) container.textContent = "No staff notes yet.";
+            result.items.forEach(note => {
+                const item = document.createElement("article");
+                item.className = "user-note";
+                const meta = document.createElement("div");
+                meta.className = "small text-secondary";
+                meta.textContent = `${note.authorUsername} · ${displayDate(note.createdAt)}`;
+                const body = document.createElement("p");
+                body.textContent = note.body;
+                item.append(meta, body);
+                container.appendChild(item);
+            });
+            renderPagination("userNotesPagination", result, loadUserNotes);
+        } catch (error) {
+            console.error(error);
+            container.textContent = "Notes could not be loaded.";
+        }
+    }
+
+    async function addUserNote(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const body = document.getElementById("userNoteBody").value.trim();
+        setText("userNoteError", "");
+        if (!body || body.length > 2000) {
+            setText("userNoteError", "Enter a note of 1 to 2,000 characters.");
+            return;
+        }
+        const submit = form.querySelector('button[type="submit"]');
+        submit.disabled = true;
+        try {
+            const response = await fetch(`/admin/customers/${selectedUserId}/notes`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json", "X-CSRF-TOKEN": csrfToken},
+                body: JSON.stringify({body})
+            });
+            if (!response.ok) throw new Error(`Note save failed with ${response.status}`);
+            document.getElementById("userNoteBody").value = "";
+            await loadUserNotes(0);
+        } catch (error) {
+            console.error(error);
+            setText("userNoteError", "Note could not be saved.");
+        } finally {
+            submit.disabled = false;
+        }
+    }
+
+    function displayDate(value) {
+        return value ? String(value).replace("T", " ").slice(0, 16) : "—";
+    }
+
     function setupAccountSearch() {
         const form = document.getElementById("accountSearchForm");
         if (!form) return;
@@ -601,6 +844,7 @@
         setupNavigation();
         setupOverviewFilters();
         setupCatalogModals();
+        setupUsers();
         setupAccountSearch();
         refreshOverview();
         refreshOrders();

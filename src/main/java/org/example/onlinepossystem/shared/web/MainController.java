@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.shared.web;
 
 import org.example.onlinepossystem.customer.api.CustomerAccount;
+import org.example.onlinepossystem.customer.api.AccountAccessReader;
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -15,9 +16,11 @@ import java.util.Optional;
 public class MainController {
 
     private final CustomerAccountReader customerAccountReader;
+    private final AccountAccessReader accountAccessReader;
 
-    public MainController(CustomerAccountReader customerAccountReader) {
+    public MainController(CustomerAccountReader customerAccountReader, AccountAccessReader accountAccessReader) {
         this.customerAccountReader = customerAccountReader;
+        this.accountAccessReader = accountAccessReader;
     }
 
     // ====== Public Pages ======
@@ -124,7 +127,13 @@ public class MainController {
     }
 
     @GetMapping({"/input-orders", "/orders", "/InputOrders", "/InputOrders.html"})
-    public String inputOrdersPage() {
+    public String inputOrdersPage(Model model, Authentication authentication) {
+        var access = accountAccessReader.findByUsername(authentication.getName());
+        if (!access.isAdmin()) throw new org.springframework.security.access.AccessDeniedException("Admin access is required.");
+        model.addAttribute("adminMode", true);
+        model.addAttribute("adminBranchId", access.branchId());
+        model.addAttribute("adminBranchName", access.branchId() == null ? null :
+                access.branchId() == 1 ? "Kenridge" : "Uitzicht");
         return "InputOrders";
     }
 }

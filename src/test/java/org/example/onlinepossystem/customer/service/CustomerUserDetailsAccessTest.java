@@ -29,7 +29,7 @@ class CustomerUserDetailsAccessTest {
         customer.setPassword("password-hash");
         customer.setAccessLevel(accessLevel);
         when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(customer));
-        CustomerUserDetailsService service = new CustomerUserDetailsService(repository, "admin", "admin-password");
+        CustomerUserDetailsService service = new CustomerUserDetailsService(new org.example.onlinepossystem.customer.persistence.JpaAccountBootstrapStore(repository, null), "admin", "admin-password");
 
         UserDetails details = service.loadUserByUsername("person@example.com");
 

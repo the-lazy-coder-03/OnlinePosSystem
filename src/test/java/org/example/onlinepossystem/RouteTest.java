@@ -141,10 +141,11 @@ public class RouteTest {
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().is3xxRedirection());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
     public void testInvalidOrderStatusKeepsExistingErrorContract() throws Exception {
         mockMvc.perform(put("/api/orders/1/status")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -159,28 +160,24 @@ public class RouteTest {
     @Test
     public void testInputOrdersPage() throws Exception {
         mockMvc.perform(get("/input-orders"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("InputOrders"));
+                .andExpect(status().is3xxRedirection());
     }
 
     @Test
     public void testOrdersPage() throws Exception {
         mockMvc.perform(get("/orders"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("InputOrders"));
+                .andExpect(status().is3xxRedirection());
     }
 
     @Test
     public void testInputOrdersHtmlIsOk() throws Exception {
         mockMvc.perform(get("/InputOrders.html"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("InputOrders"));
+                .andExpect(status().is3xxRedirection());
     }
 
     @Test
     public void testInputOrdersCaseSensitiveIsOk() throws Exception {
         mockMvc.perform(get("/InputOrders"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("InputOrders"));
+                .andExpect(status().is3xxRedirection());
     }
 }

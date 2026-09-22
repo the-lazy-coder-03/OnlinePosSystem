@@ -54,6 +54,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
+        if (isDatabaseAuthorizationFailure(ex)) return build(HttpStatus.FORBIDDEN,
+                "You do not have permission to perform this action.", request, null);
         logger.error("Data integrity violation in API", ex);
         return build(HttpStatus.CONFLICT, "That request conflicts with existing data.", request, null);
     }
@@ -77,6 +79,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex, HttpServletRequest request) {
+        if (isDatabaseAuthorizationFailure(ex)) return build(HttpStatus.FORBIDDEN,
+                "You do not have permission to perform this action.", request, null);
         logger.error("Unhandled exception in API", ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error", request, null);
     }
@@ -101,4 +105,11 @@ public class ApiExceptionHandler {
             String path,
             Map<String, String> validationErrors
     ) {}
+    private boolean isDatabaseAuthorizationFailure(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.sql.SQLException sql && "42501".equals(sql.getSQLState())) return true;
+        }
+        return false;
+    }
+
 }

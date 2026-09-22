@@ -44,6 +44,8 @@ public class PostgresAccountBootstrapStore implements AccountBootstrapStore {
                 c.getHouseNumber(), c.getStreet(), c.getArea(), c.getComplexName(), c.getPreferredStore(),
                 c.getPostalCode(), c.getCity(), c.getLastOrderedAt());
         c.setId(id);
+        c.setAccessLevel(0);
+        c.setRole("USER");
         return c;
     }
 

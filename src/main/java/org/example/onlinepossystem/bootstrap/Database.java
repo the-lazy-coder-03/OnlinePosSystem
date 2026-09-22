@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@org.springframework.context.annotation.Profile("dev")
+@org.springframework.context.annotation.Profile("postgres-test")
 public class Database implements CommandLineRunner {
 
     private final DataSource dataSource;

@@ -20,7 +20,7 @@ class CustomerAccessServiceTest {
         Customer customer = new Customer();
         customer.setId(42L);
         when(repository.findById(42L)).thenReturn(Optional.of(customer));
-        CustomerAccessService service = new CustomerAccessService(repository, "environment-admin");
+        CustomerAccessService service = new CustomerAccessService(repository, "environment-admin", mock(org.springframework.context.ApplicationEventPublisher.class));
         String[] expectedRoles = {"USER", "ADMIN", "ADMIN", "SUPER_ADMIN", "DRIVER"};
 
         for (int level = 0; level <= 4; level++) {
@@ -35,7 +35,7 @@ class CustomerAccessServiceTest {
     @Test
     void environmentAdminIsAlwaysLevelThreeAndInvalidAssignmentsFailClosed() {
         CustomerRepository repository = mock(CustomerRepository.class);
-        CustomerAccessService service = new CustomerAccessService(repository, "environment-admin");
+        CustomerAccessService service = new CustomerAccessService(repository, "environment-admin", mock(org.springframework.context.ApplicationEventPublisher.class));
 
         assertThat(service.findByUsername("environment-admin").level()).isEqualTo(3);
         assertThatThrownBy(() -> service.assignAccessLevel(1L, 5))

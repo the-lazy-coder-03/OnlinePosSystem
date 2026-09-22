@@ -33,8 +33,5 @@ add feature for topping adding ,select which cat(ie pizza or burger or what ever
 -add specials 
 -add logic to auto apply specials 
 -Add banner to advertise special for specific day 
--make the add to cart button stick to the button of the page
--remove topping prices by the deafult items
--make the button the same size once logged in
--hide address field if its collection
-
+-add password verification before allowing signup 
+-make admin accounts not need location 

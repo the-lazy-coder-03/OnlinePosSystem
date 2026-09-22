@@ -20,11 +20,14 @@ public class CustomerAccessService implements AccountAccessReader, AccountAccess
 
     private final CustomerRepository customerRepository;
     private final String environmentAdminUsername;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     public CustomerAccessService(CustomerRepository customerRepository,
-                                 @Value("${ADMIN_USERNAME}") String environmentAdminUsername) {
+                                 @Value("${ADMIN_USERNAME}") String environmentAdminUsername,
+                                 org.springframework.context.ApplicationEventPublisher events) {
         this.customerRepository = customerRepository;
         this.environmentAdminUsername = environmentAdminUsername;
+        this.events = events;
     }
 
     @Override
@@ -64,6 +67,7 @@ public class CustomerAccessService implements AccountAccessReader, AccountAccess
         customer.setAccessLevel(validated.level());
         customer.setRole(roleFor(validated.level()));
         customerRepository.save(customer);
+        events.publishEvent(new org.example.onlinepossystem.customer.api.AccountAccessChanged(customer.getId(), customer.getEmail()));
     }
 
     private AccountAccessSummary toSummary(Customer customer) {

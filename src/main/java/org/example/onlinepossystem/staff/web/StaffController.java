@@ -6,10 +6,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-/**
- * REST API Controller for Staff authentication.
- * Handles PIN-based login for branch staff.
- */
+/** Legacy staff records are retained for super-admin maintenance only. */
 @RestController
 @RequestMapping("/api/staff")
 public class StaffController {
@@ -20,32 +17,11 @@ public class StaffController {
         this.staffOperations = staffOperations;
     }
 
-    /**
-     * POST /api/staff/login
-     * Authenticate staff using PIN or 16-character code.
-     *
-     * Request Body: { "pin": "1234" } or { "code": "..." }
-     * Response:
-     *   - Success: { "success": true, "branch": "Kenridge" }
-     *   - Failure: { "success": false, "message": "Invalid credentials" }
-     */
+    /** Tell older POS clients where named account login has moved. */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
-        String enteredPin = request.get("pin");
-        String enteredCode = request.get("code");
-
-        if ((enteredCode == null || enteredCode.isEmpty()) && (enteredPin == null || enteredPin.isEmpty())) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", "PIN or Code is required"));
-        }
-
-        return staffOperations.authenticate(enteredPin, enteredCode)
-                .<ResponseEntity<?>>map(branch -> ResponseEntity.ok(Map.of(
-                        "success", true,
-                        "branch", branch
-                )))
-                .orElseGet(() -> ResponseEntity.status(401)
-                        .body(Map.of("success", false, "message", "Invalid credentials")));
+    public ResponseEntity<?> login() {
+        return ResponseEntity.status(410).body(Map.of("success", false,
+                "message", "PIN/code login has been retired. Sign in with your admin account at /admin/login."));
     }
 
     /**

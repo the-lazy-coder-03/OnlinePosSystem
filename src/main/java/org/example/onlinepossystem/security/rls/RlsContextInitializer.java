@@ -12,7 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 /** Runs only on the connection whose JPA transaction has just begun. */
-public final class RlsContextInitializer {
+public class RlsContextInitializer {
     private static final Logger logger = LoggerFactory.getLogger(RlsContextInitializer.class);
 
     public void initialize(Connection connection) throws SQLException {

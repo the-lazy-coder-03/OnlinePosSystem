@@ -37,9 +37,9 @@ public class StaffLoginTest {
         mockMvc.perform(post("/api/staff/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\": \"" + code + "\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.branch").value("Kenridge"));
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("/admin/login")));
     }
 
     @Test
@@ -48,12 +48,12 @@ public class StaffLoginTest {
         mockMvc.perform(post("/api/staff/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\": \"INVALID_CODE_123\"}"))
-                .andExpect(status().isUnauthorized())
+                .andExpect(status().isGone())
                 .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
-    public void testLoginWithPinStillWorks() throws Exception {
+    public void testPinLoginIsRetired() throws Exception {
         // Given
         String pin = "5678";
         staffService.createStaff("Uitzicht Staff", "Uitzicht", pin, "UITZICHT_1234567");
@@ -62,8 +62,8 @@ public class StaffLoginTest {
         mockMvc.perform(post("/api/staff/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"pin\": \"" + pin + "\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.branch").value("Uitzicht"));
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("/admin/login")));
     }
 }

@@ -22,9 +22,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private static final String BRANCH_ADMIN_PREFIX = "/topic/admin/branches/";
 
     private final AccountAccessReader accountAccessReader;
+    private final AccountWebSocketSessions sessions;
 
-    public WebSocketConfig(AccountAccessReader accountAccessReader) {
+    public WebSocketConfig(AccountAccessReader accountAccessReader, AccountWebSocketSessions sessions) {
         this.accountAccessReader = accountAccessReader;
+        this.sessions = sessions;
     }
 
     @Override
@@ -41,6 +43,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(new org.springframework.security.messaging.context.SecurityContextChannelInterceptor());
         registration.interceptors(new ChannelInterceptor() {
             @Override
             public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -69,6 +72,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 return message;
             }
         });
+    }
+
+    @Override
+    public void configureWebSocketTransport(org.springframework.web.socket.config.annotation.WebSocketTransportRegistration registration) {
+        registration.addDecoratorFactory(sessions::decorate);
     }
 
     private Integer branchId(String destination) {

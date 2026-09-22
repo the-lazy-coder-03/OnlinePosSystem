@@ -169,7 +169,6 @@
         /* ========================
            SECTIONS
         ======================== */
-        #loginSection { display: block; }
         #queueSection { display: none; }
         #singleOrderSection { display: none; }
 
@@ -178,14 +177,6 @@
 <body>
 
 <div class="container">
-    <!-- LOGIN -->
-    <div id="loginSection" th:style="${adminMode == true} ? 'display:none;' : 'display:block;'">
-        <h2>Staff Login</h2>
-        <input type="password" id="codeInput" placeholder="Enter 16-character Code" maxlength="16" style="padding:10px;font-size:1.2rem;border-radius:10px;border:2px solid #0073e6; width: 60%;"><br><br>
-        <button onclick="login()" style="padding:10px 25px;font-size:1rem;background:#0073e6;color:white;border:none;border-radius:10px;">Login</button>
-        <p id="codeError" style="color:red; display:none;">Invalid Code</p>
-    </div>
-
     <!-- ORDER QUEUE / DASHBOARD -->
     <div id="queueSection" th:style="${adminMode == true} ? 'display:block;' : 'display:none;'">
         <div class="branchLabel" id="branchLabelQueue"></div>
@@ -210,6 +201,8 @@
 <script src="/js/stomp-client.js"></script>
 <script th:inline="javascript">
     const ADMIN_MODE = /*[[${adminMode ?: false}]]*/ false;
+    const ADMIN_BRANCH_ID = /*[[${adminBranchId}]]*/ null;
+    const ADMIN_BRANCH_NAME = /*[[${adminBranchName}]]*/ null;
     let currentBranch = '';
     let branchOrders = [];
     let orderIndex = 0;
@@ -230,57 +223,13 @@
     }
 
     function startAdminOrdersPage() {
-        currentBranch = 'All Branches';
-        document.getElementById('branchLabelQueue').innerText = 'Admin: All Branches';
+        currentBranch = ADMIN_BRANCH_NAME || 'All Branches';
+        document.getElementById('branchLabelQueue').innerText = `Admin: ${currentBranch}`;
         fetchBranchOrders().then(() => {
             processedOrders = [];
             showQueue();
             connectOrderStream();
         });
-    }
-
-    // LOGIN - Now connects to backend
-    async function login() {
-        const code = document.getElementById('codeInput').value;
-        document.getElementById('codeError').style.display = 'none';
-
-        if (code.length !== 16) {
-            document.getElementById('codeError').style.display = 'block';
-            document.getElementById('codeError').innerText = 'Code must be exactly 16 characters long';
-            return;
-        }
-
-        try {
-            // Call backend API to authenticate
-            const response = await fetch(`${API_BASE_URL}/staff/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: code })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Login successful
-                currentBranch = data.branch;
-                document.getElementById('loginSection').style.display = 'none';
-                document.getElementById('queueSection').style.display = 'block';
-                document.getElementById('branchLabelQueue').innerText = `Branch: ${currentBranch}`;
-
-                // Fetch orders for this branch
-                await fetchBranchOrders();
-                processedOrders = [];
-                showQueue();
-            } else {
-                // Login failed
-                document.getElementById('codeError').style.display = 'block';
-                document.getElementById('codeError').innerText = data.message || 'Invalid Code';
-            }
-        } catch (error) {
-            console.error('Login error:', error);
-            document.getElementById('codeError').style.display = 'block';
-            document.getElementById('codeError').innerText = 'Error connecting to server';
-        }
     }
 
     // FETCH ORDERS FROM BACKEND
@@ -339,7 +288,8 @@
             onConnect: () => {
                 liveReconnectDelayMs = 1000;
                 setLiveStatus('Live order updates connected.');
-                liveStompClient.subscribe(ADMIN_ORDER_TOPIC, frame => {
+                const topic = ADMIN_BRANCH_ID ? `/topic/admin/branches/${ADMIN_BRANCH_ID}/orders` : ADMIN_ORDER_TOPIC;
+                liveStompClient.subscribe(topic, frame => {
                     try {
                         const payload = JSON.parse(frame.body);
                         const order = payload.order || payload;
