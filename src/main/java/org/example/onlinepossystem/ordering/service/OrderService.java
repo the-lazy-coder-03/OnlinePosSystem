@@ -5,6 +5,7 @@ import org.example.onlinepossystem.branch.api.BranchView;
 import org.example.onlinepossystem.customer.api.CustomerAccount;
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
 import org.example.onlinepossystem.customer.api.CustomerOrderRecorder;
+import org.example.onlinepossystem.customer.api.EnvironmentAdminAccount;
 import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
 import org.example.onlinepossystem.ordering.api.CustomerOrderSummary;
 import org.example.onlinepossystem.ordering.api.OrderEventPublisher;
@@ -26,6 +27,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     private final BranchLookup branchLookup;
     private final CustomerAccountReader customerAccountReader;
     private final CustomerOrderRecorder customerOrderRecorder;
+    private final EnvironmentAdminAccount environmentAdminAccount;
     private final OrderRequestValidator orderRequestValidator;
     private final MenuOrderItemFactory menuOrderItemFactory;
     private final PizzaOrderItemFactory pizzaOrderItemFactory;
@@ -38,6 +40,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
                         BranchLookup branchLookup,
                         CustomerAccountReader customerAccountReader,
                         CustomerOrderRecorder customerOrderRecorder,
+                        EnvironmentAdminAccount environmentAdminAccount,
                         OrderRequestValidator orderRequestValidator,
                         MenuOrderItemFactory menuOrderItemFactory,
                         PizzaOrderItemFactory pizzaOrderItemFactory,
@@ -49,6 +52,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         this.branchLookup = branchLookup;
         this.customerAccountReader = customerAccountReader;
         this.customerOrderRecorder = customerOrderRecorder;
+        this.environmentAdminAccount = environmentAdminAccount;
         this.orderRequestValidator = orderRequestValidator;
         this.menuOrderItemFactory = menuOrderItemFactory;
         this.pizzaOrderItemFactory = pizzaOrderItemFactory;
@@ -67,9 +71,22 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     @Override
     @Transactional
     public OrderResponseDTO placeOrderForCustomer(OrderRequestDTO request, String customerEmail) {
+        CustomerAccount customer = resolveCustomer(customerEmail);
+        return saveOrder(request, customer);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponseDTO placeOrderForEnvironmentAdmin(OrderRequestDTO request) {
+        Long customerId = environmentAdminAccount.ensureCustomerId();
+        CustomerAccount customer = customerAccountReader.findById(customerId)
+                .orElseThrow(() -> new IllegalStateException("Internal admin customer is missing."));
+        return saveOrder(request, customer);
+    }
+
+    private OrderResponseDTO saveOrder(OrderRequestDTO request, CustomerAccount customer) {
         orderRequestValidator.validate(request);
         BranchView branch = branchLookup.requireByName(request.getBranchName());
-        CustomerAccount customer = resolveCustomer(customerEmail);
         LocalDateTime createdAt = LocalDateTime.now();
 
         Order order = new Order();
@@ -112,13 +129,20 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         }
 
         return customerAccountReader.findByEmail(customerEmail)
-                .map(customer -> orderRepository
-                        .findByCustomerIdOrderByCreatedAtDesc(customer.id(), PageRequest.of(0, limit))
-                        .stream()
-                        .map(orderResponseMapper::toDto)
-                        .map(customerOrderSummaryMapper::toSummary)
-                        .toList())
+                .map(customer -> recentOrders(customer.id(), limit))
                 .orElseGet(List::of);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CustomerOrderSummary> getRecentOrdersForCustomerId(Long customerId, int limit) {
+        if (customerId == null || customerId < 1 || limit < 1) return List.of();
+        return recentOrders(customerId, limit);
+    }
+
+    private List<CustomerOrderSummary> recentOrders(Long customerId, int limit) {
+        return orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId, PageRequest.of(0, limit))
+                .stream().map(orderResponseMapper::toDto).map(customerOrderSummaryMapper::toSummary).toList();
     }
 
     @Override

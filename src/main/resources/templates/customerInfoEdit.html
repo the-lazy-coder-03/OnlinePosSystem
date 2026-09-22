@@ -289,8 +289,8 @@
     <div class="sidebar">
         <button class="back-btn" onclick="goBack()">← Back to Home</button>
         <h3>Account Menu</h3>
-        <button class="tab-btn active" data-tab="profile">1. Edit Profile</button>
-        <button class="tab-btn" data-tab="orders">2. Past Orders</button>
+        <button class="tab-btn active" data-tab="profile" th:unless="${readOnlyHistory}">1. Edit Profile</button>
+        <button class="tab-btn" th:classappend="${readOnlyHistory} ? ' active' : ''" data-tab="orders" th:text="${readOnlyHistory} ? 'Order History' : '2. Past Orders'">2. Past Orders</button>
     </div>
 
     <!-- =========================
@@ -301,7 +301,7 @@
         <!-- =========================
              3.1 PROFILE TAB
         ========================= -->
-        <div class="tab-content active" id="profile">
+        <div class="tab-content active" id="profile" th:unless="${readOnlyHistory}">
             <h2>1. Edit Profile</h2>
             <div th:if="${param.success}" class="message">Profile updated successfully!</div>
             <div th:if="${param.error != null and param.error[0] == 'password'}" class="message">Password must be at least 8 characters and include uppercase, lowercase, number, and special character.</div>
@@ -336,8 +336,8 @@
         <!-- =========================
              3.2 ORDERS TAB
         ========================= -->
-        <div class="tab-content" id="orders">
-            <h2>2. Past Orders</h2>
+        <div class="tab-content" th:classappend="${readOnlyHistory} ? ' active' : ''" id="orders">
+            <h2 th:text="${readOnlyHistory} ? 'Order History' : '2. Past Orders'">2. Past Orders</h2>
             <div id="ordersContainer">
                 <div th:if="${#lists.isEmpty(recentOrders)}" class="empty-orders">
                     No recent orders yet.
@@ -420,9 +420,10 @@
     // TRACK FORM CHANGES
     // =========================
     const profileForm = document.getElementById("profileForm");
-    profileForm.addEventListener("input", () => { isProfileDirty = true; });
-
-    profileForm.addEventListener('submit', () => { isProfileDirty = false; });
+    if (profileForm) {
+        profileForm.addEventListener("input", () => { isProfileDirty = true; });
+        profileForm.addEventListener('submit', () => { isProfileDirty = false; });
+    }
 
     window.addEventListener("beforeunload", (e) => {
         if(isProfileDirty){
