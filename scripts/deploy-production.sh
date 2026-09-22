@@ -11,6 +11,7 @@ PUBLIC_HOST="${PUBLIC_HOST:-crowdcam.co.za}"
 ROLLBACK_TAG="onlinepossystem-app:rollback-${DEPLOY_SHA}"
 OLD_CONTAINER_ID=""
 OLD_IMAGE_ID=""
+ROLLBACK_AVAILABLE=false
 APP_RECREATED=false
 
 cleanup() {
@@ -31,7 +32,7 @@ rollback() {
   set +e
   echo "Deployment failed; restoring the previous application container." >&2
 
-  if [[ "$APP_RECREATED" == "true" && -n "$OLD_IMAGE_ID" ]]; then
+  if [[ "$APP_RECREATED" == "true" && "$ROLLBACK_AVAILABLE" == "true" ]]; then
     docker tag "$ROLLBACK_TAG" onlinepossystem-app:latest
     compose up -d --no-deps --force-recreate app
   elif [[ -n "$OLD_CONTAINER_ID" ]]; then
@@ -70,13 +71,18 @@ chmod 600 SupportConfigFiles/.env
 export GIT_SHA="$DEPLOY_SHA"
 
 compose up -d db
-compose build app migrate
-
 OLD_CONTAINER_ID="$(compose ps -q app 2>/dev/null || true)"
 if [[ -n "$OLD_CONTAINER_ID" ]]; then
   OLD_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$OLD_CONTAINER_ID")"
-  docker tag "$OLD_IMAGE_ID" "$ROLLBACK_TAG"
+  if docker image inspect "$OLD_IMAGE_ID" >/dev/null 2>&1; then
+    docker tag "$OLD_IMAGE_ID" "$ROLLBACK_TAG"
+  else
+    docker commit --pause=false "$OLD_CONTAINER_ID" "$ROLLBACK_TAG" >/dev/null
+  fi
+  ROLLBACK_AVAILABLE=true
 fi
+
+compose build app migrate
 
 trap rollback ERR
 if [[ -n "$OLD_CONTAINER_ID" ]]; then
@@ -115,7 +121,7 @@ curl --fail --silent --show-error --max-time 10 \
   --resolve "${PUBLIC_HOST}:443:127.0.0.1" "https://${PUBLIC_HOST}/" >/dev/null
 
 trap - ERR
-if [[ -n "$OLD_IMAGE_ID" ]]; then
+if [[ "$ROLLBACK_AVAILABLE" == "true" ]]; then
   docker image rm "$ROLLBACK_TAG" >/dev/null 2>&1 || true
 fi
 compose ps
