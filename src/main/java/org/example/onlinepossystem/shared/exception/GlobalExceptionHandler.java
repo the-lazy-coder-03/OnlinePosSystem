@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.validation.BindException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -23,6 +24,15 @@ import java.util.NoSuchElementException;
 public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public String handleNoResourceFoundException(NoResourceFoundException ex, Model model) {
+        logger.info("Resource not found: {}", ex.getResourcePath());
+        model.addAttribute("status", 404);
+        model.addAttribute("message", "The requested resource was not found.");
+        return "error";
+    }
 
     @ExceptionHandler(NoSuchElementException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)

@@ -15,6 +15,7 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.orm.jpa.EntityManagerFactoryUtils;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -415,6 +416,16 @@ class RlsPostgresIT {
         var environmentAdmin = accounts.loadUserByUsername("environment-admin");
         var driverAccount = accounts.loadUserByUsername("driver@example.com");
         String orderRequest = "{\"customerName\":\"Named Admin\",\"branchName\":\"Uitzicht\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}";
+        var loginRedirect = mvc.perform(get("/order"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/login")))
+                .andReturn();
+        var namedSuperSession = (MockHttpSession) loginRedirect.getRequest().getSession(false);
+        mvc.perform(post("/login").session(namedSuperSession).with(csrf())
+                        .with(request -> { request.setRemoteAddr("198.51.100.20"); return request; })
+                        .param("username", "super@example.com").param("password", "admin-pass"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/order")));
         mvc.perform(get("/api/orders/menu").param("branch", "Kenridge"))
                 .andExpect(status().isOk());
         mvc.perform(post("/api/orders").with(user(customer)).contentType(MediaType.APPLICATION_JSON)
@@ -422,9 +433,9 @@ class RlsPostgresIT {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber());
         mvc.perform(get("/profile/edit").with(user(customer)))
                 .andExpect(status().isOk());
-        mvc.perform(get("/order").with(user(namedSuper)))
+        mvc.perform(get("/order").session(namedSuperSession))
                 .andExpect(status().isOk()).andExpect(view().name("PlaceOrder"));
-        var superOrder = mvc.perform(post("/api/orders").with(user(namedSuper))
+        var superOrder = mvc.perform(post("/api/orders").session(namedSuperSession)
                         .contentType(MediaType.APPLICATION_JSON).content(orderRequest))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber())
                 .andReturn();

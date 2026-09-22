@@ -114,10 +114,11 @@ public class AdminAccessTest {
     public void testAdminLoginSuccess() throws Exception {
         mockMvc.perform(post("/login")
                 .with(csrf())
+                .param("adminLogin", "true")
                 .param("username", "admin")
                 .param("password", "admin"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/"));
+                .andExpect(redirectedUrl("/admin"));
     }
 
     @Test
@@ -132,10 +133,20 @@ public class AdminAccessTest {
         mockMvc.perform(post("/login")
                 .session(session)
                 .with(csrf())
+                .param("adminLogin", "true")
                 .param("username", "admin")
                 .param("password", "admin"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string(HttpHeaders.LOCATION, containsString("/admin")));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    public void testMissingAuthenticatedRouteReturnsNotFound() throws Exception {
+        mockMvc.perform(get("/radmin"))
+                .andExpect(status().isNotFound())
+                .andExpect(view().name("error"))
+                .andExpect(model().attribute("status", 404));
     }
 
     @Test

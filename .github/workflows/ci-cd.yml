@@ -63,6 +63,9 @@ jobs:
       - name: Build jar
         run: ./Misc/mvnw -f Misc/pom.xml -B package -DskipTests
 
+      - name: Validate deployment script
+        run: bash -n scripts/deploy-production.sh
+
   deploy:
     name: Deploy to Azure VM
     runs-on: ubuntu-latest
@@ -71,6 +74,9 @@ jobs:
     timeout-minutes: 25
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
       - name: Validate required secrets
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
@@ -179,6 +185,17 @@ jobs:
             runtime/online-pos-system.env \
             "${AZURE_VM_USER}@${AZURE_VM_HOST}:${remote_env}"
 
+      - name: Upload deployment script
+        env:
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+          AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
+        run: |
+          remote_script="/tmp/online-pos-system-deploy-${GITHUB_SHA}.sh"
+          scp -i ~/.ssh/online-pos-azure -P "${AZURE_VM_PORT:-22}" \
+            scripts/deploy-production.sh \
+            "${AZURE_VM_USER}@${AZURE_VM_HOST}:${remote_script}"
+
       - name: Deploy Docker Compose stack
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
@@ -194,52 +211,8 @@ jobs:
           quoted_branch="$(printf '%q' "$GITHUB_REF_NAME")"
           quoted_sha="$(printf '%q' "$GITHUB_SHA")"
           quoted_runtime_env_created="$(printf '%q' "$RUNTIME_ENV_CREATED")"
+          remote_script="/tmp/online-pos-system-deploy-${GITHUB_SHA}.sh"
+          quoted_remote_script="$(printf '%q' "$remote_script")"
 
           ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
-            "REMOTE_ENV=${quoted_remote_env} REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} RUNTIME_ENV_CREATED=${quoted_runtime_env_created} bash -s" <<'REMOTE'
-          set -euo pipefail
-
-          compose() {
-            docker compose --env-file SupportConfigFiles/.env -f SupportConfigFiles/docker-compose.yml -p onlinepossystem "$@"
-          }
-
-          test -d "$REMOTE_APP_DIR/.git" || (echo "Remote app directory is not a git repository: $REMOTE_APP_DIR" && exit 1)
-          command -v git >/dev/null 2>&1 || (echo "git is not installed on the server" && exit 1)
-          command -v docker >/dev/null 2>&1 || (echo "docker is not installed on the server" && exit 1)
-
-          cd "$REMOTE_APP_DIR"
-          git fetch origin "$DEPLOY_BRANCH"
-          git checkout "$DEPLOY_BRANCH"
-          git pull --ff-only origin "$DEPLOY_BRANCH"
-
-          mkdir -p SupportConfigFiles
-          if [[ "$RUNTIME_ENV_CREATED" == "true" ]]; then
-            test -f "$REMOTE_ENV" || (echo "Uploaded environment file missing: $REMOTE_ENV" && exit 1)
-            mv "$REMOTE_ENV" SupportConfigFiles/.env
-          fi
-
-          test -f SupportConfigFiles/.env || (echo "SupportConfigFiles/.env is missing on the server" && exit 1)
-          chmod 600 SupportConfigFiles/.env
-
-          compose up -d db
-          compose build app migrate
-          # Stop the old runtime before changing ownership or enforcing RLS.
-          compose stop app
-          compose run --rm provision
-          compose run --rm migrate
-          compose up -d app nginx certbot-renew
-
-          for i in $(seq 1 60); do
-            if curl --fail --silent --show-error --max-time 10 \
-              --resolve crowdcam.co.za:443:127.0.0.1 \
-              https://crowdcam.co.za/ >/dev/null; then
-              compose ps
-              exit 0
-            fi
-            sleep 2
-          done
-
-          compose ps || true
-          compose logs --tail=160 app nginx || true
-          exit 1
-          REMOTE
+            "REMOTE_ENV=${quoted_remote_env} REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} RUNTIME_ENV_CREATED=${quoted_runtime_env_created} bash ${quoted_remote_script}"

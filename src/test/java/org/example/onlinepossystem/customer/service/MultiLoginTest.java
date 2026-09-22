@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,6 +64,102 @@ public class MultiLoginTest {
                         .content("{\"customerName\":\"Named Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").isNumber());
+    }
+
+    @Test
+    public void namedSuperAdminReturnsToSavedOrderPageAfterLogin() throws Exception {
+        String email = "named-super-login@example.com";
+        String password = "Password1!";
+        Customer customer = customerService.registerCustomer(
+                "Named", "Login", email, password, "0712345688", null,
+                "12", "Main Street", "Kenridge", null, "Kenridge Branch", "7550"
+        );
+        accessAdministration.assignAccessLevel(customer.getId(), 3);
+
+        MvcResult loginRedirect = mockMvc.perform(MockMvcRequestBuilders.get("/order"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", containsString("/login")))
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) loginRedirect.getRequest().getSession(false);
+
+        MvcResult login = mockMvc.perform(MockMvcRequestBuilders.post("/login")
+                        .session(session)
+                        .with(request -> { request.setRemoteAddr("198.51.100.10"); return request; })
+                        .with(csrf())
+                        .param("username", email)
+                        .param("password", password))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/order")))
+                .andExpect(authenticated().withUsername(email))
+                .andReturn();
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/order")
+                        .session((MockHttpSession) login.getRequest().getSession(false)))
+                .andExpect(status().isOk())
+                .andExpect(view().name("PlaceOrder"));
+    }
+
+    @Test
+    public void invalidSavedDestinationFallsBackAfterSuccessfulLogin() throws Exception {
+        String email = "saved-target@example.com";
+        String password = "Password1!";
+        customerService.registerCustomer(
+                "Saved", "Target", email, password, "0712345687", null,
+                "12", "Main Street", "Kenridge", null, "Kenridge Branch", "7550"
+        );
+
+        MvcResult loginRedirect = mockMvc.perform(MockMvcRequestBuilders.get("/radmin"))
+                .andExpect(status().is3xxRedirection())
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) loginRedirect.getRequest().getSession(false);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/login")
+                        .session(session)
+                        .with(request -> { request.setRemoteAddr("198.51.100.11"); return request; })
+                        .with(csrf())
+                        .param("username", email)
+                        .param("password", password))
+                .andExpect(status().isFound())
+                .andExpect(redirectedUrl("/"))
+                .andExpect(authenticated().withUsername(email));
+    }
+
+    @Test
+    public void duplicateLoginWithRotatedCsrfIsRejectedButSessionStaysAuthenticated() throws Exception {
+        String email = "duplicate-login@example.com";
+        String password = "Password1!";
+        customerService.registerCustomer(
+                "Duplicate", "Login", email, password, "0712345686", null,
+                "12", "Main Street", "Kenridge", null, "Kenridge Branch", "7550"
+        );
+
+        MvcResult loginPage = mockMvc.perform(MockMvcRequestBuilders.get("/login"))
+                .andExpect(status().isOk())
+                .andReturn();
+        MockHttpSession session = (MockHttpSession) loginPage.getRequest().getSession(false);
+        CsrfToken csrfToken = (CsrfToken) loginPage.getRequest().getAttribute(CsrfToken.class.getName());
+        assertNotNull(csrfToken);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/login")
+                        .session(session)
+                        .with(request -> { request.setRemoteAddr("198.51.100.12"); return request; })
+                        .param(csrfToken.getParameterName(), csrfToken.getToken())
+                        .param("username", email)
+                        .param("password", password))
+                .andExpect(status().isFound())
+                .andExpect(authenticated().withUsername(email));
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/login")
+                        .session(session)
+                        .with(request -> { request.setRemoteAddr("198.51.100.12"); return request; })
+                        .param(csrfToken.getParameterName(), csrfToken.getToken())
+                        .param("username", email)
+                        .param("password", password))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/order").session(session))
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(email));
     }
 
     @Test
