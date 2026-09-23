@@ -3,6 +3,7 @@ package org.example.onlinepossystem.customer.service;
 import org.example.onlinepossystem.customer.entity.Customer;
 import org.example.onlinepossystem.customer.api.AccountAccessAdministration;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
+import org.example.onlinepossystem.ordering.repository.OrderRepository;
 import org.example.onlinepossystem.security.api.RateLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,9 @@ public class MultiLoginTest {
 
     @Autowired
     private CustomerRepository customerRepository;
+
+    @Autowired
+    private OrderRepository orderRepository;
 
     @Autowired
     private AccountAccessAdministration accessAdministration;
@@ -173,15 +177,23 @@ public class MultiLoginTest {
     }
 
     @Test
-    public void environmentSuperAdminCannotPlaceCustomerOrder() throws Exception {
+    public void environmentSuperAdminCanPlaceLinkedCustomerOrder() throws Exception {
         UserDetails principal = userDetailsService.loadUserByUsername("admin");
 
         mockMvc.perform(MockMvcRequestBuilders.get("/order").with(user(principal)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
         mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(user(principal))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"customerName\":\"Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNumber());
+
+        Customer internalAccount = customerRepository.findByEnvironmentAdminTrue().orElseThrow();
+        assertNull(internalAccount.getEmail());
+        assertNull(internalAccount.getPassword());
+        assertEquals(3, internalAccount.getAccessLevel());
+        assertTrue(orderRepository.findAll().stream()
+                .anyMatch(order -> internalAccount.getId().equals(order.getCustomerId())));
     }
 
     @Test

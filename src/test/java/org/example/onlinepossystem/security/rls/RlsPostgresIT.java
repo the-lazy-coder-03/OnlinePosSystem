@@ -450,7 +450,36 @@ class RlsPostgresIT {
                 assertThat(result.getLong("branch_id")).isEqualTo(2);
             }
         }
-        for (var blocked : List.of(branchAdmin, driverAccount, environmentAdmin)) {
+        mvc.perform(get("/order").with(user(environmentAdmin)))
+                .andExpect(status().isOk()).andExpect(view().name("PlaceOrder"));
+        var environmentOrder = mvc.perform(post("/api/orders").with(user(environmentAdmin))
+                        .contentType(MediaType.APPLICATION_JSON).content(orderRequest))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber())
+                .andReturn();
+        long environmentOrderId = application.getBean(ObjectMapper.class)
+                .readTree(environmentOrder.getResponse().getContentAsString()).path("id").asLong();
+        try (Connection c = ownerConnection(); var statement = c.prepareStatement("""
+                SELECT o.customer_id, c.environment_admin, c.email, c.password
+                FROM customer_order o JOIN customers c ON c.id = o.customer_id
+                WHERE o.order_id = ?
+                """)) {
+            statement.setLong(1, environmentOrderId);
+            try (var result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getBoolean("environment_admin")).isTrue();
+                assertThat(result.getString("email")).isNull();
+                assertThat(result.getString("password")).isNull();
+            }
+        }
+        mvc.perform(get("/profile/edit").with(user(environmentAdmin)))
+                .andExpect(status().isOk()).andExpect(view().name("customerInfoEdit"))
+                .andExpect(model().attribute("readOnlyHistory", true));
+        try (Connection c = ownerConnection(); var statement = c.createStatement();
+             var result = statement.executeQuery("SELECT count(*) FROM customers WHERE environment_admin")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getInt(1)).isEqualTo(1);
+        }
+        for (var blocked : List.of(branchAdmin, driverAccount)) {
             mvc.perform(get("/order").with(user(blocked))).andExpect(status().isForbidden());
             mvc.perform(post("/api/orders").with(user(blocked))
                     .contentType(MediaType.APPLICATION_JSON).content(orderRequest))

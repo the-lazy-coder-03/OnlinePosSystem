@@ -3,7 +3,6 @@ package org.example.onlinepossystem.profile.web;
 import org.example.onlinepossystem.profile.dto.ProfilePageView;
 import org.example.onlinepossystem.profile.service.ProfilePageService;
 import org.example.onlinepossystem.customer.api.EnvironmentAdminAccount;
-import org.example.onlinepossystem.security.api.AccountPrincipal;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -24,8 +23,8 @@ public class ProfileController {
         if (authentication == null || !authentication.isAuthenticated()) {
             return "redirect:/login";
         }
-        if (authentication.getPrincipal() instanceof AccountPrincipal principal && principal.environmentAdmin()) {
-            Long customerId = environmentAdminAccount.ensureCustomerId();
+        if (environmentAdminAccount.matches(authentication.getPrincipal())) {
+            Long customerId = environmentAdminAccount.ensureCustomerId(authentication.getPrincipal());
             model.addAttribute("readOnlyHistory", true);
             return profilePageService.getProfilePageForCustomerId(customerId)
                     .map(profile -> populateProfileModel(model, profile))

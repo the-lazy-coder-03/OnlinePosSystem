@@ -58,6 +58,22 @@ public class PizzaCatalogAdminService {
     }
 
     @Transactional
+    public int updatePizzaCategoryPrice(Integer branchId, Integer categoryId, Integer pizzaSizeId, String price, String actor) {
+        double amount = CatalogAdminSupport.requiredPrice(price);
+        branchLookup.requireById(branchId);
+        pizzaCategoryRepository.findById(categoryId)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Category not found: " + categoryId));
+        pizzaSizeRepository.findById(pizzaSizeId)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Pizza size not found: " + pizzaSizeId));
+        List<BranchPizzaPrice> prices = branchPizzaPriceRepository.findCategoryPrices(branchId, categoryId, pizzaSizeId);
+        prices.forEach(record -> record.setPrice(amount));
+        branchPizzaPriceRepository.saveAll(prices);
+        logger.info("Admin action=updatePizzaCategoryPrice branchId={} categoryId={} sizeId={} price={} count={} admin={}",
+                branchId, categoryId, pizzaSizeId, amount, prices.size(), CatalogAdminSupport.actorName(actor));
+        return prices.size();
+    }
+
+    @Transactional
     public void savePizza(Integer id, String name, Integer categoryId, String description,
                           List<Integer> ingredientIds, Map<String, String> parameters, String actor) {
         boolean creating = id == null;

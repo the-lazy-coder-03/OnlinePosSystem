@@ -11,6 +11,9 @@ import java.util.Optional;
 
 @Repository
 public interface BranchPizzaPriceRepository extends JpaRepository<BranchPizzaPrice, BranchPizzaPrice.BranchPizzaPriceId> {
+    @Query("select price from BranchPizzaPrice price where price.id.branchId = :branchId and price.pizza.category.id = :categoryId and price.id.pizzaSizeId = :pizzaSizeId")
+    List<BranchPizzaPrice> findCategoryPrices(@Param("branchId") Integer branchId, @Param("categoryId") Integer categoryId, @Param("pizzaSizeId") Integer pizzaSizeId);
+
     @Query("select price from BranchPizzaPrice price where price.id.branchId = :branchId")
     List<BranchPizzaPrice> findByBranchId(@Param("branchId") Integer branchId);
 

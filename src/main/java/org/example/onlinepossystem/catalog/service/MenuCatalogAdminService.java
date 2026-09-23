@@ -47,6 +47,20 @@ public class MenuCatalogAdminService {
     }
 
     @Transactional
+    public int updateMenuItemCategoryPrice(Integer branchId, Integer categoryId, String price, String actor) {
+        double amount = CatalogAdminSupport.requiredPrice(price);
+        branchLookup.requireById(branchId);
+        menuCategoryRepository.findById(categoryId)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Category not found: " + categoryId));
+        List<BranchMenuItemPrice> prices = branchMenuItemPriceRepository.findCategoryPrices(branchId, categoryId);
+        prices.forEach(record -> record.setPrice(amount));
+        branchMenuItemPriceRepository.saveAll(prices);
+        logger.info("Admin action=updateMenuItemCategoryPrice branchId={} categoryId={} price={} count={} admin={}",
+                branchId, categoryId, amount, prices.size(), CatalogAdminSupport.actorName(actor));
+        return prices.size();
+    }
+
+    @Transactional
     public void saveMenuItem(Integer id, String name, Integer categoryId, String description,
                              List<Integer> modifierGroupIds, Map<String, String> parameters, String actor) {
         boolean creating = id == null;

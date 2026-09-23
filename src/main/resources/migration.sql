@@ -100,6 +100,14 @@ ALTER TABLE public.customers
 ALTER TABLE public.customers
     ADD COLUMN IF NOT EXISTS environment_admin boolean NOT NULL DEFAULT false;
 
+UPDATE public.customers
+SET environment_admin = false
+WHERE environment_admin IS NULL;
+
+ALTER TABLE public.customers
+    ALTER COLUMN environment_admin SET DEFAULT false,
+    ALTER COLUMN environment_admin SET NOT NULL;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_customers_environment_admin
     ON public.customers (environment_admin) WHERE environment_admin;
 

@@ -33,6 +33,16 @@ public class CatalogAdminService implements CatalogAdministration {
     }
 
     @Override
+    public int updateMenuItemCategoryPrice(Integer branchId, Integer categoryId, String price, String actor) {
+        return menuAdminService.updateMenuItemCategoryPrice(branchId, categoryId, price, actor);
+    }
+
+    @Override
+    public int updatePizzaCategoryPrice(Integer branchId, Integer categoryId, Integer pizzaSizeId, String price, String actor) {
+        return pizzaAdminService.updatePizzaCategoryPrice(branchId, categoryId, pizzaSizeId, price, actor);
+    }
+
+    @Override
     public Map<String, Object> getDashboardAttributes(Integer branchId) {
         return dashboardService.getDashboardAttributes(branchId);
     }

@@ -27,6 +27,12 @@ class AdminControllerBranchAccessTest {
 
         assertThatThrownBy(() -> controller.updatePizzaPrice(2, 10, 3, 99.0, authentication))
                 .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> controller.updatePizzaCategoryPrice(2, 1, 3, "99.00", authentication,
+                new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap()))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> controller.updateMenuItemCategoryPrice(2, 1, "99.00", authentication,
+                new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap()))
+                .isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(catalog);
     }
 }

@@ -1,5 +1,7 @@
 package org.example.onlinepossystem.customer.api;
 
 public interface EnvironmentAdminAccount {
-    Long ensureCustomerId();
+    boolean matches(Object principal);
+
+    Long ensureCustomerId(Object principal);
 }

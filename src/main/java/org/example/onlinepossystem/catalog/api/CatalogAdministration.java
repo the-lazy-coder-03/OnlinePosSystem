@@ -12,6 +12,10 @@ public interface CatalogAdministration {
 
     void deletePizza(Integer id, String actor);
 
+    int updatePizzaCategoryPrice(Integer branchId, Integer categoryId, Integer pizzaSizeId, String price, String actor);
+
+    int updateMenuItemCategoryPrice(Integer branchId, Integer categoryId, String price, String actor);
+
     void updatePizzaPrice(Integer branchId, Integer pizzaId, Integer pizzaSizeId, Double price, String actor);
 
     void saveMenuItem(Integer id, String name, Integer categoryId, String description,

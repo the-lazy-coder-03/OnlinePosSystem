@@ -5,7 +5,6 @@ import org.example.onlinepossystem.branch.api.BranchView;
 import org.example.onlinepossystem.customer.api.CustomerAccount;
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
 import org.example.onlinepossystem.customer.api.CustomerOrderRecorder;
-import org.example.onlinepossystem.customer.api.EnvironmentAdminAccount;
 import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
 import org.example.onlinepossystem.ordering.api.CustomerOrderSummary;
 import org.example.onlinepossystem.ordering.api.OrderEventPublisher;
@@ -27,7 +26,6 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     private final BranchLookup branchLookup;
     private final CustomerAccountReader customerAccountReader;
     private final CustomerOrderRecorder customerOrderRecorder;
-    private final EnvironmentAdminAccount environmentAdminAccount;
     private final OrderRequestValidator orderRequestValidator;
     private final MenuOrderItemFactory menuOrderItemFactory;
     private final PizzaOrderItemFactory pizzaOrderItemFactory;
@@ -40,7 +38,6 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
                         BranchLookup branchLookup,
                         CustomerAccountReader customerAccountReader,
                         CustomerOrderRecorder customerOrderRecorder,
-                        EnvironmentAdminAccount environmentAdminAccount,
                         OrderRequestValidator orderRequestValidator,
                         MenuOrderItemFactory menuOrderItemFactory,
                         PizzaOrderItemFactory pizzaOrderItemFactory,
@@ -52,7 +49,6 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         this.branchLookup = branchLookup;
         this.customerAccountReader = customerAccountReader;
         this.customerOrderRecorder = customerOrderRecorder;
-        this.environmentAdminAccount = environmentAdminAccount;
         this.orderRequestValidator = orderRequestValidator;
         this.menuOrderItemFactory = menuOrderItemFactory;
         this.pizzaOrderItemFactory = pizzaOrderItemFactory;
@@ -77,10 +73,9 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
 
     @Override
     @Transactional
-    public OrderResponseDTO placeOrderForEnvironmentAdmin(OrderRequestDTO request) {
-        Long customerId = environmentAdminAccount.ensureCustomerId();
+    public OrderResponseDTO placeOrderForCustomerId(OrderRequestDTO request, Long customerId) {
         CustomerAccount customer = customerAccountReader.findById(customerId)
-                .orElseThrow(() -> new IllegalStateException("Internal admin customer is missing."));
+                .orElseThrow(() -> new IllegalArgumentException("Customer account is missing."));
         return saveOrder(request, customer);
     }
 
