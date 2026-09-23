@@ -1,5 +1,6 @@
 package org.example.onlinepossystem.security.config;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.example.onlinepossystem.security.JwtAuthenticationFilter;
 import org.example.onlinepossystem.security.AccountPrincipalRefreshFilter;
 import org.example.onlinepossystem.security.LoggingAuthenticationFailureHandler;
@@ -143,6 +144,8 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions
+                        .accessDeniedHandler((request, response, exception) ->
+                                response.setStatus(HttpServletResponse.SC_FORBIDDEN))
                         .defaultAuthenticationEntryPointFor(
                                 (request, response, exception) -> response.sendError(401, "Authentication is required"),
                                 new AntPathRequestMatcher("/api/**")
