@@ -36,7 +36,7 @@ rollback() {
     docker tag "$ROLLBACK_TAG" onlinepossystem-app:latest
     compose up -d --no-deps --force-recreate app
   elif [[ -n "$OLD_CONTAINER_ID" ]]; then
-    compose start app
+    docker start "$OLD_CONTAINER_ID" >/dev/null
   fi
 
   compose ps >&2
@@ -71,8 +71,12 @@ chmod 600 SupportConfigFiles/.env
 export GIT_SHA="$DEPLOY_SHA"
 
 compose up -d db
-OLD_CONTAINER_ID="$(compose ps -q app 2>/dev/null || true)"
+OLD_CONTAINER_ID="$(compose ps -aq app 2>/dev/null || true)"
 if [[ -n "$OLD_CONTAINER_ID" ]]; then
+  if [[ "$(docker inspect --format '{{.State.Running}}' "$OLD_CONTAINER_ID")" != "true" ]]; then
+    echo "Restarting the previous application container before deployment."
+    docker start "$OLD_CONTAINER_ID" >/dev/null
+  fi
   OLD_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$OLD_CONTAINER_ID")"
   if docker image inspect "$OLD_IMAGE_ID" >/dev/null 2>&1; then
     docker tag "$OLD_IMAGE_ID" "$ROLLBACK_TAG"
@@ -87,15 +91,11 @@ fi
 compose build app migrate
 
 trap rollback ERR
-if [[ -n "$OLD_CONTAINER_ID" ]]; then
-  compose stop app
-fi
-
 # These commands must never inherit the SSH command stream as standard input.
 compose run --rm --interactive=false provision </dev/null
 compose run --rm --interactive=false migrate </dev/null
-compose up -d --no-deps --force-recreate app
 APP_RECREATED=true
+compose up -d --no-deps --force-recreate app
 
 APP_CONTAINER_ID="$(compose ps -q app)"
 test -n "$APP_CONTAINER_ID"
