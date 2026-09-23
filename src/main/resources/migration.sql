@@ -851,16 +851,23 @@ INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALU
                                                                                 (1004, 10, 'Bacon & Cheese Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
                                                                                 (1005, 10, 'Chicken & Mayo Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
                                                                                 (1006, 10, 'Bacon & Banana Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
-                                                                                (1007, 10, 'Mince & Cheese Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE),
-
-                                                                                -- Desserts
-                                                                                (1101, 11, 'Magnum', 'Ola ice cream', FALSE, FALSE),
-                                                                                (1102, 11, 'Cornetto', 'Ola ice cream', FALSE, FALSE),
-                                                                                (1103, 11, 'Paddle Pop', 'Ola ice cream', FALSE, FALSE)
+                                                                                (1007, 10, 'Mince & Cheese Toasted Sandwich', 'Toasted sandwich', FALSE, FALSE)
 ON CONFLICT (id) DO UPDATE
     SET category_id = EXCLUDED.category_id,
         name = EXCLUDED.name,
         description = EXCLUDED.description,
+        is_300ml = EXCLUDED.is_300ml,
+        is_2l = EXCLUDED.is_2l,
+        active = TRUE;
+
+-- Dessert rows may already exist with generated IDs after being added through
+-- the admin catalog. Reuse those rows by their natural unique key.
+INSERT INTO menu_item (id, category_id, name, description, is_300ml, is_2l) VALUES
+    (1101, 11, 'Magnum', 'Ola ice cream', FALSE, FALSE),
+    (1102, 11, 'Cornetto', 'Ola ice cream', FALSE, FALSE),
+    (1103, 11, 'Paddle Pop', 'Ola ice cream', FALSE, FALSE)
+ON CONFLICT (category_id, name) DO UPDATE
+    SET description = EXCLUDED.description,
         is_300ml = EXCLUDED.is_300ml,
         is_2l = EXCLUDED.is_2l,
         active = TRUE;
@@ -975,11 +982,6 @@ INSERT INTO branch_menu_item_price (branch_id, menu_item_id, price) VALUES
                                                                         (1, 1006, 52.00),
                                                                         (1, 1007, 56.00),
 
-                                                                        -- Kenridge desserts
-                                                                        (1, 1101, 45.00),
-                                                                        (1, 1102, 35.00),
-                                                                        (1, 1103, 25.00),
-
                                                                         -- Existing Uitzicht values preserved
                                                                         (2, 101, 20.00),
                                                                         (2, 103, 20.00),
@@ -1056,10 +1058,23 @@ INSERT INTO branch_menu_item_price (branch_id, menu_item_id, price) VALUES
                                                                         (2, 1004, 48.00),
                                                                         (2, 1005, 48.00),
                                                                         (2, 1006, 48.00),
-                                                                        (2, 1007, 49.00),
-                                                                        (2, 1101, 45.00),
-                                                                        (2, 1102, 35.00),
-                                                                        (2, 1103, 25.00)
+                                                                        (2, 1007, 49.00)
+ON CONFLICT (branch_id, menu_item_id) DO UPDATE
+    SET price = EXCLUDED.price;
+
+INSERT INTO branch_menu_item_price (branch_id, menu_item_id, price)
+SELECT dessert_price.branch_id, menu_item.id, dessert_price.price
+FROM (VALUES
+          (1, 'Magnum', 45.00),
+          (1, 'Cornetto', 35.00),
+          (1, 'Paddle Pop', 25.00),
+          (2, 'Magnum', 45.00),
+          (2, 'Cornetto', 35.00),
+          (2, 'Paddle Pop', 25.00)
+     ) AS dessert_price(branch_id, item_name, price)
+JOIN menu_item
+  ON menu_item.category_id = 11
+ AND menu_item.name = dessert_price.item_name
 ON CONFLICT (branch_id, menu_item_id) DO UPDATE
     SET price = EXCLUDED.price;
 
