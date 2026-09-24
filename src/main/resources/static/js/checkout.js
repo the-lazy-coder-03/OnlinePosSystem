@@ -66,13 +66,12 @@
         if (!items.length) {
             emptyCart.hidden = false;
             totals.hidden = true;
-            placeOrderButton.disabled = true;
+            updatePlaceOrderAvailability();
             return;
         }
 
         emptyCart.hidden = true;
         totals.hidden = false;
-        placeOrderButton.disabled = false;
 
         let quantity = 0;
         let total = 0;
@@ -107,6 +106,7 @@
 
         document.getElementById("itemCount").textContent = `${quantity} item${quantity === 1 ? "" : "s"}`;
         document.getElementById("orderTotal").textContent = money(total);
+        updatePlaceOrderAvailability();
     }
 
     function customerValue(key) {
@@ -125,15 +125,23 @@
         document.getElementById("email").value = serverCustomer.email;
     }
 
+    function updatePlaceOrderAvailability() {
+        const hasItems = Boolean(draft?.items?.length);
+        const hasOrderType = Boolean(document.getElementById("orderType").value);
+        placeOrderButton.disabled = submitting || !hasItems || !hasOrderType;
+    }
+
     function setOrderType(type) {
-        const orderType = type === "delivery" ? "delivery" : "pickup";
+        const orderType = type === "delivery" || type === "pickup" ? type : "";
         document.getElementById("orderType").value = orderType;
         deliveryButton.classList.toggle("active", orderType === "delivery");
         pickupButton.classList.toggle("active", orderType === "pickup");
         deliveryButton.setAttribute("aria-pressed", String(orderType === "delivery"));
         pickupButton.setAttribute("aria-pressed", String(orderType === "pickup"));
         deliveryFields.hidden = orderType !== "delivery";
-        document.getElementById("paymentLabel").textContent = orderType === "delivery" ? "Pay on delivery" : "Pay on collection";
+        document.getElementById("paymentLabel").textContent = orderType === "delivery"
+            ? "Pay on delivery"
+            : (orderType === "pickup" ? "Pay on collection" : "Choose an order type");
         ["street", "area", "city", "postalCode"].forEach(id => {
             document.getElementById(id).required = orderType === "delivery";
         });
@@ -141,6 +149,7 @@
             draft.orderType = orderType;
             saveDraftFromForm();
         }
+        updatePlaceOrderAvailability();
     }
 
     function saveDraftFromForm() {
@@ -201,9 +210,14 @@
 
     async function placeOrder() {
         if (submitting || !draft?.items?.length) return;
+        if (!document.getElementById("orderType").value) {
+            showNotice("Choose collection or delivery before placing your order.", "error");
+            updatePlaceOrderAvailability();
+            return;
+        }
         if (!form.checkValidity()) {
             form.reportValidity();
-            showNotice("Please complete the required customer and delivery details.", "error");
+            showNotice("Please complete the required customer details and delivery address.", "error");
             return;
         }
 
@@ -241,15 +255,15 @@
             pickupButton.disabled = true;
         } catch (error) {
             showNotice(error.message || "Could not place the order. Please try again.", "error");
-            placeOrderButton.disabled = false;
             placeOrderButton.textContent = "Place order";
             submitting = false;
+            updatePlaceOrderAvailability();
         }
     }
 
     populateCustomer();
     document.getElementById("branchName").textContent = draft?.branch?.name || "your selected branch";
-    setOrderType(draft?.orderType || "pickup");
+    setOrderType(draft?.orderType === "delivery" || draft?.orderType === "pickup" ? draft.orderType : null);
     renderItems();
     deliveryButton.addEventListener("click", () => setOrderType("delivery"));
     pickupButton.addEventListener("click", () => setOrderType("pickup"));

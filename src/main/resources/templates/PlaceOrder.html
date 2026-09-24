@@ -5,6 +5,7 @@
     <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="data:," />
     <title th:text="${menuOnly == true ? 'Menu - Pete''s Pizza' : 'Place Order - Pete''s Pizza'}">Place Order - Pete's Pizza</title>
 
     <style>
@@ -687,43 +688,144 @@
 
         /* ===== Summary ===== */
         .summary{
-            padding: 12px 12px 14px;
+            padding: 12px 14px 18px;
         }
         .sum-card{
             background:#fff;
             border: 1px solid var(--line);
             border-radius: 14px;
-            box-shadow: 0 4px 14px rgba(11,42,91,.06);
-            padding: 14px;
-            margin: 10px 4px;
+            box-shadow: var(--shadow-soft);
+            padding: 20px;
+            margin: 10px 4px 14px;
+        }
+        .sum-cart-header{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:18px;
+            padding-bottom:18px;
+            border-bottom:1px solid var(--line);
+        }
+        .sum-eyebrow{
+            margin:0 0 5px;
+            color:var(--blue-650);
+            font-size:.72rem;
+            font-weight:900;
+            letter-spacing:.12em;
+            text-transform:uppercase;
+        }
+        .sum-cart-title{
+            margin:0;
+            color:var(--blue-800);
+            font-size:1.15rem;
+            font-weight:950;
+        }
+        .sum-branch{
+            display:block;
+            margin-top:5px;
+            color:var(--muted);
+            font-size:.82rem;
+            font-weight:700;
         }
         .sum-item{
-            padding: 10px 0;
+            padding:16px 0;
             border-bottom: 1px solid var(--line);
         }
         .sum-item:last-child{ border-bottom:none; }
-        .sum-top{
-            display:flex;
-            justify-content: space-between;
-            gap: 12px;
-            font-weight: 950;
+        .sum-item-main{
+            display:grid;
+            grid-template-columns:40px minmax(0,1fr) auto;
+            align-items:start;
+            gap:11px;
         }
-        .sum-sub{
-            margin-top: 6px;
-            color: var(--muted);
-            font-weight: 700;
-            font-size: .88rem;
-            line-height: 1.25rem;
+        .sum-quantity{
+            width:34px;
+            height:34px;
+            display:grid;
+            place-items:center;
+            color:var(--blue-800);
+            background:var(--blue-100);
+            border-radius:9px;
+            font-size:.8rem;
+            font-weight:950;
+        }
+        .sum-info{
+            min-width:0;
+            display:grid;
+            gap:4px;
+        }
+        .sum-info strong{ overflow-wrap:anywhere; }
+        .sum-info small{
+            color:var(--muted);
+            font-size:.78rem;
+            font-weight:650;
+            line-height:1.35;
+        }
+        .sum-info .sum-pricing{
+            color:var(--blue-800);
+            font-weight:800;
+        }
+        .sum-price{
+            color:var(--blue-900);
+            font-size:.9rem;
+            white-space:nowrap;
         }
         .sum-actions{
-            margin-top: 10px;
+            margin:10px 0 0 45px;
             display:flex;
-            gap: 10px;
+            gap:8px;
             flex-wrap: wrap;
         }
         .sum-actions .btn{
-            border-radius: 12px;
-            padding: 12px 14px;
+            min-width:42px;
+            justify-content:center;
+            border-radius:10px;
+            padding:8px 11px;
+        }
+        .sum-actions .btn-ghost,
+        .summary-actions .btn-ghost{
+            color:var(--blue-800);
+            background:var(--blue-100);
+            border:1px solid var(--blue-200);
+        }
+        .sum-totals{ padding-top:10px; }
+        .sum-line,
+        .sum-total{
+            display:flex;
+            justify-content:space-between;
+            gap:18px;
+        }
+        .sum-line{
+            padding:10px 0;
+            color:var(--muted);
+            font-size:.9rem;
+        }
+        .sum-total{
+            margin:5px 0 0;
+            padding-top:15px;
+            color:var(--blue-900);
+            border-top:1px solid var(--line);
+            font-size:1.25rem;
+            font-weight:950;
+        }
+        .sum-total span:last-child{ color:var(--blue-650); }
+        .summary-actions{
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+        }
+        .summary-actions .btn-primary{
+            color:#fff;
+            background:var(--blue-650);
+            border:1px solid var(--blue-650);
+        }
+        .summary-actions .btn-primary:hover{ background:var(--blue-700); }
+        @media (max-width: 620px){
+            .summary{ padding:8px; }
+            .sum-card{ padding:17px; margin-inline:0; }
+            .sum-item-main{ grid-template-columns:36px minmax(0,1fr); }
+            .sum-price{ grid-column:2; }
+            .sum-actions{ margin-left:41px; }
         }
         .payload{
             margin: 10px 4px;
@@ -892,11 +994,11 @@
     </div>
 </header>
 
-<!-- ===== Branch + Order Type Overlay ===== -->
+<!-- ===== Branch Overlay ===== -->
 <div class="overlay" id="branchOverlay" aria-hidden="true">
     <div class="overlay-card">
         <h2 id="branchOverlayTitle">Start Your Order</h2>
-        <p id="branchOverlayDesc">Choose a branch first, then select collection or delivery.</p>
+        <p id="branchOverlayDesc">Choose a branch to start your order.</p>
 
         <div id="branchStep">
             <h3 style="margin:12px 0 6px;color:var(--blue-800);">Choose a Branch</h3>
@@ -910,24 +1012,12 @@
             </div>
         </div>
 
-        <div id="orderTypeStep" class="hidden ordering-only">
-            <h3 style="margin:16px 0 6px;color:var(--blue-800);">Collection or Delivery?</h3>
-            <div class="choice-grid">
-                <button class="btn btn-ghost choice-btn" id="typeCollection" type="button">
-                    Collection (Pickup)
-                </button>
-                <button class="btn btn-ghost choice-btn" id="typeDelivery" type="button">
-                    Delivery
-                </button>
-            </div>
-        </div>
-
         <div class="formrow">
             <button class="btn btn-ghost" id="btnGoHome" type="button">← Back to Home</button>
         </div>
 
         <p id="branchOverlayNote" style="margin-top:12px;font-size:.88rem;">
-            Branch and order type selection are required to continue.
+            You’ll choose collection or delivery at checkout.
         </p>
     </div>
 </div>
@@ -1235,8 +1325,8 @@
     }
 
     function continueToCheckout(){
-        if (!state.branch.id || !state.orderType) {
-            state.ui.orderNotice = { type: "error", message: "Please select a branch and order type before checkout." };
+        if (!state.branch.id) {
+            state.ui.orderNotice = { type: "error", message: "Please select a branch before checkout." };
             renderSummary();
             return;
         }
@@ -1365,11 +1455,10 @@
      ************************************************************/
     const render = {
         updateTopBar(){
-            const orderLabel = state.orderType === "delivery" ? "Delivery" : (state.orderType === "pickup" ? "Collection" : null);
             const baseLabel = state.branch.id ? `${state.branch.name}` : (MENU_ONLY ? "Menu" : "Place Order");
             const label = MENU_ONLY && state.branch.id
                 ? `${baseLabel} Menu`
-                : (orderLabel && state.branch.id ? `${baseLabel} • ${orderLabel}` : baseLabel);
+                : baseLabel;
             const b = state.branch.id ? `${state.branch.name} (ID: ${state.branch.id})` : "Branch: —";
             $("branchLabel").textContent = label;
             $("branchPill").textContent = b;
@@ -2215,11 +2304,9 @@
 
             $("btnHomeTop").addEventListener("click", goHome);
 
-            // BRANCH + ORDER TYPE OVERLAY
+            // BRANCH OVERLAY
             $("branchKenridge").addEventListener("click", () => actions.selectBranch(1, "Kenridge"));
             $("branchUitzicht").addEventListener("click", () => actions.selectBranch(2, "Uitzicht"));
-            $("typeCollection").addEventListener("click", () => actions.selectOrderType("pickup"));
-            $("typeDelivery").addEventListener("click", () => actions.selectOrderType("delivery"));
 
             $("btnGoHome").addEventListener("click", goHome);
 
@@ -2258,19 +2345,21 @@
             render.list();
 
             if (checkoutDraft){
+                state.orderType = checkoutDraft.orderType === "delivery"
+                    ? "delivery"
+                    : (checkoutDraft.orderType === "pickup" ? "pickup" : null);
                 await actions.loadBranch(
                     Number(checkoutDraft.branch.id),
-                    checkoutDraft.branch.name || branchNameFromId(checkoutDraft.branch.id),
-                    checkoutDraft.orderType === "delivery" ? "delivery" : "pickup"
+                    checkoutDraft.branch.name || branchNameFromId(checkoutDraft.branch.id)
                 );
                 state.cart.items = checkoutDraft.items;
                 render.updateCartBadges();
                 view.show("summary");
             } else if (MENU_ONLY && Number.isFinite(Number(INITIAL_BRANCH_ID))){
                 const branchId = Number(INITIAL_BRANCH_ID);
-                await actions.loadBranch(branchId, INITIAL_BRANCH_NAME || branchNameFromId(branchId), null);
+                await actions.loadBranch(branchId, INITIAL_BRANCH_NAME || branchNameFromId(branchId));
             } else if (!MENU_ONLY && Number.isFinite(Number(PREFERRED_BRANCH_ID)) && PREFERRED_BRANCH_NAME){
-                actions.preparePreferredBranch(Number(PREFERRED_BRANCH_ID), PREFERRED_BRANCH_NAME);
+                await actions.loadBranch(Number(PREFERRED_BRANCH_ID), PREFERRED_BRANCH_NAME);
             } else {
                 ui.showBranchOverlay(true);
             }
@@ -2292,55 +2381,21 @@
         selectBranch(branchId, branchName){
             state.selection.branchId = branchId;
             state.selection.branchName = branchName;
-            state.orderType = null;
             ui.setBranchChoiceUI(branchId);
-            if (MENU_ONLY){
-                actions.loadBranch(branchId, branchName, null).catch(e => alert(e.message));
-                return;
-            }
-            ui.showOrderTypeStep(true);
-            ui.resetOrderTypeUI();
+            actions.loadBranch(branchId, branchName).catch(e => alert(e.message));
         },
 
-        preparePreferredBranch(branchId, branchName){
-            state.selection.branchId = branchId;
-            state.selection.branchName = branchName;
-            state.orderType = null;
-            ui.setBranchChoiceUI(branchId);
-            ui.showBranchOverlay(true);
-            ui.showBranchStep(false);
-            ui.showOrderTypeStep(true);
-            ui.resetOrderTypeUI();
-            ui.showPreferredBranchPrompt(branchName);
-        },
-
-        async selectOrderType(orderType){
-            if (!state.selection.branchId){
-                alert("Please select a branch first.");
-                return;
-            }
-            ui.setOrderTypeChoiceUI(orderType);
-            try{
-                await actions.loadBranch(state.selection.branchId, state.selection.branchName, orderType);
-            } catch (e){
-                alert(e.message);
-            }
-        },
-
-        async loadBranch(branchId, branchName, orderType){
-            if (!MENU_ONLY && !orderType) {
-                throw new Error("Please select collection or delivery.");
-            }
-
+        async loadBranch(branchId, branchName){
+            const switchingBranch = !MENU_ONLY && state.branch.id && state.branch.id !== branchId;
             // If switching branch, clear cart to avoid mixed pricing
-            if (!MENU_ONLY && state.branch.id && state.branch.id !== branchId && state.cart.items.length){
+            if (switchingBranch && state.cart.items.length){
                 const ok = confirm("Switching branch will clear your current cart. Continue?");
                 if (!ok) return;
                 store.clearCart(false);
             }
 
+            if (switchingBranch) state.orderType = null;
             store.setBranch(branchId, branchName);
-            state.orderType = MENU_ONLY ? null : orderType;
             state.selection.branchId = branchId;
             state.selection.branchName = branchName;
             ui.showBranchOverlay(false);
@@ -3402,22 +3457,12 @@
                     state.selection.branchId = state.branch.id;
                     state.selection.branchName = state.branch.name;
                     ui.setBranchChoiceUI(state.branch.id);
-                    ui.showBranchStep(true);
-                    ui.showOrderTypeStep(!MENU_ONLY);
-                    if (!MENU_ONLY) ui.setOrderTypeChoiceUI(state.orderType);
-                } else if (state.selection.branchId && !MENU_ONLY){
-                    ui.setBranchChoiceUI(state.selection.branchId);
-                    ui.showBranchStep(false);
-                    ui.showOrderTypeStep(true);
-                    ui.setOrderTypeChoiceUI(state.orderType);
                 } else {
                     state.selection.branchId = null;
                     state.selection.branchName = "";
                     ui.setBranchChoiceUI(null);
-                    ui.resetOrderTypeUI();
-                    ui.showBranchStep(true);
-                    ui.showOrderTypeStep(false);
                 }
+                ui.showBranchStep(true);
             }
         },
         openBranchPicker(){
@@ -3428,32 +3473,15 @@
             }
             ui.showBranchOverlay(true);
             ui.showBranchStep(true);
-            ui.showOrderTypeStep(false);
-            ui.resetOrderTypeUI();
             $("branchOverlayTitle").textContent = "Start Your Order";
-            $("branchOverlayDesc").textContent = "Choose a branch first, then select collection or delivery.";
-        },
-        showPreferredBranchPrompt(branchName){
-            $("branchOverlayTitle").textContent = "Use Your Preferred Store";
-            $("branchOverlayDesc").textContent = `${branchName} is selected from your account. Choose collection or delivery.`;
+            $("branchOverlayDesc").textContent = "Choose a branch to start your order.";
         },
         showBranchStep(show){
             $("branchStep").classList.toggle("hidden", !show);
         },
-        showOrderTypeStep(show){
-            $("orderTypeStep").classList.toggle("hidden", !show);
-        },
         setBranchChoiceUI(branchId){
             $("branchKenridge").classList.toggle("selected", branchId === 1);
             $("branchUitzicht").classList.toggle("selected", branchId === 2);
-        },
-        setOrderTypeChoiceUI(orderType){
-            $("typeCollection").classList.toggle("selected", orderType === "pickup");
-            $("typeDelivery").classList.toggle("selected", orderType === "delivery");
-        },
-        resetOrderTypeUI(){
-            $("typeCollection").classList.remove("selected");
-            $("typeDelivery").classList.remove("selected");
         },
         showMenuItemOverlay(show){
             $("menuItemOverlay").classList.toggle("show", !!show);
@@ -3913,105 +3941,10 @@
     }
 
     /************************************************************
-     * Cart + Order payload generation (required)
+     * Cart summary
      ************************************************************/
     function cartTotal(){
         return state.cart.items.reduce((sum, it) => sum + (Number(it.pricing?.lineTotal) || 0), 0);
-    }
-
-    function buildOrderPayload(){
-        const isDeliveryOrder = state.orderType === "delivery";
-        return {
-            customerName: state.customer.name || "Guest",
-            phone: state.customer.phone || "",
-            houseNumber: isDeliveryOrder ? (state.customer.houseNumber || "") : "",
-            street: isDeliveryOrder ? (state.customer.street || "") : "",
-            area: isDeliveryOrder ? (state.customer.area || "") : "",
-            city: isDeliveryOrder ? (state.customer.city || "") : "",
-            postalCode: isDeliveryOrder ? (state.customer.postalCode || "") : "",
-            complexName: isDeliveryOrder ? (state.customer.complexName || "") : "",
-            branchName: state.branch.name,
-            orderType: state.orderType,
-            items: state.cart.items.map(it => {
-                if (it.type === "menu"){
-                    const burgerToppings = (it.selectedBurgerToppingIds || []).map(id => ({
-                        id: Number(id),
-                        quantity: 1,
-                        type: "burgerComponent"
-                    }));
-                    const burgerExtraToppings = (it.selectedBurgerExtraToppingIds || []).map(id => ({
-                        id: Number(id),
-                        quantity: 1,
-                        type: "burgerExtraComponent"
-                    }));
-                    const modifierOptions = (it.selectedModifierOptionIds || []).map(id => ({
-                        id: Number(id),
-                        quantity: 1,
-                        type: "modifierOption"
-                    }));
-                    return {
-                        menuItemId: it.menuItemId,
-                        quantity: it.quantity,
-                        customizations: burgerToppings.concat(burgerExtraToppings, modifierOptions)
-                    };
-                }
-
-                return {
-                    pizzaId: it.pizzaId,
-                    sizeCm: it.sizeCm,
-                    pizzaBaseOptionId: it.pizzaBaseOptionId || null,
-                    quantity: it.quantity,
-                    customizations: (it.selectedExtraToppingIds || []).map(id => ({
-                        id: Number(id),
-                        quantity: 1
-                    }))
-                };
-            })
-        };
-    }
-
-    async function submitOrder(){
-        state.ui.orderNotice = null;
-
-        if (!state.branch.name || !state.orderType){
-            state.ui.orderNotice = { type: "error", message: "Please select a branch and order type before confirming." };
-            renderSummary();
-            return;
-        }
-        if (!state.cart.items.length){
-            state.ui.orderNotice = { type: "error", message: "Your cart is empty." };
-            renderSummary();
-            return;
-        }
-
-        const payload = buildOrderPayload();
-        try{
-            const res = await fetch("/api/orders", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", [document.querySelector('meta[name="_csrf_header"]').content]: document.querySelector('meta[name="_csrf"]').content },
-                body: JSON.stringify(payload)
-            });
-            if (!res.ok){
-                let message = `Failed to place order (${res.status}).`;
-                try{
-                    const errJson = await res.json();
-                    message = errJson.message || errJson.error || message;
-                } catch (_){
-                    const errText = await res.text().catch(() => "");
-                    if (errText) message = errText;
-                }
-                state.ui.orderNotice = { type: "error", message };
-                renderSummary();
-                return;
-            }
-            const data = await res.json();
-            state.ui.orderNotice = { type: "success", message: `Order #${data.id} placed. Status: ${data.status}.` };
-            store.clearCart(false);
-            renderSummary();
-        } catch (e){
-            state.ui.orderNotice = { type: "error", message: e.message || "Failed to place order." };
-            renderSummary();
-        }
     }
 
     function renderSummary(){
@@ -4032,14 +3965,19 @@
         }
 
         const card = document.createElement("div");
-        card.className = "sum-card";
-        const typeLabel = state.orderType === "delivery" ? "Delivery" : (state.orderType === "pickup" ? "Collection" : "");
+        card.className = "sum-card sum-cart";
+        const itemCount = state.cart.items.reduce((total, item) => total + (Number(item.quantity) || 1), 0);
         card.innerHTML = `
-            <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;">
-              <div style="font-weight:950;color:var(--blue-800);">Order for ${escapeHtml(state.branch.name || ("Branch " + state.branch.id))}${typeLabel ? " • " + typeLabel : ""}</div>
-              <div style="font-weight:950;color:var(--blue-650);">${money(cartTotal())}</div>
+            <div class="sum-cart-header">
+              <div>
+                <p class="sum-eyebrow">Your cart</p>
+                <h3 class="sum-cart-title">Order summary</h3>
+                <span class="sum-branch">${escapeHtml(state.branch.name || ("Branch " + state.branch.id))}</span>
+              </div>
             </div>
+            <div class="sum-items"></div>
         `;
+        const itemsContainer = card.querySelector(".sum-items");
 
         for (let i=0;i<state.cart.items.length;i++){
             const it = state.cart.items[i];
@@ -4049,7 +3987,7 @@
             const isPizza = it.type === "pizza";
             const tops = isPizza ? (it.selectedToppingNames || []).join(", ") : "";
             const mods = !isPizza ? (it.selectedModifierNames || []).join(", ") : "";
-            const meta = isPizza ? ` <span style="color:var(--muted);font-weight:850;">(${it.sizeCm} cm)</span>` : "";
+            const meta = isPizza ? ` (${it.sizeCm} cm)` : "";
             const detailLine = isPizza
                 ? [
                     it.pizzaBaseOptionName ? ("Base: " + escapeHtml(it.pizzaBaseOptionName)) : "",
@@ -4060,92 +3998,37 @@
                 ? `Subtotal (1): ${money(it.pricing?.subtotal || 0)} • Base: ${money(it.pricing?.base || 0)}${Number(it.pricing?.baseOption || 0) > 0 ? ` • Base option: ${money(it.pricing.baseOption)}` : ""} • Toppings: ${money(it.pricing?.toppings || 0)}`
                 : `Subtotal (1): ${money(it.pricing?.subtotal || 0)} • Base: ${money(it.pricing?.base || 0)} • Modifiers: ${money(it.pricing?.modifiers || 0)}`;
             div.innerHTML = `
-                <div class="sum-top">
-                  <div>${it.quantity}x ${escapeHtml(it.name)}${meta}</div>
-                  <div>${money(it.pricing?.lineTotal || 0)}</div>
-                </div>
-                <div class="sum-sub">
-                  ${detailLine}
-                  <div style="margin-top:6px;font-weight:850;">
-                    ${pricingLine}
+                <div class="sum-item-main">
+                  <span class="sum-quantity">${it.quantity}×</span>
+                  <div class="sum-info">
+                    <strong>${escapeHtml(it.name)}${meta}</strong>
+                    <small>${detailLine}</small>
+                    <small class="sum-pricing">${pricingLine}</small>
                   </div>
+                  <strong class="sum-price">${money(it.pricing?.lineTotal || 0)}</strong>
                 </div>
                 <div class="sum-actions">
-                  <button class="btn btn-ghost" type="button" data-action="dec" data-index="${i}">−</button>
-                  <button class="btn btn-ghost" type="button" data-action="inc" data-index="${i}">+</button>
+                  <button class="btn btn-ghost" type="button" data-action="dec" data-index="${i}" aria-label="Decrease ${escapeHtml(it.name)} quantity">−</button>
+                  <button class="btn btn-ghost" type="button" data-action="inc" data-index="${i}" aria-label="Increase ${escapeHtml(it.name)} quantity">+</button>
                   <button class="btn btn-danger" type="button" data-action="remove" data-index="${i}">Remove</button>
                 </div>
             `;
-            card.appendChild(div);
+            itemsContainer.appendChild(div);
         }
+
+        card.insertAdjacentHTML("beforeend", `
+            <div class="sum-totals">
+              <div class="sum-line"><span>Items</span><span>${itemCount} item${itemCount === 1 ? "" : "s"}</span></div>
+              <div class="sum-total"><span>Total</span><span>${money(cartTotal())}</span></div>
+            </div>
+        `);
 
         body.appendChild(card);
-
-        const customerCard = document.createElement("div");
-        customerCard.className = "sum-card";
-        const addressSection = state.orderType === "delivery" ? `
-            <div class="customer-address-fields" id="customerAddressFields">
-                <div style="margin-top:8px;font-weight:850;color:var(--muted);">Address</div>
-                <div class="formrow">
-                    <input type="text" id="custHouseInput" placeholder="House / Unit #" />
-                    <input type="text" id="custStreetInput" placeholder="Street" />
-                </div>
-                <div class="formrow">
-                    <input type="text" id="custAreaInput" placeholder="Area / Suburb" />
-                    <input type="text" id="custCityInput" placeholder="City" />
-                </div>
-                <div class="formrow">
-                    <input type="text" id="custPostalInput" placeholder="Postal code" />
-                    <input type="text" id="custComplexInput" placeholder="Complex / Building (optional)" />
-                </div>
-            </div>
-        ` : "";
-        customerCard.innerHTML = `
-            <div style="font-weight:900;color:var(--blue-800);margin-bottom:8px;">Customer Details</div>
-            <div class="formrow" style="margin-top:0;">
-                <input type="text" id="custNameInput" placeholder="Customer name" />
-                <input type="tel" id="custPhoneInput" placeholder="Phone (optional)" />
-            </div>
-            ${addressSection}
-        `;
-        body.appendChild(customerCard);
-
-        const nameInput = customerCard.querySelector("#custNameInput");
-        const phoneInput = customerCard.querySelector("#custPhoneInput");
-        const houseInput = customerCard.querySelector("#custHouseInput");
-        const streetInput = customerCard.querySelector("#custStreetInput");
-        const areaInput = customerCard.querySelector("#custAreaInput");
-        const cityInput = customerCard.querySelector("#custCityInput");
-        const postalInput = customerCard.querySelector("#custPostalInput");
-        const complexInput = customerCard.querySelector("#custComplexInput");
-        nameInput.value = state.customer.name || "";
-        phoneInput.value = state.customer.phone || "";
-        nameInput.addEventListener("input", (e) => {
-            state.customer.name = safeText(e.target.value).trim();
-        });
-        phoneInput.addEventListener("input", (e) => {
-            state.customer.phone = safeText(e.target.value).trim();
-        });
-        const addressInputs = [
-            [houseInput, "houseNumber"],
-            [streetInput, "street"],
-            [areaInput, "area"],
-            [cityInput, "city"],
-            [postalInput, "postalCode"],
-            [complexInput, "complexName"]
-        ];
-        for (const [input, stateKey] of addressInputs) {
-            if (!input) continue;
-            input.value = state.customer[stateKey] || "";
-            input.addEventListener("input", (e) => {
-                state.customer[stateKey] = safeText(e.target.value).trim();
-            });
-        }
 
         const actionsRow = document.createElement("div");
         actionsRow.className = "sum-card";
         actionsRow.innerHTML = `
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div class="summary-actions">
               <button class="btn btn-primary" id="btnConfirmOrder" type="button">Continue to Checkout</button>
               <button class="btn btn-ghost" id="btnClearCart2" type="button">Clear Cart</button>
             </div>

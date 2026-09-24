@@ -49,14 +49,15 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await login(page, 'browser@example.com');
     await page.goto('/order');
     await page.locator('#branchKenridge').click();
-    await page.locator('#typeCollection').click();
+    await expect(page.locator('#branchOverlay')).not.toHaveClass(/show/);
+    await expect(page.locator('#typeCollection, #typeDelivery')).toHaveCount(0);
     await page.locator('#listBody .row').first().click();
     await expect(page.locator('#btnAddToCart')).toBeVisible();
     await expect(page.locator('#stickyTotal')).not.toHaveText('R0.00');
     await page.locator('#btnAddToCart').click();
     await page.locator('#btnViewCart').click();
     const maliciousName = '<img src=x onerror="window.compromised=true">';
-    await page.locator('#custNameInput').fill(maliciousName);
+    await expect(page.locator('#custNameInput, #custPhoneInput')).toHaveCount(0);
 
     const adminContext = await browser.newContext();
     const admin = await adminContext.newPage();
@@ -70,8 +71,18 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
         page.waitForURL('**/checkout'),
         page.locator('#btnConfirmOrder').click()
     ]);
-    await expect(page.locator('#fullName')).toHaveValue(maliciousName);
     await expect(page.locator('#checkoutItems .cart-item')).toHaveCount(1);
+    await expect(page.locator('#deliveryButton')).not.toHaveClass(/active/);
+    await expect(page.locator('#pickupButton')).not.toHaveClass(/active/);
+    await expect(page.locator('#placeOrderButton')).toBeDisabled();
+    await page.locator('#deliveryButton').click();
+    await expect(page.locator('#deliveryFields')).toBeVisible();
+    await expect(page.locator('#street')).toHaveAttribute('required', '');
+    await page.locator('#pickupButton').click();
+    await expect(page.locator('#deliveryFields')).toBeHidden();
+    await expect(page.locator('#street')).not.toHaveAttribute('required', '');
+    await expect(page.locator('#placeOrderButton')).toBeEnabled();
+    await page.locator('#fullName').fill(maliciousName);
     await page.locator('#phone').fill('0712345678');
 
     const placed = page.waitForResponse(response => response.url().endsWith('/api/orders') && response.request().method() === 'POST');
