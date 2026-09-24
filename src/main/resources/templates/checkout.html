@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <link rel="icon" href="data:,">
     <title>Checkout — Pete’s Pizza</title>
     <link rel="stylesheet" th:href="@{/css/checkout.css}">
 </head>
@@ -52,15 +53,16 @@
                 </div>
             </div>
             <div class="option-grid" role="group" aria-label="Order type">
-                <button type="button" class="select-option" id="deliveryButton">
+                <button type="button" class="select-option" id="deliveryButton" aria-pressed="false" aria-describedby="orderTypeHint">
                     <span class="option-mark" aria-hidden="true">D</span>
                     <span><strong>Delivery</strong><small>Deliver to my saved address</small></span>
                 </button>
-                <button type="button" class="select-option" id="pickupButton">
+                <button type="button" class="select-option" id="pickupButton" aria-pressed="false" aria-describedby="orderTypeHint">
                     <span class="option-mark" aria-hidden="true">C</span>
                     <span><strong>Collection</strong><small>Collect from the selected branch</small></span>
                 </button>
             </div>
+            <p id="orderTypeHint" class="selection-hint">Choose collection or delivery before placing your order.</p>
         </article>
 
         <article class="checkout-card">
@@ -88,7 +90,7 @@
                     <input id="email" name="email" type="email" autocomplete="email" readonly>
                     <small class="field-hint">Orders are linked to this signed-in account.</small>
                 </div>
-                <div id="deliveryFields">
+                <div id="deliveryFields" hidden>
                     <div class="form-row form-row-address">
                         <div class="form-group">
                             <label for="houseNumber">House / unit</label>
@@ -134,7 +136,7 @@
             <div class="payment-option" aria-label="Pay on fulfilment">
                 <span class="radio-selected" aria-hidden="true"></span>
                 <div>
-                    <strong id="paymentLabel">Pay on delivery</strong>
+                    <strong id="paymentLabel">Choose an order type</strong>
                     <small>No online payment details are required.</small>
                 </div>
             </div>
@@ -157,7 +159,7 @@
             <div class="summary-total"><span>Total</span><span id="orderTotal">R0.00</span></div>
         </div>
         <div id="checkoutNotice" class="checkout-notice" role="status" aria-live="polite" hidden></div>
-        <button class="button button-primary place-order" id="placeOrderButton" type="button">Place order</button>
+        <button class="button button-primary place-order" id="placeOrderButton" type="button" disabled>Place order</button>
         <p class="terms">The final total is validated by Pete’s Pizza when your order is placed.</p>
     </aside>
 </main>

@@ -138,12 +138,30 @@ public class RouteTest {
 
     @Test
     @org.springframework.security.test.context.support.WithMockUser(roles = "USER")
+    public void testOrderPageDefersFulfilmentAndCustomerDetailsToCheckout() throws Exception {
+        mockMvc.perform(get("/order"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("PlaceOrder"))
+                .andExpect(content().string(containsString("You’ll choose collection or delivery at checkout.")))
+                .andExpect(content().string(containsString("await actions.loadBranch(Number(PREFERRED_BRANCH_ID), PREFERRED_BRANCH_NAME)")))
+                .andExpect(content().string(not(containsString("id=\"typeCollection\""))))
+                .andExpect(content().string(not(containsString("id=\"typeDelivery\""))))
+                .andExpect(content().string(not(containsString("id=\"custNameInput\""))))
+                .andExpect(content().string(not(containsString("Customer Details"))));
+    }
+
+    @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "USER")
     public void testCheckoutPageUsesIntegratedCustomerAndCartTemplate() throws Exception {
         mockMvc.perform(get("/checkout"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("checkout"))
                 .andExpect(content().string(containsString("Pete’s Pizza")))
                 .andExpect(content().string(containsString("id=\"checkoutItems\"")))
+                .andExpect(content().string(containsString("id=\"deliveryButton\"")))
+                .andExpect(content().string(containsString("id=\"pickupButton\"")))
+                .andExpect(content().string(containsString("Customer details")))
+                .andExpect(content().string(containsString("id=\"placeOrderButton\" type=\"button\" disabled")))
                 .andExpect(content().string(containsString("/js/checkout.js")))
                 .andExpect(content().string(not(containsString("Classic Beef Burger"))));
     }
