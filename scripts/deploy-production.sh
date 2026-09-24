@@ -48,8 +48,15 @@ test -d "$REMOTE_APP_DIR/.git" || { echo "Remote app directory is not a git repo
 command -v git >/dev/null 2>&1 || { echo "git is not installed on the server" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "docker is not installed on the server" >&2; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "curl is not installed on the server" >&2; exit 1; }
+command -v flock >/dev/null 2>&1 || { echo "flock is not installed on the server" >&2; exit 1; }
 
 cd "$REMOTE_APP_DIR"
+exec 9>.git/online-pos-deploy.lock
+if ! flock -w 1200 9; then
+  echo "Timed out waiting for another production deployment to finish" >&2
+  exit 1
+fi
+
 git fetch origin "$DEPLOY_BRANCH"
 git checkout "$DEPLOY_BRANCH"
 git pull --ff-only origin "$DEPLOY_BRANCH"
