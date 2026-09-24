@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <title>Checkout — Pete’s Pizza</title>
+    <link rel="stylesheet" th:href="@{/css/checkout.css}">
+</head>
+<body>
+<div id="checkoutDefaults"
+     th:data-full-name="${customerName ?: ''}"
+     th:data-email="${user != null ? user.email : ''}"
+     th:data-phone="${user != null ? user.phone1 : ''}"
+     th:data-house-number="${user != null ? user.houseNumber : ''}"
+     th:data-street="${user != null ? user.street : ''}"
+     th:data-area="${user != null ? user.area : ''}"
+     th:data-city="${user != null ? user.city : ''}"
+     th:data-postal-code="${user != null ? user.postalCode : ''}"
+     th:data-complex-name="${user != null ? user.complexName : ''}"
+     hidden></div>
+
+<header class="topbar">
+    <div class="topbar-inner">
+        <a class="brand" th:href="@{/}">Pete’s Pizza</a>
+        <nav class="top-actions" aria-label="Main navigation">
+            <a class="nav-link" th:href="@{/}">Home</a>
+            <a class="nav-link" th:href="@{/menu}">Menu</a>
+            <a class="nav-link nav-link-primary" th:href="@{/profile/edit}">My Account</a>
+        </nav>
+    </div>
+</header>
+
+<section class="page-heading">
+    <div class="page-heading-inner">
+        <a id="backToOrderTop" class="back-link" th:href="@{/order}">← Back to order</a>
+        <p class="eyebrow">Final step</p>
+        <h1>Checkout</h1>
+        <p>Check your details and order before placing it.</p>
+    </div>
+</section>
+
+<main class="checkout-layout">
+    <section class="checkout-column" aria-label="Checkout details">
+        <article class="checkout-card">
+            <div class="section-heading">
+                <span class="step-number">1</span>
+                <div>
+                    <h2>Order type</h2>
+                    <p>Your selected branch is <strong id="branchName">—</strong>.</p>
+                </div>
+            </div>
+            <div class="option-grid" role="group" aria-label="Order type">
+                <button type="button" class="select-option" id="deliveryButton">
+                    <span class="option-mark" aria-hidden="true">D</span>
+                    <span><strong>Delivery</strong><small>Deliver to my saved address</small></span>
+                </button>
+                <button type="button" class="select-option" id="pickupButton">
+                    <span class="option-mark" aria-hidden="true">C</span>
+                    <span><strong>Collection</strong><small>Collect from the selected branch</small></span>
+                </button>
+            </div>
+        </article>
+
+        <article class="checkout-card">
+            <div class="section-heading">
+                <span class="step-number">2</span>
+                <div>
+                    <h2>Customer details</h2>
+                    <p>Loaded from your Pete’s Pizza account. You can adjust them for this order.</p>
+                </div>
+            </div>
+            <form id="checkoutForm" novalidate>
+                <input type="hidden" id="orderType" name="orderType">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fullName">Full name</label>
+                        <input id="fullName" name="fullName" type="text" autocomplete="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Phone number</label>
+                        <input id="phone" name="phone" type="tel" autocomplete="tel" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="email">Account email</label>
+                    <input id="email" name="email" type="email" autocomplete="email" readonly>
+                    <small class="field-hint">Orders are linked to this signed-in account.</small>
+                </div>
+                <div id="deliveryFields">
+                    <div class="form-row form-row-address">
+                        <div class="form-group">
+                            <label for="houseNumber">House / unit</label>
+                            <input id="houseNumber" name="houseNumber" type="text" autocomplete="address-line1">
+                        </div>
+                        <div class="form-group">
+                            <label for="street">Street</label>
+                            <input id="street" name="street" type="text" autocomplete="address-line1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="area">Area / suburb</label>
+                            <input id="area" name="area" type="text" autocomplete="address-level3">
+                        </div>
+                        <div class="form-group">
+                            <label for="city">City</label>
+                            <input id="city" name="city" type="text" autocomplete="address-level2">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="postalCode">Postal code</label>
+                            <input id="postalCode" name="postalCode" type="text" autocomplete="postal-code">
+                        </div>
+                        <div class="form-group">
+                            <label for="complexName">Complex / building <span>(optional)</span></label>
+                            <input id="complexName" name="complexName" type="text" autocomplete="address-line2">
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </article>
+
+        <article class="checkout-card payment-card">
+            <div class="section-heading">
+                <span class="step-number">3</span>
+                <div>
+                    <h2>Payment</h2>
+                    <p>Payment is completed when you collect your order or when it is delivered.</p>
+                </div>
+            </div>
+            <div class="payment-option" aria-label="Pay on fulfilment">
+                <span class="radio-selected" aria-hidden="true"></span>
+                <div>
+                    <strong id="paymentLabel">Pay on delivery</strong>
+                    <small>No online payment details are required.</small>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <aside class="order-summary" aria-labelledby="summaryTitle">
+        <div class="summary-header">
+            <div><p class="eyebrow">Your cart</p><h2 id="summaryTitle">Order summary</h2></div>
+            <a id="editOrderLink" th:href="@{/order}">Edit order</a>
+        </div>
+        <div id="checkoutItems" class="checkout-items"></div>
+        <div id="emptyCart" class="empty-cart" hidden>
+            <strong>Your cart is empty</strong>
+            <p>Return to the order page and add something delicious.</p>
+            <a class="button button-secondary" th:href="@{/order}">Start an order</a>
+        </div>
+        <div id="summaryTotals" class="summary-totals">
+            <div class="summary-line"><span>Items</span><span id="itemCount">0</span></div>
+            <div class="summary-total"><span>Total</span><span id="orderTotal">R0.00</span></div>
+        </div>
+        <div id="checkoutNotice" class="checkout-notice" role="status" aria-live="polite" hidden></div>
+        <button class="button button-primary place-order" id="placeOrderButton" type="button">Place order</button>
+        <p class="terms">The final total is validated by Pete’s Pizza when your order is placed.</p>
+    </aside>
+</main>
+
+<script th:src="@{/js/checkout.js}" defer></script>
+</body>
+</html>

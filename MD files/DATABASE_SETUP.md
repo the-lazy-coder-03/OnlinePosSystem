@@ -1,130 +1,48 @@
-# Database Setup Instructions
+# Database setup and testing
 
-## Database Tables
+The application requires PostgreSQL 16 and separate administrator, migration-owner,
+and runtime accounts. Normal runtime uses `ddl-auto=validate`, verifies private-data
+RLS before JPA initialization, and never creates the schema. The `dev` profile uses
+the same protection. Do not use administrator or owner credentials for runtime.
 
-Your Spring Boot application will automatically create the necessary tables when you run it (due to `spring.jpa.hibernate.ddl-auto=update`). The following tables will be created:
+## Setup
 
-### 1. Staff Table
-```sql
-CREATE TABLE staff (
-    id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    branch VARCHAR(255) NOT NULL,
-    pin_hash VARCHAR(255) NOT NULL
-);
-```
+1. Use a dedicated application database and configure the variables documented in
+   `SupportConfigFiles/.env.example`.
+2. Run `scripts/provision-rls.sh` as the database administrator. It transfers only
+   recognized application objects and provisions separate owner/runtime logins.
+3. Build the application, then run `scripts/migrate-database.sh target/OnlinePosSystem-0.0.1-SNAPSHOT.jar`
+   with the owner credentials and `RLS_RUNTIME_ROLE` naming the runtime login.
+4. Start the application using restricted `SPRING_DATASOURCE_*` credentials.
 
-### 2. Orders Table
-```sql
-CREATE TABLE orders (
-    id BIGSERIAL PRIMARY KEY,
-    branch VARCHAR(255) NOT NULL,
-    customer_name VARCHAR(255) NOT NULL,
-    type VARCHAR(255) NOT NULL,
-    items TEXT NOT NULL,
-    status VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP NOT NULL
-);
-```
+See [ROW_LEVEL_SECURITY.md](ROW_LEVEL_SECURITY.md) for the exact permission model,
+provisioning variables and Docker Compose sequence. The active order table is
+`customer_order`; the optional legacy `orders` table is default-deny. Staff PIN
+login has been retired (HTTP 410). Create named admin accounts through the
+super-admin interface; access levels 1 and 2 correspond to the two branches.
 
-## Initial Data Setup
+## Repeatable local checks
 
-### Managing Staff Accounts
-
-The easiest way to manage staff accounts and their PINs is through `Misc/staff-config.json`.
-
-**Example `Misc/staff-config.json`:**
-```json
-[
-  {
-    "name": "Kenridge Manager",
-    "branch": "Kenridge",
-    "pin": "1234",
-    "branchCode": "KENRIDGE_1234567"
-  },
-  {
-    "name": "Uitzicht Manager",
-    "branch": "Uitzicht",
-    "pin": "5678",
-    "branchCode": "UITZICHT_1234567"
-  }
-]
-```
-
-To update a PIN or add a new staff member:
-1. Edit `Misc/staff-config.json`.
-2. Restart the Spring Boot application.
-3. The application will automatically synchronize the database with the file content.
-
-Alternatively, you can use the `/api/staff/create` endpoint:
-
-**For Kenridge Branch (PIN: 1234):**
-```bash
-curl -X POST http://192.168.1.31:8081/api/staff/create \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Kenridge Staff",
-    "branch": "Kenridge",
-    "pin": "1234"
-  }'
-```
-
-**For Uitzicht Branch (PIN: 5678):**
-```bash
-curl -X POST http://192.168.1.31:8081/api/staff/create \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Uitzicht Staff",
-    "branch": "Uitzicht",
-    "pin": "5678"
-  }'
-```
-
-### Creating Test Orders
-
-You can create test orders using the `/api/orders` endpoint:
+Set these variables for a disposable PostgreSQL server; each test command creates
+and removes its own database and roles. Never point them at a production server.
 
 ```bash
-# Kenridge Order
-curl -X POST http://192.168.1.31:8081/api/orders \
-  -H "Content-Type: application/json" \
-  -d '{
-    "branch": "Kenridge",
-    "customerName": "Alice",
-    "type": "Pickup",
-    "items": "[\"Pizza\",\"Soda\"]"
-  }'
-
-# Uitzicht Order
-curl -X POST http://192.168.1.31:8081/api/orders \
-  -H "Content-Type: application/json" \
-  -d '{
-    "branch": "Uitzicht",
-    "customerName": "Bob",
-    "type": "Delivery",
-    "items": "[\"Burger\",\"Fries\"]"
-  }'
+export RLS_TEST_ADMIN_URL=jdbc:postgresql://localhost:5432/postgres
+export RLS_TEST_ADMIN_USERNAME=your_local_postgres_admin
+export RLS_TEST_ADMIN_PASSWORD=your_local_test_password
+./scripts/test-postgres.sh -B verify -Prls-it
+npm --prefix SupportConfigFiles ci
+npm --prefix SupportConfigFiles exec -- playwright install chromium
+npm --prefix SupportConfigFiles run test:browser
+python3 scripts/check-template-scripts.py
 ```
 
-## Security Notes
+The Maven command includes unit/application tests, the restricted-role RLS suite,
+and packaging. Browser tests launch that packaged jar on loopback port 18081 with
+a separately provisioned database. They exercise actual CSRF tokens, ordering,
+profile history, private live updates and HTML-injection payloads. Test email and
+maps credentials are empty; no real email delivery is attempted.
 
-- **IMPORTANT:** Staff PINs are hashed using BCrypt before storage. Never store plain text PINs in the database.
-- The `/api/staff/create` endpoint is for initial setup. In production, you should secure this endpoint or disable it after creating staff accounts.
-- PINs are validated by comparing the entered PIN against the stored BCrypt hash using secure comparison.
-
-## Accessing the POS Frontend
-
-1. Start your Spring Boot application: `Misc/mvnw spring-boot:run`
-2. Open browser to: `http://192.168.1.31:8081/orders`
-3. Login with 16-character Code:
-   - `KENRIDGE_1234567` for Kenridge branch
-   - `UITZICHT_1234567` for Uitzicht branch
-
-## Database Configuration
-
-Your database is already configured in `src/main/resources/application.properties`:
-- **Database:** PostgreSQL (Neon)
-- **Port:** 8081
-- **Auto-create tables:** Enabled (`spring.jpa.hibernate.ddl-auto=update`)
-
-The application will automatically create the `staff` and `orders` tables on first run.
+Browser session writes require the current CSRF token from the rendered page.
+Bearer clients authenticate with `/api/auth/login` and send `Authorization: Bearer ...`;
+bearer credentials are validated independently of any session cookie.

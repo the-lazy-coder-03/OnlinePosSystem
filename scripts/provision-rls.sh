@@ -10,4 +10,4 @@ if [[ "$MIGRATION_DATASOURCE_USERNAME" == "$SPRING_DATASOURCE_USERNAME" ]]; then
   exit 1
 fi
 # PGHOST/PGPORT/PGUSER/PGPASSWORD identify the administrator connection.
-psql -X --file="$(dirname "$0")/sql/provision-rls.sql"
+psql -X --dbname="$PGDATABASE" --file="$(dirname "$0")/sql/provision-rls.sql"

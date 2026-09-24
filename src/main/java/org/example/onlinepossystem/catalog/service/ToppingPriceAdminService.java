@@ -36,6 +36,7 @@ public class ToppingPriceAdminService {
     @Transactional
     public void updateToppingPrice(Integer branchId, Integer priceCategoryId,
                                    Integer pizzaSizeId, Double price, String actor) {
+        price = CatalogAdminSupport.validatedPrice(price);
         branchLookup.requireById(branchId);
         PriceCategory priceCategory = priceCategoryRepository.findById(priceCategoryId)
                 .orElseThrow(() -> new java.util.NoSuchElementException(

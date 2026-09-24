@@ -1,112 +1,54 @@
-# CI/CD Deployment
+# CI/CD deployment
 
-The live `crowdcam.co.za` website runs with Docker Compose on `130.131.162.110`
-in `/home/azureuser/OnlinePosSystem`. Its runtime settings come from that
-directory's `SupportConfigFiles/.env`. The proxy on `40.76.227.74` forwards website traffic there.
-The systemd deployment described below is separate from this live Docker app.
+The repository workflow deploys a Docker Compose stack using the configured
+`AZURE_VM_*` secrets and `REMOTE_APP_DIR`. Treat historical server addresses as
+inventory requiring verification, not a source of deployment configuration.
 
-This project deploys to the Azure Ubuntu VM at `40.76.227.74` with GitHub Actions.
-The workflow builds on a GitHub-hosted runner, uploads the release over SSH, and
-restarts the `online-pos-system` systemd service on the VM.
+## Verification and deployment flow
 
-## Server Layout
+Pull requests and pushes to `master`/`main` run Java 17 Maven verification against
+PostgreSQL 16, including the dedicated RLS integration profile. The workflow then
+runs Chromium browser regressions and script syntax checks. Pull requests never
+run the deployment job. Pushes to those branches and manual workflow dispatches
+retain the existing deployment behavior after all build checks pass.
 
-The app runs as a systemd service:
+Deployment checks out the tested revision, builds images, provisions database
+roles, runs owner migrations, and recreates the runtime application container.
+It checks container health, the image revision, and the existing HTTPS endpoint.
+The application image can be rolled back on failure; that rollback does not undo
+database changes. Back up the database before applying schema migrations.
 
-```bash
-sudo systemctl status online-pos-system
-sudo journalctl -u online-pos-system -f
-```
+## Credentials and schema ownership
 
-Runtime files:
+Configure `POSTGRES_USER`/`POSTGRES_PASSWORD` for the database administrator,
+`MIGRATION_DATASOURCE_USERNAME`/`MIGRATION_DATASOURCE_PASSWORD` for the owner,
+and `SPRING_DATASOURCE_USERNAME`/`SPRING_DATASOURCE_PASSWORD` for runtime.
+These must be three separate accounts. See `SupportConfigFiles/.env.example` and
+[ROW_LEVEL_SECURITY.md](ROW_LEVEL_SECURITY.md) for provisioning and migration steps.
 
-```text
-/etc/online-pos-system/online-pos-system.env
-/opt/online-pos-system/app.jar
-/opt/online-pos-system/staff-config.json
-/usr/local/sbin/deploy-online-pos-system
-```
+The normal application never migrates its schema. Only the separate `migrate`
+profile runs `migration.sql` and the immutable RLS migration. `RUN_MIGRATION_SQL`
+controls the catalog migration in that profile; it does not disable runtime RLS.
+Never edit an applied immutable migration. Add an ordered migration when changing
+SQL security definitions and update the reviewed security contract alongside it.
 
-The Azure VM has PostgreSQL installed locally. The app database is:
+The older systemd installer remains a separate deployment helper. It only installs
+and restarts a jar: its database must already be provisioned and migrated, and its
+runtime environment must contain restricted credentials. It is not the workflow's
+current deployment path.
 
-```text
-Database: online_pos_system
-User: pos_app
-Host: 127.0.0.1
-Port: 5432
-```
+## Browser and proxy security
 
-## One-Time Server Setup
+`APP_BASE_URL` supplies the default allowed CORS origin. If separate trusted browser
+origins need API access, configure the comma-separated Spring property
+`app.cors.allowed-origins` (`APP_CORS_ALLOWED_ORIGINS`); credentialed wildcard origins
+are rejected. Same-origin requests continue to work normally.
 
-The VM needs Java, PostgreSQL, the `online-pos-system` service, and the deploy
-helper. From this repository, run:
-
-```bash
-scp -i ~/Downloads/teszt_key.pem scripts/install-server-deploy-helper.sh azureuser@40.76.227.74:/tmp/install-server-deploy-helper.sh
-ssh -i ~/Downloads/teszt_key.pem azureuser@40.76.227.74 \
-  'chmod +x /tmp/install-server-deploy-helper.sh && DEPLOY_USER=azureuser /tmp/install-server-deploy-helper.sh'
-```
-
-## GitHub Secrets
-
-Add these secrets in GitHub under **Settings > Secrets and variables > Actions**:
-
-```text
-AZURE_VM_HOST=40.76.227.74
-AZURE_VM_USER=azureuser
-AZURE_VM_PORT=22
-AZURE_VM_SSH_KEY=<private deploy key for GitHub Actions>
-SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/online_pos_system
-SPRING_DATASOURCE_USERNAME=pos_app
-SPRING_DATASOURCE_PASSWORD=<database password>
-JWT_SECRET=<long random secret, at least 32 characters>
-SERVER_PORT=8081
-APP_BASE_URL=https://email.crowdcam.co.za
-SESSION_COOKIE_SECURE=true
-RUN_MIGRATION_SQL=true
-```
-
-Optional app secrets:
-
-```text
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=<admin password>
-GOOGLE_MAPS_API_KEY=<key if maps are enabled>
-RESEND_API_KEY=<Resend sending_access API key>
-RESEND_FROM_EMAIL=noreply@email.crowdcam.co.za
-```
-
-## Flow
-
-On each push to `master` or `main`, GitHub Actions:
-
-1. Runs the test suite with the `dev` profile.
-2. Builds the Spring Boot jar.
-3. Uploads the jar and `staff-config.json` as a workflow artifact.
-4. Connects to `azureuser@40.76.227.74` over SSH.
-5. Writes `/etc/online-pos-system/online-pos-system.env` from GitHub Secrets.
-6. Installs the new jar and restarts `online-pos-system`.
-7. Runs a local health check against `http://127.0.0.1:8081/` on the VM.
-
-You can also deploy manually from the GitHub Actions tab with **Run workflow**.
-
-## Startup SQL Migration
-
-`src/main/resources/migration.sql` can run automatically on app startup. It
-updates the food/menu catalog while preserving customers and customer order
-history.
-
-This is enabled by default for the normal PostgreSQL app profile. If
-`migration.sql` changed in the commit, the app detects the new file checksum on
-startup and applies it once.
-
-To disable this behavior, set the GitHub secret:
-
-```text
-RUN_MIGRATION_SQL=false
-```
-
-The app stores the last applied SQL checksum in `app_migration_state`.
+Forwarded headers are handled by Tomcat's native trusted-proxy support. Configure
+`server.tomcat.remoteip.internal-proxies`/`trusted-proxies` for the actual proxy
+network when necessary. Application rate limiting uses the resolved remote address,
+not a client-supplied raw `X-Forwarded-For` value. Keep secure session cookies enabled
+on HTTPS deployments; local browser tests explicitly disable the secure flag.
 
 ## Password Reset Email
 
@@ -142,7 +84,7 @@ After changing the live `.env`, recreate the app container to apply it:
 
 ```bash
 docker compose --env-file SupportConfigFiles/.env \
-  -f SupportConfigFiles/docker-compose.yml up -d --no-deps --force-recreate app
+  -f docker/docker-compose.yml up -d --no-deps --force-recreate app
 ```
 
 ## Docker Compose and HTTPS

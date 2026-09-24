@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title th:text="${menuOnly == true ? 'Menu - Pete''s Pizza' : 'Place Order - Pete''s Pizza'}">Place Order - Pete's Pizza</title>
@@ -1117,6 +1119,7 @@
     const PREFERRED_BRANCH_ID = /*[[${preferredBranchId}]]*/ null;
     const PREFERRED_BRANCH_NAME = /*[[${preferredBranchName ?: ''}]]*/ "";
     const CUSTOMER_ORDER_QUEUE = "/user/queue/orders";
+    const CHECKOUT_STORAGE_KEY = "petesPizza.checkoutDraft.v1";
     let customerStompClient = null;
     let customerReconnectTimerId = null;
     let customerReconnectDelayMs = 1000;
@@ -1203,6 +1206,42 @@
         state.customer.complexName = (el.dataset.complexName || "").trim();
     }
 
+    function readCheckoutDraft(){
+        try {
+            const draft = JSON.parse(sessionStorage.getItem(CHECKOUT_STORAGE_KEY) || "null");
+            if (!draft || !Array.isArray(draft.items) || !draft.items.length || !draft.branch?.id) return null;
+            return draft;
+        } catch (_error) {
+            sessionStorage.removeItem(CHECKOUT_STORAGE_KEY);
+            return null;
+        }
+    }
+
+    function saveCheckoutDraft(){
+        sessionStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify({
+            branch: { id: state.branch.id, name: state.branch.name },
+            orderType: state.orderType,
+            customer: { ...state.customer },
+            items: state.cart.items
+        }));
+    }
+
+    function continueToCheckout(){
+        if (!state.branch.id || !state.orderType) {
+            state.ui.orderNotice = { type: "error", message: "Please select a branch and order type before checkout." };
+            renderSummary();
+            return;
+        }
+        if (!state.cart.items.length) {
+            state.ui.orderNotice = { type: "error", message: "Your cart is empty." };
+            renderSummary();
+            return;
+        }
+        saveCheckoutDraft();
+        checkoutNavigationInProgress = true;
+        window.location.href = "/checkout";
+    }
+
     function money(v){
         const n = Number(v || 0);
         return "R" + n.toFixed(2);
@@ -1270,7 +1309,7 @@
         async quotePizza(branchId, pizzaId, payload){
             return api.fetchJson(`${state.apiBase}/${branchId}/pizzas/${pizzaId}/quote`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [document.querySelector('meta[name="_csrf_header"]').content]: document.querySelector('meta[name="_csrf"]').content },
                 body: JSON.stringify(payload)
             });
         }
@@ -1302,6 +1341,7 @@
                 if (!ok) return;
             }
             state.cart.items = [];
+            sessionStorage.removeItem(CHECKOUT_STORAGE_KEY);
             render.updateCartBadges();
             renderSummary();
         },
@@ -1369,7 +1409,7 @@
                 btn.className = "catbtn" + (cat.key === state.ui.activeCategory ? " active" : "");
                 btn.type = "button";
                 btn.dataset.category = cat.key;
-                btn.innerHTML = `<span>${cat.label}</span><span class="count">${counts.get(cat.key) ?? 0}</span>`;
+                btn.innerHTML = `<span>${escapeHtml(cat.label)}</span><span class="count">${counts.get(cat.key) ?? 0}</span>`;
                 btn.addEventListener("click", () => actions.selectCategory(cat));
                 wrap.appendChild(btn);
             }
@@ -2127,6 +2167,10 @@
     const actions = {
         async init(){
             initCustomerDefaults();
+            const checkoutDraft = MENU_ONLY ? null : readCheckoutDraft();
+            if (checkoutDraft?.customer) {
+                Object.assign(state.customer, checkoutDraft.customer);
+            }
             ui.applyMode();
             const goHome = () => {
                 if (!MENU_ONLY && state.cart.items.length){
@@ -2205,7 +2249,16 @@
             render.sidebar();
             render.list();
 
-            if (MENU_ONLY && Number.isFinite(Number(INITIAL_BRANCH_ID))){
+            if (checkoutDraft){
+                await actions.loadBranch(
+                    Number(checkoutDraft.branch.id),
+                    checkoutDraft.branch.name || branchNameFromId(checkoutDraft.branch.id),
+                    checkoutDraft.orderType === "delivery" ? "delivery" : "pickup"
+                );
+                state.cart.items = checkoutDraft.items;
+                render.updateCartBadges();
+                view.show("summary");
+            } else if (MENU_ONLY && Number.isFinite(Number(INITIAL_BRANCH_ID))){
                 const branchId = Number(INITIAL_BRANCH_ID);
                 await actions.loadBranch(branchId, INITIAL_BRANCH_NAME || branchNameFromId(branchId), null);
             } else if (!MENU_ONLY && Number.isFinite(Number(PREFERRED_BRANCH_ID)) && PREFERRED_BRANCH_NAME){
@@ -3927,7 +3980,7 @@
         try{
             const res = await fetch("/api/orders", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [document.querySelector('meta[name="_csrf_header"]').content]: document.querySelector('meta[name="_csrf"]').content },
                 body: JSON.stringify(payload)
             });
             if (!res.ok){
@@ -4085,7 +4138,7 @@
         actionsRow.className = "sum-card";
         actionsRow.innerHTML = `
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <button class="btn btn-primary" id="btnConfirmOrder" type="button">Confirm Order</button>
+              <button class="btn btn-primary" id="btnConfirmOrder" type="button">Continue to Checkout</button>
               <button class="btn btn-ghost" id="btnClearCart2" type="button">Clear Cart</button>
             </div>
         `;
@@ -4107,7 +4160,7 @@
             });
         });
 
-        $("btnConfirmOrder").addEventListener("click", () => submitOrder());
+        $("btnConfirmOrder").addEventListener("click", continueToCheckout);
 
         $("btnClearCart2").addEventListener("click", () => store.clearCart(true));
 
@@ -4146,8 +4199,9 @@
     /************************************************************
      * Warn on leaving with cart
      ************************************************************/
+    let checkoutNavigationInProgress = false;
     window.addEventListener("beforeunload", (e) => {
-        if (!MENU_ONLY && state.cart.items.length > 0){
+        if (!MENU_ONLY && state.cart.items.length > 0 && !checkoutNavigationInProgress){
             e.preventDefault();
             e.returnValue = "";
         }

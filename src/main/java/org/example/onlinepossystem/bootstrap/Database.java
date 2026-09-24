@@ -29,7 +29,7 @@ public class Database implements CommandLineRunner {
                     StaffDirectory staffDirectory,
                     CatalogSeeder catalogSeeder,
                     ObjectMapper objectMapper,
-                    @Value("${app.staff-config-path:Misc/staff-config.json}") String staffConfigPath) {
+                    @Value("${app.staff-config-path}") String staffConfigPath) {
         this.dataSource = dataSource;
         this.staffDirectory = staffDirectory;
         this.catalogSeeder = catalogSeeder;

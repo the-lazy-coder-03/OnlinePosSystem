@@ -3,6 +3,7 @@ package org.example.onlinepossystem.ordering.web;
 import jakarta.validation.Valid;
 import org.example.onlinepossystem.catalog.api.OrderCatalogResolver;
 import org.example.onlinepossystem.catalog.dto.MenuDTO;
+import org.example.onlinepossystem.customer.api.EnvironmentAdminAccount;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
 import org.example.onlinepossystem.ordering.api.InvalidOrderStatusException;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
@@ -24,10 +25,13 @@ public class OrderController {
 
     private final OrderOperations orderOperations;
     private final OrderCatalogResolver catalogResolver;
+    private final EnvironmentAdminAccount environmentAdminAccount;
 
-    public OrderController(OrderOperations orderOperations, OrderCatalogResolver catalogResolver) {
+    public OrderController(OrderOperations orderOperations, OrderCatalogResolver catalogResolver,
+                           EnvironmentAdminAccount environmentAdminAccount) {
         this.orderOperations = orderOperations;
         this.catalogResolver = catalogResolver;
+        this.environmentAdminAccount = environmentAdminAccount;
     }
 
     /**
@@ -49,6 +53,10 @@ public class OrderController {
             @Valid @RequestBody OrderRequestDTO request,
             Authentication authentication
     ) {
+        if (authentication != null && environmentAdminAccount.matches(authentication.getPrincipal())) {
+            Long customerId = environmentAdminAccount.ensureCustomerId(authentication.getPrincipal());
+            return ResponseEntity.ok(orderOperations.placeOrderForCustomerId(request, customerId));
+        }
         String customerEmail = authentication == null ? null : authentication.getName();
         return ResponseEntity.ok(orderOperations.placeOrderForCustomer(request, customerEmail));
     }

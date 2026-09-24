@@ -67,9 +67,21 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     @Override
     @Transactional
     public OrderResponseDTO placeOrderForCustomer(OrderRequestDTO request, String customerEmail) {
+        CustomerAccount customer = resolveCustomer(customerEmail);
+        return saveOrder(request, customer);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponseDTO placeOrderForCustomerId(OrderRequestDTO request, Long customerId) {
+        CustomerAccount customer = customerAccountReader.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Customer account is missing."));
+        return saveOrder(request, customer);
+    }
+
+    private OrderResponseDTO saveOrder(OrderRequestDTO request, CustomerAccount customer) {
         orderRequestValidator.validate(request);
         BranchView branch = branchLookup.requireByName(request.getBranchName());
-        CustomerAccount customer = resolveCustomer(customerEmail);
         LocalDateTime createdAt = LocalDateTime.now();
 
         Order order = new Order();
@@ -112,13 +124,20 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         }
 
         return customerAccountReader.findByEmail(customerEmail)
-                .map(customer -> orderRepository
-                        .findByCustomerIdOrderByCreatedAtDesc(customer.id(), PageRequest.of(0, limit))
-                        .stream()
-                        .map(orderResponseMapper::toDto)
-                        .map(customerOrderSummaryMapper::toSummary)
-                        .toList())
+                .map(customer -> recentOrders(customer.id(), limit))
                 .orElseGet(List::of);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CustomerOrderSummary> getRecentOrdersForCustomerId(Long customerId, int limit) {
+        if (customerId == null || customerId < 1 || limit < 1) return List.of();
+        return recentOrders(customerId, limit);
+    }
+
+    private List<CustomerOrderSummary> recentOrders(Long customerId, int limit) {
+        return orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId, PageRequest.of(0, limit))
+                .stream().map(orderResponseMapper::toDto).map(customerOrderSummaryMapper::toSummary).toList();
     }
 
     @Override

@@ -66,6 +66,28 @@ public class AdminController {
         return "redirect:/admin#items";
     }
 
+    @PostMapping("/pizzas/category-price")
+    public String updatePizzaCategoryPrice(@RequestParam Integer branchId,
+            @RequestParam Integer categoryId, @RequestParam Integer pizzaSizeId,
+            @RequestParam String price, Authentication authentication,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirect) {
+        requireBranch(authentication, branchId);
+        int count = catalogAdministration.updatePizzaCategoryPrice(branchId, categoryId, pizzaSizeId, price, actor(authentication));
+        redirect.addFlashAttribute("pricingMessage", count == 0 ? "No matching prices found" : count + " prices updated.");
+        return "redirect:/admin#pricing";
+    }
+
+    @PostMapping("/menu-items/category-price")
+    public String updateMenuItemCategoryPrice(@RequestParam Integer branchId,
+            @RequestParam Integer categoryId,
+            @RequestParam String price, Authentication authentication,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirect) {
+        requireBranch(authentication, branchId);
+        int count = catalogAdministration.updateMenuItemCategoryPrice(branchId, categoryId, price, actor(authentication));
+        redirect.addFlashAttribute("pricingMessage", count == 0 ? "No matching prices found" : count + " prices updated.");
+        return "redirect:/admin#pricing";
+    }
+
     @PostMapping("/pizzas/price")
     public String updatePizzaPrice(@RequestParam Integer branchId,
                                    @RequestParam Integer pizzaId,
@@ -191,6 +213,17 @@ public class AdminController {
                                      Authentication authentication) {
         catalogAdministration.saveModifierOption(id, groupId, name, menuItemId, additionalPrice, actor(authentication));
         return "redirect:/admin#modifiers";
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler({
+            IllegalArgumentException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
+    public String invalidPriceInput(Exception exception, Model model) {
+        model.addAttribute("status", 400);
+        model.addAttribute("message", exception instanceof IllegalArgumentException
+                ? exception.getMessage() : "Select a valid branch, category and size.");
+        return "error";
     }
 
     private String actor(Authentication authentication) {

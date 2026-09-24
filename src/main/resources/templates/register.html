@@ -2,6 +2,7 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Register — Pete’s Pizza</title>
 
     <style>
@@ -60,7 +61,7 @@
            FORM CONTAINER
         ========================== */
         .container {
-            max-width: 450px;
+            width: min(450px, calc(100% - 24px));
             margin: 40px auto;
             padding: 35px 30px;
             background-color: white;
@@ -71,6 +72,16 @@
 
         .container:hover {
             transform: scale(1.02);
+        }
+
+        @media (max-width: 520px) {
+            header { padding: 16px; }
+            header h1 { font-size: 1.75rem; }
+            header p { font-size: 1rem; }
+            nav { gap: 8px; margin: 12px; flex-wrap: wrap; }
+            nav a { min-height: 44px; padding: 10px 14px; }
+            .container { margin: 12px auto; padding: 20px 16px; border-radius: 8px; }
+            input, select, textarea { font-size: 16px; }
         }
 
         h2 {

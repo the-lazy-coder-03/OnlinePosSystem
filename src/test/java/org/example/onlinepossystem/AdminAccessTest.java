@@ -81,7 +81,7 @@ public class AdminAccessTest {
     @Test
     @WithMockUser(username = "user", roles = {"USER"})
     public void testAdminOrderStatusUpdateForbiddenForUserRole() throws Exception {
-        mockMvc.perform(put("/api/admin/orders/1/status")
+        mockMvc.perform(put("/api/admin/orders/1/status").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"Preparing\"}"))
                 .andExpect(status().isForbidden());
@@ -108,7 +108,7 @@ public class AdminAccessTest {
     @Test
     @WithMockUser(username = "branch-admin", roles = {"ADMIN"})
     public void testBranchAdminCannotCreateStaffAccounts() throws Exception {
-        mockMvc.perform(post("/api/staff/create")
+        mockMvc.perform(post("/api/staff/create").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {

@@ -39,6 +39,13 @@ public class ProfilePageService {
                 ));
     }
 
+    public Optional<ProfilePageView> getProfilePageForCustomerId(Long customerId) {
+        return customerAccountReader.findById(customerId)
+                .map(customer -> new ProfilePageView(customer,
+                        customerOrderHistoryReader.getRecentOrdersForCustomerId(customerId, RECENT_ORDER_LIMIT)
+                                .stream().map(this::toProfileOrder).toList()));
+    }
+
     private ProfileOrderView toProfileOrder(CustomerOrderSummary order) {
         return new ProfileOrderView(
                 order.id(),

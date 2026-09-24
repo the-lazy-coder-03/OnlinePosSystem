@@ -13,6 +13,41 @@ Registration, credential lookup, and recovery cannot start with a customer RLS c
 1. Back up the application database. Provision or confirm a named super admin and named branch-admin accounts before switching off the legacy staff login. Keep the existing `ADMIN_USERNAME`/`ADMIN_PASSWORD` available for access assignments.
 2. In a **dedicated application database**, set `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD` for a trusted database administrator. Set `MIGRATION_DATASOURCE_USERNAME`, `MIGRATION_DATASOURCE_PASSWORD`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` for two different accounts. Run `scripts/provision-rls.sh`. It transfers ownership of known application objects and creates/restricts the two logins; it does not erase data.
 3. Set `MIGRATION_DATASOURCE_URL` (same database, owner credentials) and run `scripts/migrate-database.sh target/OnlinePosSystem-0.0.1-SNAPSHOT.jar`. The owner-only migration profile applies the existing catalog migration and the immutable RLS migration. The normal runtime uses `SPRING_DATASOURCE_*` and Hibernate schema validation; it refuses to start if role privileges or policies are unsafe.
-4. With Docker Compose, run `docker compose --env-file SupportConfigFiles/.env -f SupportConfigFiles/docker-compose.yml up -d db`, then `... run --rm provision`, then `... run --rm migrate`, and finally `... up -d app nginx certbot-renew`. The deployment workflow follows that order and preserves the existing TLS health check.
+4. With Docker Compose, run `docker compose --env-file SupportConfigFiles/.env -f docker/docker-compose.yml up -d db`, then `... run --rm provision`, then `... run --rm migrate`, and finally `... up -d app nginx certbot-renew`. The deployment workflow follows that order and preserves the existing TLS health check.
 
 For isolated local PostgreSQL 16 tests, set `RLS_TEST_ADMIN_URL`, `RLS_TEST_ADMIN_USERNAME`, and `RLS_TEST_ADMIN_PASSWORD` for an administrator of a disposable PostgreSQL server, then run `./scripts/test-postgres.sh`. All Spring tests use a disposable PostgreSQL database; the RLS integration tests additionally create separate owner/runtime roles and another unique database, run migrations twice, exercise RLS through the restricted login and a one-connection Hikari pool, verify a legacy timestamp schema upgrade, and remove their database and roles afterward. Development also uses PostgreSQL: run the owner migration, then start with `SPRING_PROFILES_ACTIVE=dev` and restricted `SPRING_DATASOURCE_*` credentials. Never run the provisioning script against an unrelated shared database.
+
+## Reviewed security contract
+
+Startup also compares the actual definitions against `SupportConfigFiles/rls-contract.json`, packaged as
+`config/rls-contract.json` inside the jar. Maven includes only this reviewed JSON
+from the configuration directory; environment files and staff configuration are
+not bundled. This includes all 56 policies on the 13 private tables (including
+owner-maintenance policies), all 13 non-internal triggers on those tables, and the
+11 `app_security` functions. Policy commands, roles, `USING`/`WITH CHECK` expressions,
+function bodies, and trigger enabled states must match. Additional policies are
+rejected; a policy retaining its original name cannot silently become `USING (true)`.
+The optional legacy `orders` table permits only its owner-maintenance policy or no
+policies. Runtime has read-only SQL grants there and sees no rows.
+
+The verifier checks effective table/function grants as well as ownership and role
+membership, and rejects PUBLIC access to private tables/functions, grant options,
+database/schema creation and permission to disable triggers through
+`session_replication_role`. It restores the connection's original search path after
+reading the contract. The runtime test-only RLS escape hatch requires a classpath
+marker that is absent from the packaged application.
+
+The contract was generated from the reviewed migrations on a fresh PostgreSQL 16
+database using `db/rls-contract-query.sql` with `search_path=pg_catalog`; JSON object
+ordering is irrelevant. Never regenerate it from a deployed database to silence a
+startup failure. Investigate drift, restore reviewed definitions or add a new
+ordered/checksummed migration, and regenerate from a fresh disposable database only
+after reviewing the intended SQL changes. `rls-v1.sql` remains immutable. This audit
+changes verification without changing the installed SQL schema or policies, so no
+new SQL migration is needed.
+
+The test suite introduces weakened predicates, unexpected policies, disabled or
+missing triggers, replaced functions, unsafe grants and owner memberships in isolated
+transactions. It also verifies that a disabled account-protection trigger prevents
+the application from starting. See [DATABASE_SETUP.md](DATABASE_SETUP.md) for Maven
+and real-browser commands.

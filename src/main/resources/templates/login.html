@@ -2,6 +2,7 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Pete’s Pizza | Login</title>
 
     <style>
@@ -13,7 +14,8 @@
         body {
             font-family: Arial, sans-serif;
             background-color: #e6f0ff;
-            height: 100vh;
+            min-height: 100dvh;
+            padding: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -24,6 +26,7 @@
         ========================= */
         .page-container {
             text-align: center;
+            width: 100%;
         }
 
         /* =========================
@@ -49,7 +52,8 @@
         .login-container {
             background: white;
             padding: 40px 30px;
-            width: 380px;
+            width: min(380px, 100%);
+            margin-inline: auto;
             border-radius: 15px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             transition: transform 0.3s;
@@ -76,7 +80,7 @@
             padding: 0 15px;
             border-radius: 15px; /* rounded like order page */
             border: 2px solid #0052cc;
-            font-size: 1em;
+            font-size: 16px;
             background-color: #f0f6ff;
             transition: all 0.3s;
         }

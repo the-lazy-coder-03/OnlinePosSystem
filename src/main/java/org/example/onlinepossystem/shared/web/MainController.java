@@ -74,9 +74,21 @@ public class MainController {
         return "PlaceOrder";
     }
 
+    @GetMapping("/checkout")
+    public String checkoutPage(Model model, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return "redirect:/login";
+        }
+
+        addCustomerDetails(model, authentication.getName());
+        return "checkout";
+    }
+
     private void addCustomerDetails(Model model, String email) {
         customerAccountReader.findByEmail(email).ifPresent(customer -> {
-            model.addAttribute("customerName", customer.firstName());
+            String fullName = (Optional.ofNullable(customer.firstName()).orElse("") + " "
+                    + Optional.ofNullable(customer.lastName()).orElse("")).trim();
+            model.addAttribute("customerName", fullName);
             model.addAttribute("user", customer);
             resolvePreferredBranch(customer).ifPresent(branch -> {
                 model.addAttribute("preferredBranchId", branch.id());

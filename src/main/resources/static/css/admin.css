@@ -242,6 +242,29 @@ body.admin-body {
     font-weight: 700;
 }
 
+.catalog-filter-toolbar {
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.catalog-filter-search {
+    flex: 1 1 260px;
+}
+
+.catalog-filter-select {
+    flex: 0 1 180px;
+    min-width: 150px;
+}
+
+.catalog-filter-summary {
+    margin-left: auto;
+    align-self: center;
+    color: var(--admin-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .admin-section {
     margin-bottom: 28px;
 }
@@ -614,6 +637,17 @@ body.admin-body {
     .toolbar {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .catalog-filter-search,
+    .catalog-filter-select {
+        flex-basis: auto;
+        width: 100%;
+    }
+
+    .catalog-filter-summary {
+        margin-left: 0;
+        text-align: left;
     }
 
     .panel-heading {

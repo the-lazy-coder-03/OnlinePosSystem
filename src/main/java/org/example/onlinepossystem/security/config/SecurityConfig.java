@@ -26,6 +26,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
 @Configuration
 @EnableMethodSecurity
@@ -83,34 +85,50 @@ public class SecurityConfig {
     }
 
     @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration() {
+        var registration = new FilterRegistrationBean<>(jwtAuthenticationFilter);
+        registration.setEnabled(false); // Runs only inside Spring Security, after context loading.
+        return registration;
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
             SecurityContextRepository securityContextRepository
     ) throws Exception {
         http
+                .cors(org.springframework.security.config.Customizer.withDefaults())
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, CsrfFilter.class)
                 .addFilterAfter(new AccountPrincipalRefreshFilter(userDetailsService), JwtAuthenticationFilter.class)
                 .securityContext(context -> context
                         .securityContextRepository(securityContextRepository)
                 )
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/**")
+                        .ignoringRequestMatchers(request -> Boolean.TRUE.equals(
+                                request.getAttribute(JwtAuthenticationFilter.AUTHENTICATED_BEARER)))
+                        .ignoringRequestMatchers(request -> "POST".equals(request.getMethod())
+                                && java.util.Set.of("/api/auth/login", "/api/auth/forgot-password",
+                                        "/api/auth/reset-password", "/api/staff/login").contains(request.getRequestURI().substring(request.getContextPath().length()))
+                                && request.getContentType() != null
+                                && request.getContentType().split(";", 2)[0].trim()
+                                        .equalsIgnoreCase("application/json"))
                 )
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.sameOrigin())
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Protect order and profile pages
-                        .requestMatchers("/order", "/profile/edit", "/profile/update").hasRole("USER")
+                        .requestMatchers("/order", "/checkout", "/profile/edit").hasAnyRole("USER", "SUPER_ADMIN")
+                        .requestMatchers("/profile/update").hasRole("USER")
                         .requestMatchers("/admin/login").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 
                         // Protect sensitive API endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/staff/create").hasRole("SUPER_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasAnyRole("USER", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/orders/menu").permitAll()
                         .requestMatchers("/api/orders", "/api/orders/**").hasRole("ADMIN")
                         .requestMatchers("/input-orders", "/orders", "/InputOrders", "/InputOrders.html").hasRole("ADMIN")

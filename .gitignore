@@ -1,6 +1,10 @@
 /SupportConfigFiles/.env
 /.idea/
 /target/
+/node_modules/
+/SupportConfigFiles/node_modules/
+/SupportConfigFiles/playwright-report/
+/playwright-report/
 /.DS_Store
 **/.DS_Store
 /docker/certbot/

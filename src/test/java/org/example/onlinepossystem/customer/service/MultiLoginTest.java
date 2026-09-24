@@ -3,6 +3,7 @@ package org.example.onlinepossystem.customer.service;
 import org.example.onlinepossystem.customer.entity.Customer;
 import org.example.onlinepossystem.customer.api.AccountAccessAdministration;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
+import org.example.onlinepossystem.ordering.repository.OrderRepository;
 import org.example.onlinepossystem.security.api.RateLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,9 @@ public class MultiLoginTest {
     private CustomerRepository customerRepository;
 
     @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
     private AccountAccessAdministration accessAdministration;
 
     @Autowired
@@ -69,7 +73,7 @@ public class MultiLoginTest {
         mockMvc.perform(MockMvcRequestBuilders.get("/order").with(user(principal)))
                 .andExpect(status().isOk())
                 .andExpect(view().name("PlaceOrder"));
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(user(principal))
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(principal))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"customerName\":\"Named Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
                 .andExpect(status().isOk())
@@ -173,15 +177,23 @@ public class MultiLoginTest {
     }
 
     @Test
-    public void environmentSuperAdminCannotPlaceCustomerOrder() throws Exception {
+    public void environmentSuperAdminCanPlaceLinkedCustomerOrder() throws Exception {
         UserDetails principal = userDetailsService.loadUserByUsername("admin");
 
         mockMvc.perform(MockMvcRequestBuilders.get("/order").with(user(principal)))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(user(principal))
+                .andExpect(status().isOk());
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(principal))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"customerName\":\"Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNumber());
+
+        Customer internalAccount = customerRepository.findByEnvironmentAdminTrue().orElseThrow();
+        assertNull(internalAccount.getEmail());
+        assertNull(internalAccount.getPassword());
+        assertEquals(3, internalAccount.getAccessLevel());
+        assertTrue(orderRepository.findAll().stream()
+                .anyMatch(order -> internalAccount.getId().equals(order.getCustomerId())));
     }
 
     @Test
@@ -240,8 +252,11 @@ public class MultiLoginTest {
     @Test
     public void testRegistrationSignsCustomerIn() throws Exception {
         String email = "new-customer@example.com";
+        MockHttpSession beforeLogin = new MockHttpSession();
+        String previousSessionId = beforeLogin.getId();
 
         MvcResult registration = mockMvc.perform(MockMvcRequestBuilders.post("/register")
+                        .session(beforeLogin)
                         .with(csrf())
                         .param("firstName", "New")
                         .param("lastName", "Customer")
@@ -260,6 +275,7 @@ public class MultiLoginTest {
 
         MockHttpSession session = (MockHttpSession) registration.getRequest().getSession(false);
         assertNotNull(session);
+        org.junit.jupiter.api.Assertions.assertNotEquals(previousSessionId, session.getId());
 
         mockMvc.perform(MockMvcRequestBuilders.get("/order").session(session))
                 .andExpect(status().isOk())

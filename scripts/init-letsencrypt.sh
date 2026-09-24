@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-compose_file="${repo_dir}/SupportConfigFiles/docker-compose.yml"
+compose_file="${repo_dir}/docker/docker-compose.yml"
 env_file="${repo_dir}/SupportConfigFiles/.env"
 cert_dir="${repo_dir}/docker/certbot/conf/live/crowdcam.co.za"
 challenge_dir="${repo_dir}/docker/certbot/www"

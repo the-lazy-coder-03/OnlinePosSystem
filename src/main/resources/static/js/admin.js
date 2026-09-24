@@ -246,7 +246,78 @@
         });
     }
 
+    function setupCatalogFilters() {
+        document.querySelectorAll("[data-catalog-filter]").forEach(toolbar => {
+            const filterName = toolbar.dataset.catalogFilter;
+            const tableBody = document.querySelector(`[data-filter-table="${filterName}"]`);
+            if (!tableBody) return;
+
+            const rows = [...tableBody.querySelectorAll("[data-catalog-row]")];
+            const search = toolbar.querySelector("[data-filter-search]");
+            const category = toolbar.querySelector("[data-filter-category]");
+            const status = toolbar.querySelector("[data-filter-status]");
+            const format = toolbar.querySelector("[data-filter-format]");
+            const clear = toolbar.querySelector("[data-filter-clear]");
+            const count = toolbar.querySelector("[data-filter-count]");
+            const empty = tableBody.querySelector("[data-filter-empty]");
+
+            const applyFilters = () => {
+                const query = normalizedFilterText(search?.value);
+                const selectedCategory = category?.value || "";
+                const selectedStatus = status?.value || "";
+                const selectedFormat = format?.value || "";
+                let visible = 0;
+
+                rows.forEach(row => {
+                    const searchableText = normalizedFilterText(
+                        `${row.dataset.filterName || ""} ${row.dataset.filterDescription || ""}`
+                    );
+                    const formats = new Set((row.dataset.filterFormats || "").split(/\s+/).filter(Boolean));
+                    const matches = (!query || searchableText.includes(query))
+                        && (!selectedCategory || row.dataset.filterCategory === selectedCategory)
+                        && (!selectedStatus || row.dataset.filterStatus === selectedStatus)
+                        && (!selectedFormat || formats.has(selectedFormat));
+                    row.classList.toggle("d-none", !matches);
+                    if (matches) visible += 1;
+                });
+
+                empty?.classList.toggle("d-none", visible !== 0);
+                if (count) {
+                    const label = toolbar.dataset.filterLabel || "items";
+                    count.textContent = `Showing ${visible} of ${rows.length} ${label}`;
+                }
+            };
+
+            search?.addEventListener("input", applyFilters);
+            [category, status, format].forEach(control => control?.addEventListener("change", applyFilters));
+            clear?.addEventListener("click", () => {
+                if (search) search.value = "";
+                [category, status, format].forEach(control => {
+                    if (control) control.value = "";
+                });
+                applyFilters();
+                search?.focus();
+            });
+            applyFilters();
+        });
+    }
+
+    function normalizedFilterText(value) {
+        return String(value || "").trim().toLocaleLowerCase();
+    }
+
     function setupCatalogModals() {
+        document.querySelectorAll("[data-category-price-form]").forEach(form => {
+            form.addEventListener("submit", event => {
+                const label = name => form.elements.namedItem(name)?.selectedOptions[0]?.textContent || "";
+                const scope = [label("categoryId"), label("pizzaSizeId"), label("branchId")].filter(Boolean).join(" / ");
+                const price = Number(form.elements.namedItem("price").value).toFixed(2);
+                if (!window.confirm(`Set all existing prices for ${scope} to R${price}? Previous individual adjustments will be overwritten.`)) {
+                    event.preventDefault();
+                }
+            });
+        });
+
         document.querySelectorAll("[data-pizza-edit]").forEach(button => {
             button.addEventListener("click", () => populatePizzaModal(button.dataset));
         });
@@ -843,6 +914,7 @@
     document.addEventListener("DOMContentLoaded", () => {
         setupNavigation();
         setupOverviewFilters();
+        setupCatalogFilters();
         setupCatalogModals();
         setupUsers();
         setupAccountSearch();

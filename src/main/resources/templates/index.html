@@ -8,6 +8,7 @@
 ====================================================== -->
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Pete’s Pizza — Home</title>
 
     <!-- ==================================================
@@ -188,6 +189,24 @@
             border: 0;
             border-radius: 10px;
             display: block;
+        }
+
+        @media (max-width: 700px) {
+            header { padding: 16px; }
+            header h1 { font-size: 1.8rem; }
+            header p { font-size: 1rem; }
+            .profile-container {
+                position: static;
+                justify-content: center;
+                flex-wrap: wrap;
+                margin-top: 12px;
+            }
+            nav { margin: 12px; }
+            .nav-links { width: 100%; gap: 8px; flex-wrap: wrap; }
+            .nav-links a { flex: 1 1 135px; width: auto; min-width: 0; }
+            #locations { padding: 0 12px 24px; gap: 12px; }
+            .map-container { min-width: 0; flex-basis: 100%; padding: 16px; border-radius: 8px; }
+            .map-container iframe { height: 300px; }
         }
 
     </style>
