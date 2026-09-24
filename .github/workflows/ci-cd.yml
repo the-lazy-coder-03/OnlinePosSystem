@@ -155,8 +155,11 @@ jobs:
     name: Deploy to Azure VM
     runs-on: ubuntu-latest
     needs: [backend-tests, browser-tests, validation]
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'master' || github.ref_name == 'main'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_name == 'master')
     timeout-minutes: 25
+    concurrency:
+      group: online-pos-system-production-deploy
+      cancel-in-progress: false
 
     steps:
       - name: Check out repository
