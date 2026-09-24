@@ -54,6 +54,17 @@ class RlsMigrationInitializationTest {
                 .doesNotContain("truncate ");
     }
 
+    @Test
+    void postgresTestHarnessDoesNotOverrideTheIsolatedMigrationDatasource() throws IOException {
+        String script = sourceFile("scripts/test-postgres.sh");
+
+        assertThat(script)
+                .contains("unset SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD")
+                .doesNotContain("export SPRING_DATASOURCE_URL=")
+                .doesNotContain("export SPRING_DATASOURCE_USERNAME=")
+                .doesNotContain("export SPRING_DATASOURCE_PASSWORD=");
+    }
+
     private String sourceFile(String relativePath) throws IOException {
         Path workingDirectory = Path.of(System.getProperty("user.dir"));
         Path direct = workingDirectory.resolve(relativePath);
