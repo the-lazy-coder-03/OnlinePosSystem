@@ -15,6 +15,11 @@ export PGPASSWORD="${RLS_TEST_ADMIN_PASSWORD:-}"
 export TEST_DATASOURCE_URL="${RLS_TEST_ADMIN_URL%/*}/$test_db"
 export TEST_DATASOURCE_USERNAME="$RLS_TEST_ADMIN_USERNAME"
 export TEST_DATASOURCE_PASSWORD="${RLS_TEST_ADMIN_PASSWORD:-}"
+# Match the active Spring datasource variables to the disposable database too;
+# a developer's exported application credentials must never redirect tests.
+export SPRING_DATASOURCE_URL="$TEST_DATASOURCE_URL"
+export SPRING_DATASOURCE_USERNAME="$TEST_DATASOURCE_USERNAME"
+export SPRING_DATASOURCE_PASSWORD="$TEST_DATASOURCE_PASSWORD"
 export SPRING_PROFILES_ACTIVE=postgres-test
 # Local .env files must never override the disposable test database settings.
 export SPRING_CONFIG_IMPORT=
