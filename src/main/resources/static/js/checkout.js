@@ -29,7 +29,12 @@
     function readDraft() {
         try {
             const value = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "null");
-            return value && Array.isArray(value.items) ? value : null;
+            if (!value || !Array.isArray(value.items)) return null;
+            if (serverCustomer.email && value.accountEmail?.toLowerCase() !== serverCustomer.email.toLowerCase()) {
+                sessionStorage.removeItem(STORAGE_KEY);
+                return null;
+            }
+            return value;
         } catch (_error) {
             sessionStorage.removeItem(STORAGE_KEY);
             return null;
