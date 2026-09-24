@@ -15,7 +15,13 @@ export PGPASSWORD="${RLS_TEST_ADMIN_PASSWORD:-}"
 export TEST_DATASOURCE_URL="${RLS_TEST_ADMIN_URL%/*}/$test_db"
 export TEST_DATASOURCE_USERNAME="$RLS_TEST_ADMIN_USERNAME"
 export TEST_DATASOURCE_PASSWORD="${RLS_TEST_ADMIN_PASSWORD:-}"
+# The test profile reads TEST_DATASOURCE_* directly. Remove any inherited
+# Spring datasource overrides so they cannot redirect either the unit tests or
+# the RLS integration test's isolated migration context.
+unset SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD
 export SPRING_PROFILES_ACTIVE=postgres-test
+# Local .env files must never override the disposable test database settings.
+export SPRING_CONFIG_IMPORT=
 
 cleanup() {
   psql -X -q -d "$admin_uri" -c "DROP DATABASE IF EXISTS $test_db WITH (FORCE)" >/dev/null 2>&1 || true
