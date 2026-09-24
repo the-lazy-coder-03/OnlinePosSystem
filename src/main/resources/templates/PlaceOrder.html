@@ -855,6 +855,7 @@
 <body th:classappend="${menuOnly == true ? 'menu-only' : ''}">
 <div id="customerDefaults"
      th:data-name="${customerName}"
+     th:data-email="${user != null ? user.email : ''}"
      th:data-phone="${user != null ? user.phone1 : ''}"
      th:data-house-number="${user != null ? user.houseNumber : ''}"
      th:data-street="${user != null ? user.street : ''}"
@@ -1135,6 +1136,7 @@
         selection: { branchId: null, branchName: "" },
         customer: {
             name: "",
+            email: "",
             phone: "",
             houseNumber: "",
             street: "",
@@ -1197,6 +1199,7 @@
         const el = document.getElementById("customerDefaults");
         if (!el) return;
         state.customer.name = (el.dataset.name || "").trim();
+        state.customer.email = (el.dataset.email || "").trim();
         state.customer.phone = (el.dataset.phone || "").trim();
         state.customer.houseNumber = (el.dataset.houseNumber || "").trim();
         state.customer.street = (el.dataset.street || "").trim();
@@ -1210,6 +1213,10 @@
         try {
             const draft = JSON.parse(sessionStorage.getItem(CHECKOUT_STORAGE_KEY) || "null");
             if (!draft || !Array.isArray(draft.items) || !draft.items.length || !draft.branch?.id) return null;
+            if (state.customer.email && draft.accountEmail?.toLowerCase() !== state.customer.email.toLowerCase()) {
+                sessionStorage.removeItem(CHECKOUT_STORAGE_KEY);
+                return null;
+            }
             return draft;
         } catch (_error) {
             sessionStorage.removeItem(CHECKOUT_STORAGE_KEY);
@@ -1219,6 +1226,7 @@
 
     function saveCheckoutDraft(){
         sessionStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify({
+            accountEmail: state.customer.email,
             branch: { id: state.branch.id, name: state.branch.name },
             orderType: state.orderType,
             customer: { ...state.customer },
