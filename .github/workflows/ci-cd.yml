@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build and test
+  backend-tests:
+    name: Backend and RLS tests
     runs-on: ubuntu-latest
 
     services:
@@ -61,8 +61,43 @@ jobs:
       - name: Run PostgreSQL tests and verify package
         run: ./scripts/test-postgres.sh -B verify -Prls-it
 
-      - name: Build jar
-        run: ./Misc/mvnw -f Misc/pom.xml -B package -DskipTests
+  browser-tests:
+    name: Browser regression tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-test-only
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s --health-timeout=5s --health-retries=10
+
+    env:
+      RLS_TEST_ADMIN_URL: jdbc:postgresql://localhost:5432/postgres
+      RLS_TEST_ADMIN_USERNAME: postgres
+      RLS_TEST_ADMIN_PASSWORD: ci-test-only
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin
+      JWT_SECRET: ci-only-secret-must-be-at-least-32-characters-long
+      GOOGLE_MAPS_API_KEY: ci-placeholder
+      SESSION_COOKIE_SECURE: "false"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: Misc/pom.xml
 
       - name: Set up browser test runtime
         uses: actions/setup-node@v5
@@ -71,11 +106,44 @@ jobs:
           cache: npm
           cache-dependency-path: SupportConfigFiles/package-lock.json
 
-      - name: Run browser regression tests
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Build browser test jar
+        run: ./Misc/mvnw -f Misc/pom.xml -B package -DskipTests
+
+      - name: Install browser test dependencies
+        run: npm --prefix SupportConfigFiles ci
+
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('SupportConfigFiles/package-lock.json') }}
+
+      - name: Install Playwright Chromium
         run: |
-          npm --prefix SupportConfigFiles ci
-          npm --prefix SupportConfigFiles exec -- playwright install --with-deps chromium
-          npm --prefix SupportConfigFiles run test:browser
+          npm --prefix SupportConfigFiles exec -- playwright install-deps chromium
+          if [[ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]]; then
+            npm --prefix SupportConfigFiles exec -- playwright install chromium
+          fi
+
+      - name: Run browser regression tests
+        run: npm --prefix SupportConfigFiles run test:browser
+
+  validation:
+    name: Static validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
 
       - name: Validate deployment script
         run: |
@@ -86,7 +154,7 @@ jobs:
   deploy:
     name: Deploy to Azure VM
     runs-on: ubuntu-latest
-    needs: build
+    needs: [backend-tests, browser-tests, validation]
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'master' || github.ref_name == 'main'))
     timeout-minutes: 25
 

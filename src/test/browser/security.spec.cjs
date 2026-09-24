@@ -66,8 +66,16 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await admin.goto('/input-orders');
     await expect(admin.locator('#liveStatus')).toContainText('connected.');
 
+    await Promise.all([
+        page.waitForURL('**/checkout'),
+        page.locator('#btnConfirmOrder').click()
+    ]);
+    await expect(page.locator('#fullName')).toHaveValue(maliciousName);
+    await expect(page.locator('#checkoutItems .cart-item')).toHaveCount(1);
+    await page.locator('#phone').fill('0712345678');
+
     const placed = page.waitForResponse(response => response.url().endsWith('/api/orders') && response.request().method() === 'POST');
-    await page.locator('#btnConfirmOrder').click();
+    await page.locator('#placeOrderButton').click();
     const response = await placed;
     expect(response.status()).toBe(200);
     const order = await response.json();
