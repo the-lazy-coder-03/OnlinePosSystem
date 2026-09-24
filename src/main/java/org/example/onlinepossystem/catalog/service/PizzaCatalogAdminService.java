@@ -122,6 +122,7 @@ public class PizzaCatalogAdminService {
 
     @Transactional
     public void updatePizzaPrice(Integer branchId, Integer pizzaId, Integer pizzaSizeId, Double price, String actor) {
+        price = CatalogAdminSupport.validatedPrice(price);
         branchLookup.requireById(branchId);
         Pizza pizza = pizzaRepository.findById(pizzaId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Pizza not found with ID: " + pizzaId));

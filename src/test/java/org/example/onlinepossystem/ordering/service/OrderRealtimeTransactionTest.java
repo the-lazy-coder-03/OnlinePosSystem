@@ -61,14 +61,31 @@ class OrderRealtimeTransactionTest {
         transactionTemplate.executeWithoutResult(status -> {
             eventPublisher.publishEvent(new OrderCreatedEvent(order, "customer@example.com"));
 
-            assertEquals(0, messagingOperations.sentCount());
+            try {
+                org.junit.jupiter.api.Assertions.assertFalse(messagingOperations.awaitAtLeast(1, Duration.ofMillis(100)));
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(exception);
+            }
         });
 
         assertTrue(messagingOperations.awaitAtLeast(1, Duration.ofSeconds(2)));
         assertTrue(messagingOperations.destinations().contains("/topic/admin/orders"));
     }
 
+    @Test
+    void rolledBackOrderNeverPublishesAnEvent() throws InterruptedException {
+        var order = new OrderResponseDTO();
+        order.setId(2092L);
+        transactionTemplate.executeWithoutResult(status -> {
+            eventPublisher.publishEvent(new OrderCreatedEvent(order, "customer@example.com"));
+            status.setRollbackOnly();
+        });
+        org.junit.jupiter.api.Assertions.assertFalse(messagingOperations.awaitAtLeast(1, Duration.ofMillis(100)));
+    }
+
     @Configuration
+    @org.springframework.transaction.annotation.EnableTransactionManagement
     static class Config {
 
         @Bean

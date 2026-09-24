@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS — Kenridge Orders</title>
@@ -222,6 +224,7 @@
 </div>
 
 <script src="/js/stomp-client.js"></script>
+<script src="/js/pos-order-renderer.js"></script>
 <script th:inline="javascript">
     const ADMIN_MODE = /*[[${adminMode ?: false}]]*/ false;
     const ADMIN_BRANCH_ID = /*[[${adminBranchId}]]*/ null;
@@ -336,30 +339,6 @@
         liveStompClient.connect();
     }
 
-    function formatItemsSummary(order) {
-        const items = [];
-        (order.menuItems || []).forEach(mi => {
-            items.push(`${mi.qty}x ${mi.menuItemName}`);
-        });
-        (order.pizzaItems || []).forEach(pi => {
-            const size = pi.pizzaSizeCm ? ` (${pi.pizzaSizeCm}cm)` : '';
-            const base = pi.pizzaBaseOptionName ? `, ${pi.pizzaBaseOptionName}` : '';
-            items.push(`${pi.qty}x ${pi.pizzaName}${size}${base}`);
-        });
-        return items.length ? items.join(', ') : 'No items';
-    }
-
-    function formatAddress(order) {
-        const parts = [];
-        const line1 = [order.houseNumber, order.street].filter(Boolean).join(" ");
-        if (line1) parts.push(line1);
-        if (order.complexName) parts.push(order.complexName);
-        const line2 = [order.area, order.city].filter(Boolean).join(", ");
-        if (line2) parts.push(line2);
-        if (order.postalCode) parts.push(order.postalCode);
-        return parts.length ? parts.join(", ") : "N/A";
-    }
-
     async function updateOrderStatus(orderId, status) {
         try {
             const url = ADMIN_MODE
@@ -367,7 +346,7 @@
                 : `${API_BASE_URL}/orders/${orderId}/status`;
             const response = await fetch(url, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', [document.querySelector('meta[name="_csrf_header"]').content]: document.querySelector('meta[name="_csrf"]').content },
                 body: JSON.stringify({ status })
             });
 
@@ -400,42 +379,11 @@
             return;
         }
 
-        // Display all orders for this branch from backend
         branchOrders.forEach(order => {
-            const li = document.createElement('li');
-            li.className = 'orderItem';
-
-            const customerName = order.customerName || 'Guest';
-            const branchDisplay = ADMIN_MODE && order.branchName ? ` - ${order.branchName}` : '';
-            const itemsDisplay = formatItemsSummary(order);
-            const addressDisplay = formatAddress(order);
-            const statusRaw = order.status || 'Pending';
-            const status = statusRaw === 'created' ? 'Pending' : statusRaw;
-
-            li.innerHTML = `
-                <div class="orderMain">
-                    <span>Order #${order.id}${branchDisplay} - ${customerName} (${order.orderType || 'N/A'})</span>
-                    <span class="status ${status}">${status}</span>
-                </div>
-                <div style="font-size:0.95rem;color:#003366;">${itemsDisplay}</div>
-                <div style="font-size:0.9rem;color:#003366;">Address: ${addressDisplay}</div>
-                <div class="orderActions"></div>
-            `;
-
-            const actions = li.querySelector('.orderActions');
-            if (status === 'Pending') {
-                const btn = document.createElement('button');
-                btn.textContent = 'Prepare';
-                btn.onclick = () => updateOrderStatus(order.id, 'Preparing');
-                actions.appendChild(btn);
-            } else if (status === 'Preparing') {
-                const btn = document.createElement('button');
-                btn.textContent = 'Complete';
-                btn.onclick = () => updateOrderStatus(order.id, 'Completed');
-                actions.appendChild(btn);
-            }
-
-            list.appendChild(li);
+            list.appendChild(PosOrderRenderer.queueRow(order, {
+                showBranch: ADMIN_MODE,
+                onStatusChange: status => updateOrderStatus(order.id, status)
+            }));
         });
     }
 
@@ -462,44 +410,9 @@
 
         const order = branchOrders[orderIndex];
 
-        const customerName = order.customerName || 'Guest';
-        const addressDisplay = formatAddress(order);
-        let itemsList = '';
-        const menuItems = order.menuItems || [];
-        const pizzaItems = order.pizzaItems || [];
-
-        const menuLines = menuItems.map(mi => {
-            const extras = (mi.extras || []).map(e => e.name).filter(Boolean);
-            const extraStr = extras.length ? ` (Extras: ${extras.join(', ')})` : '';
-            return `<li>${mi.qty}x ${mi.menuItemName}${extraStr}</li>`;
-        });
-        const pizzaLines = pizzaItems.map(pi => {
-            const extras = (pi.extras || []).map(e => e.ingredientName).filter(Boolean);
-            if (pi.pizzaBaseOptionName) extras.unshift(pi.pizzaBaseOptionName);
-            const size = pi.pizzaSizeCm ? ` (${pi.pizzaSizeCm}cm)` : '';
-            const extraStr = extras.length ? ` (Extras: ${extras.join(', ')})` : '';
-            return `<li>${pi.qty}x ${pi.pizzaName}${size}${extraStr}</li>`;
-        });
-
-        itemsList = [...menuLines, ...pizzaLines].join('') || '<li>No items</li>';
-
-        const statusRaw = order.status || 'Pending';
-        const status = statusRaw === 'created' ? 'Pending' : statusRaw;
-
-        orderDiv.innerHTML = `
-        <div class="orderCard">
-            <p><strong>Order #${order.id}</strong></p>
-            <p><strong>Customer:</strong> ${customerName}</p>
-            <p><strong>Type:</strong> ${order.orderType || 'N/A'}</p>
-            <p><strong>Address:</strong> ${addressDisplay}</p>
-            <p><strong>Items:</strong></p>
-            <ul>${itemsList}</ul>
-            <div style="text-align:center; margin-top:15px;">
-                ${status === 'Pending' ? '<button class="acceptBtn" onclick="prepareOrder()">Prepare</button>' : ''}
-                ${status === 'Preparing' ? '<button class="acceptBtn" onclick="completeOrder()">Complete</button>' : ''}
-            </div>
-        </div>
-    `;
+        orderDiv.appendChild(PosOrderRenderer.orderCard(order, {
+            onStatusChange: status => updateOrderStatus(order.id, status).then(showSingleOrder)
+        }));
     }
 
     async function prepareOrder() {

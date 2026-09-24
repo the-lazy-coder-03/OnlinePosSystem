@@ -1,6 +1,7 @@
 name: CI/CD
 
 on:
+  pull_request:
   push:
     branches:
       - master
@@ -63,14 +64,30 @@ jobs:
       - name: Build jar
         run: ./Misc/mvnw -f Misc/pom.xml -B package -DskipTests
 
+      - name: Set up browser test runtime
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: SupportConfigFiles/package-lock.json
+
+      - name: Run browser regression tests
+        run: |
+          npm --prefix SupportConfigFiles ci
+          npm --prefix SupportConfigFiles exec -- playwright install --with-deps chromium
+          npm --prefix SupportConfigFiles run test:browser
+
       - name: Validate deployment script
-        run: bash -n scripts/deploy-production.sh
+        run: |
+          for script in scripts/*.sh; do bash -n "$script"; done
+          for script in src/main/resources/static/js/*.js; do node --check "$script"; done
+          python3 scripts/check-template-scripts.py
 
   deploy:
     name: Deploy to Azure VM
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'workflow_dispatch' || github.ref_name == 'master' || github.ref_name == 'main'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'master' || github.ref_name == 'main'))
     timeout-minutes: 25
 
     steps:

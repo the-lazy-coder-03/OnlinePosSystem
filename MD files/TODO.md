@@ -10,7 +10,7 @@
 
 ## Database
 
-- [ ] Confirm `migration.sql` runs on Spring Boot startup when changed.
+- [ ] Confirm owner migrations run before starting the restricted application.
 - [ ] Confirm food catalog changes preserve customer order history.
 - [ ] Check EC2 PostgreSQL has the latest modifier rows after deployment.
 

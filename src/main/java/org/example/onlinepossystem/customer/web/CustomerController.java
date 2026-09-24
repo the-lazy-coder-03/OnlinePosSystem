@@ -124,6 +124,9 @@ public class CustomerController {
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(email, password)
         );
+        // Registration signs in directly, so it must also rotate the pre-login session and CSRF token.
+        if (request.getSession(false) != null) request.changeSessionId();
+        new org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository().saveToken(null, request, response);
         SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
         securityContext.setAuthentication(authentication);
         SecurityContextHolder.setContext(securityContext);

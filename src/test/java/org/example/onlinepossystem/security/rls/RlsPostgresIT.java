@@ -153,6 +153,74 @@ class RlsPostgresIT {
 
     @AfterEach void clearIdentity() { SecurityContextHolder.clearContext(); }
 
+    @Test @Order(0)
+    void verifierRejectsPolicyTriggerFunctionAndGrantDrift() throws Exception {
+        var changes = new ArrayList<>(List.of(
+                "ALTER POLICY orders_read ON customer_order USING (true)",
+                "ALTER POLICY orders_insert ON customer_order WITH CHECK (true)",
+                "ALTER POLICY orders_read ON customer_order TO " + owner,
+                "ALTER POLICY owner_maintenance ON customers TO PUBLIC",
+                "DROP POLICY orders_read ON customer_order; CREATE POLICY orders_read ON customer_order USING (true)",
+                "ALTER TABLE customers DISABLE TRIGGER guard_account_update",
+                "ALTER TABLE order_menu_item DISABLE TRIGGER guard_order_relationship",
+                "DROP TRIGGER guard_order_relationship ON customer_order",
+                "ALTER FUNCTION app_security.actor_role() RENAME TO altered_actor_role",
+                "CREATE OR REPLACE FUNCTION app_security.guard_account_update() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'",
+                "GRANT EXECUTE ON FUNCTION app_security.login_credentials(text) TO PUBLIC",
+                "GRANT UPDATE ON password_reset_tokens TO " + runtime,
+                "GRANT DELETE ON customer_notes TO " + runtime,
+                "GRANT SELECT ON customers TO PUBLIC",
+                "GRANT SELECT ON customers TO " + runtime + " WITH GRANT OPTION",
+                "GRANT TRUNCATE ON customer_order TO " + runtime,
+                "GRANT CREATE ON DATABASE " + database + " TO " + runtime,
+                "GRANT " + owner + " TO " + runtime,
+                "GRANT SET ON PARAMETER session_replication_role TO " + runtime,
+                "CREATE POLICY leaked_legacy ON orders FOR SELECT USING (true)"
+        ));
+        for (String table : RlsRuntimeVerifier.REQUIRED_POLICIES.keySet()) {
+            changes.add("CREATE POLICY leaked_rows ON " + table + " FOR SELECT USING (true)");
+            changes.add("ALTER TABLE " + table + " NO FORCE ROW LEVEL SECURITY");
+        }
+        for (String change : changes) {
+            // Transactional DDL and SET LOCAL ROLE let the verifier observe each unsafe
+            // configuration as runtime, without exposing it to another test connection.
+            try (Connection c = DriverManager.getConnection(jdbcUrl, adminUser, adminPassword)) {
+                c.setAutoCommit(false);
+                try (var s = c.createStatement()) {
+                    s.execute(change);
+                    s.execute("SET LOCAL ROLE " + runtime);
+                    assertThatThrownBy(() -> RlsRuntimeVerifier.verify(c)).as(change)
+                            .isInstanceOf(IllegalStateException.class);
+                } finally { c.rollback(); }
+            }
+        }
+        try (Connection c = pool.getConnection()) { RlsRuntimeVerifier.verify(c); }
+    }
+
+    @Test @Order(0)
+    void disabledProtectionTriggerPreventsApplicationStartup() throws Exception {
+        try (Connection c = ownerConnection(); var s = c.createStatement()) {
+            s.execute("ALTER TABLE customers DISABLE TRIGGER guard_account_update");
+            try {
+                assertThatThrownBy(() -> {
+                    try (var ignored = new SpringApplication(OnlinePosSystemApplication.class).run(runtimeArguments())) { }
+                }).hasStackTraceContaining("RLS triggers differ from the reviewed security contract");
+            } finally { s.execute("ALTER TABLE customers ENABLE TRIGGER guard_account_update"); }
+        }
+    }
+
+    @Test @Order(0)
+    void bearerIdentityOverridesSessionWithoutChangingIt() throws Exception {
+        var session = (MockHttpSession) mvc.perform(post("/login").with(csrf())
+                        .param("username", "environment-admin").param("password", "test-admin-password"))
+                .andExpect(status().is3xxRedirection()).andReturn().getRequest().getSession(false);
+        String token = application.getBean(org.example.onlinepossystem.security.api.TokenService.class)
+                .generateToken(accounts.loadUserByUsername("a@example.com"));
+        mvc.perform(get("/api/admin/orders").session(session).header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/orders").session(session)).andExpect(status().isOk());
+    }
+
     @Test @Order(1)
     void runtimeIsRestrictedAndEveryProtectedTableHasForcedRls() throws Exception {
         try (Connection c = pool.getConnection()) { RlsRuntimeVerifier.verify(c); }
@@ -428,14 +496,14 @@ class RlsPostgresIT {
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/order")));
         mvc.perform(get("/api/orders/menu").param("branch", "Kenridge"))
                 .andExpect(status().isOk());
-        mvc.perform(post("/api/orders").with(user(customer)).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(customer)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"customerName\":\"A\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber());
         mvc.perform(get("/profile/edit").with(user(customer)))
                 .andExpect(status().isOk());
         mvc.perform(get("/order").session(namedSuperSession))
                 .andExpect(status().isOk()).andExpect(view().name("PlaceOrder"));
-        var superOrder = mvc.perform(post("/api/orders").session(namedSuperSession)
+        var superOrder = mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).session(namedSuperSession)
                         .contentType(MediaType.APPLICATION_JSON).content(orderRequest))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber())
                 .andReturn();
@@ -452,7 +520,7 @@ class RlsPostgresIT {
         }
         mvc.perform(get("/order").with(user(environmentAdmin)))
                 .andExpect(status().isOk()).andExpect(view().name("PlaceOrder"));
-        var environmentOrder = mvc.perform(post("/api/orders").with(user(environmentAdmin))
+        var environmentOrder = mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(environmentAdmin))
                         .contentType(MediaType.APPLICATION_JSON).content(orderRequest))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber())
                 .andReturn();
@@ -481,7 +549,7 @@ class RlsPostgresIT {
         }
         for (var blocked : List.of(branchAdmin, driverAccount)) {
             mvc.perform(get("/order").with(user(blocked))).andExpect(status().isForbidden());
-            mvc.perform(post("/api/orders").with(user(blocked))
+            mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(blocked))
                     .contentType(MediaType.APPLICATION_JSON).content(orderRequest))
                     .andExpect(status().isForbidden());
         }

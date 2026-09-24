@@ -23,11 +23,11 @@ final class CatalogAdminSupport {
         if (raw == null || raw.isBlank()) {
             return Optional.empty();
         }
-        double price = Double.parseDouble(raw);
-        if (price < 0) {
-            throw new IllegalArgumentException("Price cannot be negative");
-        }
-        return Optional.of(price);
+        return Optional.of(requiredPrice(raw));
+    }
+
+    static double validatedPrice(Double price) {
+        return requiredPrice(price == null ? null : price.toString());
     }
 
     static double requiredPrice(String raw) {

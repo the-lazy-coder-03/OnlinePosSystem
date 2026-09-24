@@ -48,12 +48,22 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             @Override
             public Message<?> preSend(Message<?> message, MessageChannel channel) {
                 StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+                if (accessor.getCommand() == StompCommand.SEND) {
+                    throw new AccessDeniedException("Clients cannot publish order events.");
+                }
                 if (accessor.getCommand() != StompCommand.SUBSCRIBE) {
                     return message;
                 }
+                if (!(accessor.getUser() instanceof org.springframework.security.core.Authentication authentication)
+                        || !authentication.isAuthenticated()
+                        || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken) {
+                    throw new AccessDeniedException("Authentication is required for subscriptions.");
+                }
                 String destination = accessor.getDestination();
+                // Spring resolves this destination to the authenticated user's private queue.
+                if ("/user/queue/orders".equals(destination)) return message;
                 if (destination == null || !destination.startsWith("/topic/admin/")) {
-                    return message;
+                    throw new AccessDeniedException("Unknown subscription destination.");
                 }
                 if (accessor.getUser() == null) {
                     throw new AccessDeniedException("Admin authentication is required for this subscription.");

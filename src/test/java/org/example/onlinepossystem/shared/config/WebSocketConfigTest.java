@@ -25,6 +25,27 @@ import static org.mockito.Mockito.when;
 class WebSocketConfigTest {
 
     @Test
+    void clientsCannotForgeEventsOrSubscribeToUnknownTopics() {
+        ChannelInterceptor interceptor = interceptor(new WebSocketConfig(
+                mock(AccountAccessReader.class), mock(AccountWebSocketSessions.class)));
+        for (String destination : new String[]{"/topic/admin/orders", "/topic/admin/branches/1/orders", "/queue/orders"}) {
+            var message = StompHeaderAccessor.create(StompCommand.SEND);
+            message.setDestination(destination);
+            message.setUser(new TestingAuthenticationToken("super-admin", "n/a"));
+            assertThatThrownBy(() -> interceptor.preSend(MessageBuilder.createMessage(
+                    new byte[0], message.getMessageHeaders()), mock(MessageChannel.class)))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+        assertThatThrownBy(() -> interceptor.preSend(subscription("/topic/unknown", "super-admin"),
+                mock(MessageChannel.class))).isInstanceOf(AccessDeniedException.class);
+        var anonymous = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        anonymous.setDestination("/topic/admin/orders");
+        assertThatThrownBy(() -> interceptor.preSend(MessageBuilder.createMessage(
+                new byte[0], anonymous.getMessageHeaders()), mock(MessageChannel.class)))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
     void branchAdminCanSubscribeOnlyToTheirBranchTopic() {
         AccountAccessReader accessReader = mock(AccountAccessReader.class);
         when(accessReader.findByUsername("kenridge-admin")).thenReturn(new AccountAccess(1));
@@ -50,6 +71,17 @@ class WebSocketConfigTest {
         assertThat(interceptor.preSend(combined, mock(MessageChannel.class))).isSameAs(combined);
     }
 
+    @Test
+    void customerCanSubscribeOnlyToTheirResolvedPrivateQueue() {
+        var interceptor = interceptor(new WebSocketConfig(mock(AccountAccessReader.class), mock(AccountWebSocketSessions.class)));
+        var ownQueue = subscription("/user/queue/orders", "customer@example.com");
+        assertThat(interceptor.preSend(ownQueue, mock(MessageChannel.class))).isSameAs(ownQueue);
+        for (String destination : new String[]{"/queue/orders", "/user/other@example.com/queue/orders", "/queue/orders-user-other"}) {
+            assertThatThrownBy(() -> interceptor.preSend(subscription(destination, "customer@example.com"), mock(MessageChannel.class)))
+                    .isInstanceOf(AccessDeniedException.class);
+        }
+    }
+
     private ChannelInterceptor interceptor(WebSocketConfig config) {
         ChannelRegistration registration = mock(ChannelRegistration.class);
         AtomicReference<ChannelInterceptor> captured = new AtomicReference<>();
@@ -64,7 +96,7 @@ class WebSocketConfigTest {
     private Message<?> subscription(String destination, String username) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
         accessor.setDestination(destination);
-        accessor.setUser(new TestingAuthenticationToken(username, "n/a"));
+        accessor.setUser(new TestingAuthenticationToken(username, "n/a", "ROLE_USER"));
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
 }

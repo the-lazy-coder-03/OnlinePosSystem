@@ -102,6 +102,7 @@ public class MenuCatalogAdminService {
 
     @Transactional
     public void updateMenuItemPrice(Integer branchId, Integer menuItemId, Double price, String actor) {
+        price = CatalogAdminSupport.validatedPrice(price);
         branchLookup.requireById(branchId);
         MenuItem menuItem = menuItemRepository.findById(menuItemId)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Menu item not found with ID: " + menuItemId));

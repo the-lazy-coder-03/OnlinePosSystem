@@ -4,6 +4,7 @@ WORKDIR /workspace
 COPY Misc/pom.xml Misc/pom.xml
 RUN mvn -f Misc/pom.xml dependency:go-offline
 COPY src src
+COPY SupportConfigFiles/rls-contract.json SupportConfigFiles/rls-contract.json
 RUN mvn -f Misc/pom.xml clean package -DskipTests
 
 # Stage 2: Run

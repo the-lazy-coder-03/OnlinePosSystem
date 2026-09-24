@@ -138,7 +138,7 @@ public class RouteTest {
 
     @Test
     public void testOrderCreationRequiresLogin() throws Exception {
-        mockMvc.perform(post("/api/orders")
+        mockMvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isUnauthorized());
@@ -147,7 +147,7 @@ public class RouteTest {
     @Test
     @org.springframework.security.test.context.support.WithMockUser(roles = "ADMIN")
     public void testInvalidOrderStatusKeepsExistingErrorContract() throws Exception {
-        mockMvc.perform(put("/api/orders/1/status")
+        mockMvc.perform(put("/api/orders/1/status").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"Cancelled\"}"))
                 .andExpect(status().isBadRequest())

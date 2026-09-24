@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title th:text="${menuOnly == true ? 'Menu - Pete''s Pizza' : 'Place Order - Pete''s Pizza'}">Place Order - Pete's Pizza</title>
@@ -1270,7 +1272,7 @@
         async quotePizza(branchId, pizzaId, payload){
             return api.fetchJson(`${state.apiBase}/${branchId}/pizzas/${pizzaId}/quote`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [document.querySelector('meta[name="_csrf_header"]').content]: document.querySelector('meta[name="_csrf"]').content },
                 body: JSON.stringify(payload)
             });
         }
@@ -1369,7 +1371,7 @@
                 btn.className = "catbtn" + (cat.key === state.ui.activeCategory ? " active" : "");
                 btn.type = "button";
                 btn.dataset.category = cat.key;
-                btn.innerHTML = `<span>${cat.label}</span><span class="count">${counts.get(cat.key) ?? 0}</span>`;
+                btn.innerHTML = `<span>${escapeHtml(cat.label)}</span><span class="count">${counts.get(cat.key) ?? 0}</span>`;
                 btn.addEventListener("click", () => actions.selectCategory(cat));
                 wrap.appendChild(btn);
             }
@@ -3927,7 +3929,7 @@
         try{
             const res = await fetch("/api/orders", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [document.querySelector('meta[name="_csrf_header"]').content]: document.querySelector('meta[name="_csrf"]').content },
                 body: JSON.stringify(payload)
             });
             if (!res.ok){

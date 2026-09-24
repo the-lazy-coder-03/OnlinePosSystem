@@ -7,10 +7,8 @@ public final class RequestClientIp {
     }
 
     public static String resolve(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
+        // The servlet container resolves forwarded addresses only from trusted proxies.
+        // Reading the raw header here would let clients choose their rate-limit key.
         return request.getRemoteAddr();
     }
 }

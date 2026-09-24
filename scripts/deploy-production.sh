@@ -23,7 +23,7 @@ trap cleanup EXIT
 
 compose() {
   docker compose --env-file SupportConfigFiles/.env \
-    -f SupportConfigFiles/docker-compose.yml -p onlinepossystem "$@"
+    -f docker/docker-compose.yml -p onlinepossystem "$@"
 }
 
 rollback() {

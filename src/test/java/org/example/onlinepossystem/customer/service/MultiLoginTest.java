@@ -73,7 +73,7 @@ public class MultiLoginTest {
         mockMvc.perform(MockMvcRequestBuilders.get("/order").with(user(principal)))
                 .andExpect(status().isOk())
                 .andExpect(view().name("PlaceOrder"));
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(user(principal))
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(principal))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"customerName\":\"Named Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
                 .andExpect(status().isOk())
@@ -182,7 +182,7 @@ public class MultiLoginTest {
 
         mockMvc.perform(MockMvcRequestBuilders.get("/order").with(user(principal)))
                 .andExpect(status().isOk());
-        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(user(principal))
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(principal))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"customerName\":\"Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
                 .andExpect(status().isOk())
@@ -252,8 +252,11 @@ public class MultiLoginTest {
     @Test
     public void testRegistrationSignsCustomerIn() throws Exception {
         String email = "new-customer@example.com";
+        MockHttpSession beforeLogin = new MockHttpSession();
+        String previousSessionId = beforeLogin.getId();
 
         MvcResult registration = mockMvc.perform(MockMvcRequestBuilders.post("/register")
+                        .session(beforeLogin)
                         .with(csrf())
                         .param("firstName", "New")
                         .param("lastName", "Customer")
@@ -272,6 +275,7 @@ public class MultiLoginTest {
 
         MockHttpSession session = (MockHttpSession) registration.getRequest().getSession(false);
         assertNotNull(session);
+        org.junit.jupiter.api.Assertions.assertNotEquals(previousSessionId, session.getId());
 
         mockMvc.perform(MockMvcRequestBuilders.get("/order").session(session))
                 .andExpect(status().isOk())
