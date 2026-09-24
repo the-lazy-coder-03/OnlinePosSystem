@@ -1,6 +1,7 @@
 /SupportConfigFiles/.env
 /.idea/
 /target/
+/.maven-home/
 /node_modules/
 /SupportConfigFiles/node_modules/
 /SupportConfigFiles/playwright-report/

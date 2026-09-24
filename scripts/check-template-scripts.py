@@ -33,11 +33,11 @@ root = Path(__file__).resolve().parent.parent
 count = 0
 for template in sorted((root / 'src/main/resources/templates').glob('*.html')):
     scripts = Scripts()
-    scripts.feed(template.read_text())
+    scripts.feed(template.read_text(encoding="utf-8"))
     for index, block in enumerate(scripts.blocks):
         if not block.strip():
             continue
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.mjs') as script:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.mjs') as script:
             script.write(block)
             script.flush()
             result = subprocess.run(['node', '--check', script.name], capture_output=True, text=True)

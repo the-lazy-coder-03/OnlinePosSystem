@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -104,10 +105,13 @@ public class RlsRuntimeVerifier {
                  var result = statement.executeQuery(resource("db/rls-contract-query.sql"))) {
                 if (!result.next()) throw new IllegalStateException("Missing RLS security contract");
                 JsonNode actual = mapper.readTree(result.getString(1));
-                for (String section : new String[]{"policies", "triggers", "functions"}) {
+                for (String section : new String[]{"policies", "triggers"}) {
                     if (!expected.path(section).equals(actual.path(section))) {
                         throw new IllegalStateException("RLS " + section + " differ from the reviewed security contract");
                     }
+                }
+                if (!normalizedFunctions(expected.path("functions")).equals(normalizedFunctions(actual.path("functions")))) {
+                    throw new IllegalStateException("RLS functions differ from the reviewed security contract");
                 }
             }
         } catch (IOException exception) {
@@ -115,6 +119,13 @@ public class RlsRuntimeVerifier {
         } finally {
             setSearchPath(connection, originalPath);
         }
+    }
+
+    private static Map<String, String> normalizedFunctions(JsonNode functions) {
+        Map<String, String> normalized = new TreeMap<>();
+        functions.fields().forEachRemaining(entry -> normalized.put(entry.getKey(),
+                entry.getValue().asText().replace("\r\n", "\n").replace('\r', '\n')));
+        return normalized;
     }
 
     private static void setSearchPath(Connection connection, String path) throws SQLException {
