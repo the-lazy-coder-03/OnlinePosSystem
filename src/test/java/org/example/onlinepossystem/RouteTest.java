@@ -137,6 +137,18 @@ public class RouteTest {
     }
 
     @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "USER")
+    public void testCheckoutPageUsesIntegratedCustomerAndCartTemplate() throws Exception {
+        mockMvc.perform(get("/checkout"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("checkout"))
+                .andExpect(content().string(containsString("Pete’s Pizza")))
+                .andExpect(content().string(containsString("id=\"checkoutItems\"")))
+                .andExpect(content().string(containsString("/js/checkout.js")))
+                .andExpect(content().string(not(containsString("Classic Beef Burger"))));
+    }
+
+    @Test
     public void testOrderCreationRequiresLogin() throws Exception {
         mockMvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
                         .contentType(MediaType.APPLICATION_JSON)

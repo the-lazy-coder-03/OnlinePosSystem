@@ -120,7 +120,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Protect order and profile pages
-                        .requestMatchers("/order", "/profile/edit").hasAnyRole("USER", "SUPER_ADMIN")
+                        .requestMatchers("/order", "/checkout", "/profile/edit").hasAnyRole("USER", "SUPER_ADMIN")
                         .requestMatchers("/profile/update").hasRole("USER")
                         .requestMatchers("/admin/login").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
