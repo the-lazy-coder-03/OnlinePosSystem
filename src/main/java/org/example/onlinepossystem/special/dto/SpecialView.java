@@ -7,7 +7,8 @@ import java.util.Set;
 
 public record SpecialView(Long id, String code, String name, String description, BigDecimal price, Integer branchId,
                           boolean active, boolean archived, LocalDate startsOn, LocalDate endsOn,
-                          Set<Integer> days, int sortOrder, List<Component> components, List<Addon> addons) {
+                          Set<Integer> days, boolean availableToday, int sortOrder,
+                          List<Component> components, List<Addon> addons) {
     public record Component(Long id, String code, String label, String productType, int quantity, String selectionMode,
                             Integer menuCategoryId, Integer pizzaCategoryId, Integer pizzaSizeId, Integer sizeCm,
                             boolean allowRepeats, boolean allowCustomization, int sortOrder,

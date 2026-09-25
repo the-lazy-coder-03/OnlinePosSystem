@@ -383,6 +383,15 @@
             box-shadow: var(--shadow-soft);
             transform: translateY(-1px);
         }
+        .row.special-unavailable{
+            cursor: default;
+            background: #f8fafc;
+        }
+        .row.special-unavailable:hover{
+            border-color: var(--line);
+            box-shadow: 0 4px 14px rgba(11,42,91,.06);
+            transform: none;
+        }
         .row-top{
             display:flex;
             align-items:center;
@@ -998,6 +1007,13 @@
             .top-actions{ width: 100%; justify-content: stretch; gap: 6px; }
             .top-actions .pill{ min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
             .top-actions .btn{ min-width: 0; flex: 0 1 auto; }
+            .row-top{ align-items: flex-start; }
+            .row-title{
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+                overflow-wrap: anywhere;
+            }
             .sticky-center{ display:none; }
             #specialSlots .special-choice{
                 display: grid;
@@ -1437,6 +1453,17 @@
         return "R" + n.toFixed(2);
     }
 
+    const SPECIAL_DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+    function specialScheduleLabel(days){
+        const labels = Array.from(new Set(Array.isArray(days) ? days : []))
+            .map(Number)
+            .filter(day => day >= 1 && day <= 7)
+            .sort((a, b) => a - b)
+            .map(day => SPECIAL_DAY_NAMES[day - 1]);
+        return labels.length ? labels.join(", ") : "Scheduled dates";
+    }
+
     function optionPriceLabel(value){
         const price = Number(value || 0);
         return price > 0 ? ("+" + money(price)) : "";
@@ -1491,7 +1518,7 @@
             return api.fetchJson(`${state.apiBase}/${branchId}/menu-items`);
         },
         async getSpecials(branchId){
-            return api.fetchJson(`${state.apiBase}/${branchId}/specials`);
+            return api.fetchJson(`${state.apiBase}/${branchId}/specials/week`);
         },
         async quoteSpecial(branchId, specialId, payload){
             return api.fetchJson(`${state.apiBase}/${branchId}/specials/${specialId}/quote`, {
@@ -1664,9 +1691,16 @@
                 body.appendChild(heading);
                 for (const special of specials) {
                     const row = document.createElement("div");
-                    row.className = "row";
-                    row.innerHTML = `<div class="row-top"><div class="row-title">${escapeHtml(special.name)}</div><div class="row-price">${money(special.price)}</div></div><div class="row-sub">${escapeHtml(special.description || "Available today")}</div><div class="row-cta">${MENU_ONLY ? "View deal" : "Choose bundle"}</div>`;
-                    row.addEventListener("click", () => actions.openSpecial(special.id));
+                    const schedule = specialScheduleLabel(special.days);
+                    const availableToday = Boolean(special.availableToday);
+                    row.className = `row${availableToday ? "" : " special-unavailable"}`;
+                    const availability = availableToday
+                        ? (MENU_ONLY ? "Available today" : "Choose bundle")
+                        : `Available ${schedule}`;
+                    row.innerHTML = `<div class="row-top"><div class="row-title">${escapeHtml(special.name)}</div><div class="row-price">${money(special.price)}</div></div><div class="row-sub">${escapeHtml(special.description || schedule)}</div><div class="row-cta">${escapeHtml(availability)}</div>`;
+                    if (availableToday) {
+                        row.addEventListener("click", () => actions.openSpecial(special.id));
+                    }
                     body.appendChild(row);
                 }
             }
@@ -4321,7 +4355,7 @@
         let favourites = state.data.favouritePizzas.filter(p => matchesSearchPizza(p, q));
         let supremes = state.data.supremePizzas.filter(p => matchesSearchPizza(p, q));
         let menuItems = state.data.menuItems.filter(m => matchesSearchMenu(m, q));
-        let specials = state.data.specials.filter(s => !q || `${s.name || ""} ${s.description || ""}`.toLowerCase().includes(q));
+        let specials = state.data.specials.filter(s => !q || `${s.name || ""} ${s.description || ""} ${specialScheduleLabel(s.days)}`.toLowerCase().includes(q));
 
         if (cat === "specials") {
             favourites = [];

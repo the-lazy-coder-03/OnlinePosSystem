@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -162,6 +163,34 @@ class SpecialServiceTest {
         assertThat(service.available(2)).singleElement().satisfies(view ->
                 assertThat(view.components().get(0).options()).extracting(option -> option.name())
                         .containsExactly("First Burger"));
+    }
+
+    @Test
+    void weeklyScheduleIncludesTheWholeCurrentWeekAndMarksOnlyTodayAvailable() {
+        Branch branch = new Branch(2, "Uitzicht");
+        Special tuesday = baseSpecial(2L, branch, Set.of(2), new BigDecimal("236.00"));
+        tuesday.setName("Tuesday special");
+        Special friday = baseSpecial(3L, branch, Set.of(5), new BigDecimal("200.00"));
+        friday.setName("Friday special");
+        friday.setStartsOn(LocalDate.of(2026, 9, 25));
+        friday.setEndsOn(LocalDate.of(2026, 9, 25));
+
+        Special nextWeek = baseSpecial(4L, branch, Set.of(1), new BigDecimal("999.00"));
+        nextWeek.setStartsOn(LocalDate.of(2026, 9, 28));
+        Special inactive = baseSpecial(5L, branch, Set.of(3), new BigDecimal("999.00"));
+        inactive.setActive(false);
+        Special archived = baseSpecial(6L, branch, Set.of(4), new BigDecimal("999.00"));
+        archived.setArchived(true);
+
+        when(specials.findAllByBranchIdOrderBySortOrderAscIdAsc(2))
+                .thenReturn(List.of(friday, archived, tuesday, nextWeek, inactive, special));
+
+        assertThat(service.weeklySchedule(2))
+                .extracting(view -> view.id())
+                .containsExactly(1L, 2L, 3L);
+        assertThat(service.weeklySchedule(2))
+                .extracting(view -> view.availableToday())
+                .containsExactly(true, false, false);
     }
 
     private SpecialService service(Clock clock) {

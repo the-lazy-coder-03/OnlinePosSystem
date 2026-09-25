@@ -56,6 +56,20 @@ public class SpecialService {
     }
 
     @Transactional(readOnly = true)
+    public List<SpecialView> weeklySchedule(Integer branchId) {
+        LocalDate today = LocalDate.now(clock);
+        LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1L);
+        return specials.findAllByBranchIdOrderBySortOrderAscIdAsc(branchId).stream()
+                .filter(value -> value.isActive() && !value.isArchived())
+                .filter(value -> scheduledInWeek(value, weekStart))
+                .sorted(Comparator.comparingInt(this::firstScheduledDay)
+                        .thenComparingInt(Special::getSortOrder)
+                        .thenComparing(Special::getId, Comparator.nullsLast(Long::compareTo)))
+                .map(value -> toView(value, false))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<SpecialView> adminList() {
         return specials.findAllByOrderByBranchIdAscSortOrderAscIdAsc().stream().map(value -> toView(value, true)).toList();
     }
@@ -434,6 +448,18 @@ public class SpecialService {
                 && (special.getEndsOn() == null || !date.isAfter(special.getEndsOn()));
     }
 
+    private boolean scheduledInWeek(Special special, LocalDate weekStart) {
+        return special.getDays().stream()
+                .filter(day -> day >= 1 && day <= 7)
+                .map(day -> weekStart.plusDays(day - 1L))
+                .anyMatch(day -> (special.getStartsOn() == null || !day.isBefore(special.getStartsOn()))
+                        && (special.getEndsOn() == null || !day.isAfter(special.getEndsOn())));
+    }
+
+    private int firstScheduledDay(Special special) {
+        return special.getDays().stream().min(Integer::compareTo).orElse(8);
+    }
+
     private SpecialView toView(Special special, boolean includeInactiveAddons) {
         Integer branchId = special.getBranch().getId();
         boolean branchAvailableOnly = !includeInactiveAddons;
@@ -459,7 +485,7 @@ public class SpecialService {
         }).toList();
         return new SpecialView(special.getId(), special.getCode(), special.getName(), special.getDescription(), special.getBundlePrice(),
                 special.getBranch().getId(), special.isActive(), special.isArchived(), special.getStartsOn(), special.getEndsOn(),
-                special.getDays(), special.getSortOrder(), components, addons);
+                special.getDays(), isAvailable(special, LocalDate.now(clock)), special.getSortOrder(), components, addons);
     }
 
     private List<SpecialView.Option> componentOptions(SpecialComponent component, Integer branchId,

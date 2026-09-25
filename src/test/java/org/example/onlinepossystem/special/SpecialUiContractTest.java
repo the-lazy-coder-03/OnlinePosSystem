@@ -19,6 +19,10 @@ class SpecialUiContractTest {
                     .contains("money(quote.lineTotal)")
                     .contains("Number(quote.lineTotal)")
                     .contains("if (select.value) {")
+                    .contains("`${state.apiBase}/${branchId}/specials/week`")
+                    .contains("api.getSpecials(branchId)")
+                    .contains("specialScheduleLabel(special.days)")
+                    .contains("special.availableToday")
                     .doesNotContain("select.value && !component.allowCustomization")
                     .doesNotContain("quote.finalTotal");
         }

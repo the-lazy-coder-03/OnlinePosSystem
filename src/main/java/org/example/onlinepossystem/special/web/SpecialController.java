@@ -18,6 +18,11 @@ public class SpecialController {
     @GetMapping
     public List<SpecialView> available(@PathVariable Integer branchId) { return service.available(branchId); }
 
+    @GetMapping("/week")
+    public List<SpecialView> weeklySchedule(@PathVariable Integer branchId) {
+        return service.weeklySchedule(branchId);
+    }
+
     @PostMapping("/{specialId}/quote")
     public SpecialQuoteResponse quote(@PathVariable Integer branchId, @PathVariable Long specialId,
                                       @Valid @RequestBody SpecialQuoteRequest request) {
