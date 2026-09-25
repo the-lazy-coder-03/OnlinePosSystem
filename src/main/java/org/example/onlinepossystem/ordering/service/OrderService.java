@@ -13,6 +13,7 @@ import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
 import org.example.onlinepossystem.ordering.entity.Order;
 import org.example.onlinepossystem.ordering.repository.OrderRepository;
+import org.example.onlinepossystem.special.service.SpecialService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     private final OrderRequestValidator orderRequestValidator;
     private final MenuOrderItemFactory menuOrderItemFactory;
     private final PizzaOrderItemFactory pizzaOrderItemFactory;
+    private final SpecialService specialService;
     private final OrderStatusPolicy orderStatusPolicy;
     private final OrderResponseMapper orderResponseMapper;
     private final CustomerOrderSummaryMapper customerOrderSummaryMapper;
@@ -41,6 +43,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
                         OrderRequestValidator orderRequestValidator,
                         MenuOrderItemFactory menuOrderItemFactory,
                         PizzaOrderItemFactory pizzaOrderItemFactory,
+                        SpecialService specialService,
                         OrderStatusPolicy orderStatusPolicy,
                         OrderResponseMapper orderResponseMapper,
                         CustomerOrderSummaryMapper customerOrderSummaryMapper,
@@ -52,6 +55,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         this.orderRequestValidator = orderRequestValidator;
         this.menuOrderItemFactory = menuOrderItemFactory;
         this.pizzaOrderItemFactory = pizzaOrderItemFactory;
+        this.specialService = specialService;
         this.orderStatusPolicy = orderStatusPolicy;
         this.orderResponseMapper = orderResponseMapper;
         this.customerOrderSummaryMapper = customerOrderSummaryMapper;
@@ -102,18 +106,25 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
             customerOrderRecorder.recordOrderPlaced(customer.id(), createdAt);
         }
 
-        for (OrderRequestDTO.OrderItemRequestDTO itemRequest : request.getItems()) {
+        for (OrderRequestDTO.OrderItemRequestDTO itemRequest : safe(request.getItems())) {
             if (itemRequest.getPizzaId() != null) {
                 order.addPizzaItem(pizzaOrderItemFactory.create(branch.id(), itemRequest));
             } else {
                 order.addMenuItem(menuOrderItemFactory.create(branch.id(), itemRequest));
             }
         }
+        for (OrderRequestDTO.SpecialItemRequestDTO specialRequest : safe(request.getSpecialItems())) {
+            specialService.addToOrder(order, branch.id(), specialRequest);
+        }
 
         Order savedOrder = orderRepository.save(order);
         OrderResponseDTO response = orderResponseMapper.toDto(savedOrder);
         eventPublisher.orderCreated(response, customerUsername(savedOrder));
         return response;
+    }
+
+    private <T> List<T> safe(List<T> values) {
+        return values == null ? List.of() : values;
     }
 
     @Override

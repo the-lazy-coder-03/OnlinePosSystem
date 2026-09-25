@@ -26,7 +26,7 @@ public class MenuModifierCatalogSync implements CommandLineRunner {
         try {
             catalogMaintenance.syncMenuModifierCatalog();
         } catch (DataAccessException ex) {
-            logger.warn("Could not sync chip modifier catalog rows. migration.sql may not have run yet.", ex);
+            logger.warn("Could not sync chip modifier catalog rows. SQL files/migration.sql may not have run yet.", ex);
         }
     }
 }

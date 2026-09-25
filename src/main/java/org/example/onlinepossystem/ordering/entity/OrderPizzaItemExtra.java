@@ -17,6 +17,9 @@ public class OrderPizzaItemExtra {
     @Column(name = "ingredient_id", nullable = false)
     private Integer ingredientId;
 
+    @Column(name = "ingredient_name_at_time")
+    private String ingredientNameAtTime;
+
     @Column(nullable = false)
     private Integer qty = 1;
 
@@ -31,6 +34,8 @@ public class OrderPizzaItemExtra {
     public void setOrderPizzaItem(OrderPizzaItem orderPizzaItem) { this.orderPizzaItem = orderPizzaItem; }
     public Integer getIngredientId() { return ingredientId; }
     public void setIngredientId(Integer ingredientId) { this.ingredientId = ingredientId; }
+    public String getIngredientNameAtTime() { return ingredientNameAtTime; }
+    public void setIngredientNameAtTime(String ingredientNameAtTime) { this.ingredientNameAtTime = ingredientNameAtTime; }
     public Integer getQty() { return qty; }
     public void setQty(Integer qty) { this.qty = qty; }
     public Double getUnitPriceAtTime() { return unitPriceAtTime; }

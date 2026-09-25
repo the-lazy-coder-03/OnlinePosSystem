@@ -134,6 +134,10 @@
                 <directory>${project.basedir}/../src/main/resources</directory>
             </resource>
             <resource>
+                <directory>${project.basedir}/../SQL files</directory>
+                <targetPath>sql</targetPath>
+            </resource>
+            <resource>
                 <directory>${project.basedir}/../SupportConfigFiles</directory>
                 <targetPath>config</targetPath>
                 <includes>

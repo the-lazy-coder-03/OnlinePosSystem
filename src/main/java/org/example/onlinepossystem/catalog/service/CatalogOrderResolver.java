@@ -14,6 +14,7 @@ import org.example.onlinepossystem.catalog.entity.MenuItem;
 import org.example.onlinepossystem.catalog.entity.ModifierGroup;
 import org.example.onlinepossystem.catalog.entity.ModifierOption;
 import org.example.onlinepossystem.catalog.entity.Pizza;
+import org.example.onlinepossystem.catalog.entity.PizzaDefaultIngredient;
 import org.example.onlinepossystem.catalog.entity.PizzaSize;
 import org.example.onlinepossystem.catalog.entity.SaladIngredient;
 import org.example.onlinepossystem.catalog.menu.dto.BurgerComponentRow;
@@ -28,6 +29,7 @@ import org.example.onlinepossystem.catalog.repository.MenuItemRepository;
 import org.example.onlinepossystem.catalog.repository.ModifierGroupRepository;
 import org.example.onlinepossystem.catalog.repository.ModifierOptionRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaRepository;
+import org.example.onlinepossystem.catalog.repository.PizzaDefaultIngredientRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaBaseOptionRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaSizeRepository;
 import org.example.onlinepossystem.catalog.repository.SaladIngredientRepository;
@@ -61,6 +63,7 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
     private final ModifierGroupRepository modifierGroupRepository;
     private final BranchPizzaBaseOptionPriceRepository pizzaBaseOptionPriceRepository;
     private final PizzaBaseOptionRepository pizzaBaseOptionRepository;
+    private final PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository;
 
     public CatalogOrderResolver(BranchLookup branchLookup,
                                 MenuItemRepository menuItemRepository,
@@ -76,7 +79,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                                 MenuItemModifierGroupRepository menuItemModifierGroupRepository,
                                 ModifierGroupRepository modifierGroupRepository,
                                 BranchPizzaBaseOptionPriceRepository pizzaBaseOptionPriceRepository,
-                                PizzaBaseOptionRepository pizzaBaseOptionRepository) {
+                                PizzaBaseOptionRepository pizzaBaseOptionRepository,
+                                PizzaDefaultIngredientRepository pizzaDefaultIngredientRepository) {
         this.branchLookup = branchLookup;
         this.menuItemRepository = menuItemRepository;
         this.branchMenuItemPriceRepository = branchMenuItemPriceRepository;
@@ -92,6 +96,7 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
         this.modifierGroupRepository = modifierGroupRepository;
         this.pizzaBaseOptionPriceRepository = pizzaBaseOptionPriceRepository;
         this.pizzaBaseOptionRepository = pizzaBaseOptionRepository;
+        this.pizzaDefaultIngredientRepository = pizzaDefaultIngredientRepository;
     }
 
     @Override
@@ -211,7 +216,18 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                         + pizza.getName() + " size: " + size.getCm() + "cm in branch: " + branchId));
 
         List<ResolvedPizzaExtra> extras = new ArrayList<>();
+        List<ResolvedPizzaRemovedIngredient> removedIngredients = new ArrayList<>();
         for (CatalogCustomizationRequest customization : safeCustomizations(customizations)) {
+            if ("removedpizzaingredient".equals(normalizedType(customization))) {
+                PizzaDefaultIngredient removed = pizzaDefaultIngredientRepository.findById(
+                                new PizzaDefaultIngredient.PizzaDefaultIngredientId(pizza.getId(), customization.id()))
+                        .filter(PizzaDefaultIngredient::isRemovable)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Ingredient cannot be removed from " + pizza.getName() + "."));
+                removedIngredients.add(new ResolvedPizzaRemovedIngredient(
+                        removed.getIngredient().getId(), removed.getIngredient().getName()));
+                continue;
+            }
             Ingredient ingredient = ingredientRepository.findById(customization.id())
                     .orElseThrow(() -> new java.util.NoSuchElementException(
                             "Ingredient not found with ID: " + customization.id()
@@ -261,7 +277,8 @@ public class CatalogOrderResolver implements OrderCatalogResolver {
                 size.getCm(),
                 price.getPrice(),
                 baseOption,
-                extras
+                extras,
+                removedIngredients
         );
     }
 

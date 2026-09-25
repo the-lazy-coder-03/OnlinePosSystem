@@ -45,7 +45,7 @@ protects delivery.
 Catalog/branch/pricing data retain their existing public-read and application-level
 write permissions, as requested. Customer ownership, branch-admin visibility,
 super-admin access, driver restrictions and note visibility retain their existing
-semantics. Applied `rls-v1.sql` and `migration.sql` are unchanged; no new SQL migration
+semantics. Applied `SQL files/rls-v1.sql` and `SQL files/migration.sql` are unchanged; no new SQL migration
 is required for these verification and application changes.
 
 ## Verification results

@@ -70,6 +70,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set the runtime password}
     volumes:
       - ../scripts:/work/scripts:ro
+      - "../SQL files:/work/SQL files:ro"
     entrypoint: ["bash", "/work/scripts/provision-rls.sh"]
 
   migrate:

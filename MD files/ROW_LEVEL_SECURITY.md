@@ -2,7 +2,7 @@
 
 The normal application uses a restricted PostgreSQL login. Its request identity comes from Spring Security, then `RlsJpaDialect` initializes `app.user_id`, `app.customer_id`, `app.branch_id`, and `app.role` on the **same connection and inside each JPA transaction**. The IDs refer to the existing customer account; there is no separate user or staff account ID in the current login model. The database reads the account's current access level before setting branch and role. All four settings use `set_config(name, value, true)`: `true` makes them transaction-local, so Hikari can reuse a connection without carrying one person's identity into another person's request. Missing or invalid settings expose no protected rows.
 
-`db/rls-v1.sql` forces RLS on `customers`, `customer_order`, all eight order-line/selection tables (`order_menu_item`, `order_menu_item_extra`, `order_burger_protein`, `order_burger_removed_component`, `order_burger_extra_component`, `order_pizza_item`, `order_pizza_item_extra`, `order_pizza_item_base_option`), `staff`, `password_reset_tokens`, and `customer_notes`. The unused legacy `orders` table, if present, is preserved with default-deny RLS. Public branch, menu, pizza, and price tables remain readable without account context.
+`SQL files/rls-v1.sql` forces RLS on `customers`, `customer_order`, all eight order-line/selection tables (`order_menu_item`, `order_menu_item_extra`, `order_burger_protein`, `order_burger_removed_component`, `order_burger_extra_component`, `order_pizza_item`, `order_pizza_item_extra`, `order_pizza_item_base_option`), `staff`, `password_reset_tokens`, and `customer_notes`. The unused legacy `orders` table, if present, is preserved with default-deny RLS. Public branch, menu, pizza, and price tables remain readable without account context.
 
 Customers can read/update their own profile and read/create their own orders and order lines. Branch admins (access levels 1 and 2) can read and update orders for their assigned branch and read full saved profiles for customers who ordered there. They can read/add notes only for those customers. Super admins (level 3 and the configured environment admin) have global administrative access. Drivers gain no order-management access. Order children derive authorization from their protected parent; ownership/branch changes are rejected by triggers. The former staff PIN/code endpoint returns HTTP 410. Named admin accounts use the existing account login, and the POS queue remains available after login.
 
@@ -38,11 +38,11 @@ reading the contract. The runtime test-only RLS escape hatch requires a classpat
 marker that is absent from the packaged application.
 
 The contract was generated from the reviewed migrations on a fresh PostgreSQL 16
-database using `db/rls-contract-query.sql` with `search_path=pg_catalog`; JSON object
+database using `SQL files/rls-contract-query.sql` with `search_path=pg_catalog`; JSON object
 ordering is irrelevant. Never regenerate it from a deployed database to silence a
 startup failure. Investigate drift, restore reviewed definitions or add a new
 ordered/checksummed migration, and regenerate from a fresh disposable database only
-after reviewing the intended SQL changes. `rls-v1.sql` remains immutable. This audit
+after reviewing the intended SQL changes. `SQL files/rls-v1.sql` remains immutable. This audit
 changes verification without changing the installed SQL schema or policies, so no
 new SQL migration is needed.
 

@@ -55,7 +55,8 @@ public interface OrderCatalogResolver {
             Integer pizzaSizeCm,
             Double basePrice,
             ResolvedPizzaBaseOption baseOption,
-            List<ResolvedPizzaExtra> extras
+            List<ResolvedPizzaExtra> extras,
+            List<ResolvedPizzaRemovedIngredient> removedIngredients
     ) {
     }
 
@@ -63,6 +64,9 @@ public interface OrderCatalogResolver {
     }
 
     record ResolvedPizzaExtra(Integer ingredientId, String ingredientName, Integer quantity, Double unitPrice) {
+    }
+
+    record ResolvedPizzaRemovedIngredient(Integer ingredientId, String ingredientName) {
     }
 
     record ResolvedBurgerSelection(

@@ -46,6 +46,11 @@
     }
 
     function itemDetails(item) {
+        if (item.type === "special") {
+            return (item.selections || []).map(selection =>
+                `${selection.label || "Selection"}: ${selection.productName || "Item"}${selection.pizzaSizeCm ? ` (${selection.pizzaSizeCm}cm)` : ""}`
+            ).join(" • ");
+        }
         if (item.type === "pizza") {
             return [
                 item.sizeCm ? `${item.sizeCm} cm` : "",
@@ -168,21 +173,30 @@
     }
 
     function orderItems() {
-        return draft.items.map(item => {
+        return draft.items.filter(item => item.type !== "special").map(item => {
             if (item.type === "menu") {
                 const burgerToppings = (item.selectedBurgerToppingIds || []).map(id => ({ id: Number(id), quantity: 1, type: "burgerComponent" }));
                 const burgerExtras = (item.selectedBurgerExtraToppingIds || []).map(id => ({ id: Number(id), quantity: 1, type: "burgerExtraComponent" }));
                 const modifiers = (item.selectedModifierOptionIds || []).map(id => ({ id: Number(id), quantity: 1, type: "modifierOption" }));
                 return { menuItemId: Number(item.menuItemId), quantity: Number(item.quantity) || 1, customizations: burgerToppings.concat(burgerExtras, modifiers) };
             }
+            const selected = new Set((item.selectedToppingIds || []).map(Number));
             return {
                 pizzaId: Number(item.pizzaId),
                 sizeCm: Number(item.sizeCm),
                 pizzaBaseOptionId: item.pizzaBaseOptionId ? Number(item.pizzaBaseOptionId) : null,
                 quantity: Number(item.quantity) || 1,
-                customizations: (item.selectedExtraToppingIds || []).map(id => ({ id: Number(id), quantity: 1 }))
+                customizations: [
+                    ...(item.selectedExtraToppingIds || []).map(id => ({ id: Number(id), quantity: 1 })),
+                    ...(item.defaultToppingIds || []).filter(id => !selected.has(Number(id)))
+                        .map(id => ({ id: Number(id), quantity: 1, type: "removedPizzaIngredient" }))
+                ]
             };
         });
+    }
+
+    function specialItems() {
+        return draft.items.filter(item => item.type === "special").map(item => ({...item.specialRequest, quantity: Number(item.quantity) || 1}));
     }
 
     function orderPayload() {
@@ -198,7 +212,8 @@
             complexName: delivery ? document.getElementById("complexName").value.trim() : "",
             branchName: draft.branch.name,
             orderType: document.getElementById("orderType").value,
-            items: orderItems()
+            items: orderItems(),
+            specialItems: specialItems()
         };
     }
 

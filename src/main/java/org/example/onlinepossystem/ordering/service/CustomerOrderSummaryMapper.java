@@ -31,6 +31,13 @@ public class CustomerOrderSummaryMapper {
 
     private List<String> itemLines(OrderResponseDTO order) {
         List<String> lines = new ArrayList<>();
+        for (OrderResponseDTO.SpecialItemDTO item : safeList(order.getSpecialItems())) {
+            String selections = safeList(item.getSelections()).stream()
+                    .map(value -> display(value.getLabel(), "Selection") + ": " + display(value.getProductName(), "Item")
+                            + (value.getPizzaSizeCm() == null ? "" : " (" + value.getPizzaSizeCm() + "cm)"))
+                    .collect(Collectors.joining(", "));
+            lines.add(withExtras(quantity(item.getQuantity()) + " x " + display(item.getName(), "Special"), selections));
+        }
         for (OrderResponseDTO.MenuItemDTO item : safeList(order.getMenuItems())) {
             String line = quantity(item.getQty()) + " x " + display(item.getMenuItemName(), "Menu item");
             lines.add(withExtras(line, menuExtras(item)));

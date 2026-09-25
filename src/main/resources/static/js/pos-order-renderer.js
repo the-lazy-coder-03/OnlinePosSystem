@@ -24,6 +24,13 @@ const PosOrderRenderer = (() => {
     }
 
     function itemLines(order, withExtras) {
+        const specials = (order.specialItems || []).map(item => {
+            const selections = (item.selections || []).map(selection => {
+                const size = selection.pizzaSizeCm ? ` (${selection.pizzaSizeCm}cm)` : '';
+                return `${selection.label || 'Selection'}: ${selection.productName || 'Item'}${size}`;
+            });
+            return `${item.quantity || 1}x ${item.name || 'Special'}${withExtras && selections.length ? ` (${selections.join(', ')})` : ''}`;
+        });
         const menu = (order.menuItems || []).map(item => {
             const extras = (item.extras || []).map(extra => extra.name).filter(Boolean);
             return `${item.qty}x ${item.menuItemName}${withExtras && extras.length ? ` (Extras: ${extras.join(', ')})` : ''}`;
@@ -31,12 +38,13 @@ const PosOrderRenderer = (() => {
         const pizzas = (order.pizzaItems || []).map(item => {
             const extras = (item.extras || []).map(extra => extra.ingredientName).filter(Boolean);
             if (item.pizzaBaseOptionName) extras.unshift(item.pizzaBaseOptionName);
+            for (const removed of (item.removedIngredients || [])) extras.push(`No ${removed}`);
             const size = item.pizzaSizeCm ? ` (${item.pizzaSizeCm}cm)` : '';
             const detail = withExtras ? (extras.length ? ` (Extras: ${extras.join(', ')})` : '')
                 : (item.pizzaBaseOptionName ? `, ${item.pizzaBaseOptionName}` : '');
             return `${item.qty}x ${item.pizzaName}${size}${detail}`;
         });
-        return [...menu, ...pizzas];
+        return [...specials, ...menu, ...pizzas];
     }
 
     function actions(order, onStatusChange, className) {

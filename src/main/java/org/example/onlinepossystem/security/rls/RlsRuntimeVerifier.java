@@ -28,8 +28,16 @@ public class RlsRuntimeVerifier {
         policies.put("customer_order", new String[]{"orders_read", "orders_insert", "orders_update", "orders_delete"});
         for (String table : new String[]{"order_menu_item", "order_menu_item_extra", "order_burger_protein",
                 "order_burger_removed_component", "order_burger_extra_component", "order_pizza_item",
-                "order_pizza_item_extra", "order_pizza_item_base_option"}) {
+                "order_pizza_item_extra", "order_pizza_item_base_option", "order_special_item",
+                "order_special_selection", "order_pizza_item_removed_ingredient"}) {
             policies.put(table, new String[]{"child_read", "child_insert", "child_update", "child_delete"});
+        }
+        policies.put("special", new String[]{"special_read", "special_insert", "special_update", "special_delete"});
+        for (String table : new String[]{"special_day", "special_component", "special_addon"}) {
+            policies.put(table, new String[]{"special_child_read", "special_child_insert", "special_child_update", "special_child_delete"});
+        }
+        for (String table : new String[]{"special_component_menu_item", "special_component_pizza"}) {
+            policies.put(table, new String[]{"special_option_read", "special_option_insert", "special_option_delete"});
         }
         policies.put("customer_notes", new String[]{"customer_notes_read", "customer_notes_insert"});
         policies.put("staff", new String[]{"staff_admin"});
@@ -101,7 +109,7 @@ public class RlsRuntimeVerifier {
             var mapper = new ObjectMapper();
             JsonNode expected = mapper.readTree(resource("config/rls-contract.json"));
             try (var statement = connection.createStatement();
-                 var result = statement.executeQuery(resource("db/rls-contract-query.sql"))) {
+                 var result = statement.executeQuery(resource("sql/rls-contract-query.sql"))) {
                 if (!result.next()) throw new IllegalStateException("Missing RLS security contract");
                 JsonNode actual = mapper.readTree(result.getString(1));
                 for (String section : new String[]{"policies", "triggers", "functions"}) {

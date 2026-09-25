@@ -6,6 +6,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
+import jakarta.persistence.Column;
 
 @Entity
 @Table(name = "order_burger_removed_component")
@@ -17,6 +18,9 @@ public class OrderBurgerRemovedComponent {
     @MapsId("orderMenuItemId")
     @JoinColumn(name = "order_menu_item_id")
     private OrderMenuItem orderMenuItem;
+
+    @Column(name = "component_name_at_time")
+    private String componentNameAtTime;
 
     public OrderBurgerRemovedComponent() {
     }
@@ -47,4 +51,6 @@ public class OrderBurgerRemovedComponent {
     public void setComponentId(Integer componentId) {
         this.id.setComponentId(componentId);
     }
+    public String getComponentNameAtTime() { return componentNameAtTime; }
+    public void setComponentNameAtTime(String componentNameAtTime) { this.componentNameAtTime = componentNameAtTime; }
 }

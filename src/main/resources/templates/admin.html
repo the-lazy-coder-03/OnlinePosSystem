@@ -22,6 +22,7 @@
             <button class="nav-link" type="button" data-admin-panel="orders" role="tab" aria-selected="false"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i><span data-panel-title="orders">Live Orders</span></button>
             <button class="nav-link" type="button" data-admin-panel="users" role="tab" aria-selected="false"><i class="bi bi-person-lines-fill" aria-hidden="true"></i><span data-panel-title="users">Users</span></button>
             <button class="nav-link" type="button" data-admin-panel="items" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-box-seam" aria-hidden="true"></i><span data-panel-title="items">Items</span></button>
+            <button class="nav-link" type="button" data-admin-panel="specials" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-stars" aria-hidden="true"></i><span data-panel-title="specials">Specials</span></button>
             <button class="nav-link" type="button" data-admin-panel="pricing" role="tab" aria-selected="false"><i class="bi bi-tags" aria-hidden="true"></i><span data-panel-title="pricing">Pricing</span></button>
             <button class="nav-link" type="button" data-admin-panel="categories" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-ui-checks-grid" aria-hidden="true"></i><span data-panel-title="categories">Categories &amp; Sizes</span></button>
             <button class="nav-link" type="button" data-admin-panel="ingredients" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-list-check" aria-hidden="true"></i><span data-panel-title="ingredients">Ingredients</span></button>
@@ -46,6 +47,7 @@
             <button class="nav-link" type="button" data-admin-panel="orders" role="tab" aria-selected="false"><i class="bi bi-receipt-cutoff"></i>Live Orders</button>
             <button class="nav-link" type="button" data-admin-panel="users" role="tab" aria-selected="false"><i class="bi bi-person-lines-fill"></i>Users</button>
             <button class="nav-link" type="button" data-admin-panel="items" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-box-seam"></i>Items</button>
+            <button class="nav-link" type="button" data-admin-panel="specials" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-stars"></i>Specials</button>
             <button class="nav-link" type="button" data-admin-panel="pricing" role="tab" aria-selected="false"><i class="bi bi-tags"></i>Pricing</button>
             <button class="nav-link" type="button" data-admin-panel="categories" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-ui-checks-grid"></i>Categories &amp; Sizes</button>
             <button class="nav-link" type="button" data-admin-panel="ingredients" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-list-check"></i>Ingredients</button>
@@ -149,6 +151,12 @@
                     </tbody></table></div></div></div>
             </section>
 
+            <section id="specials" class="admin-panel" aria-labelledby="specialsHeading" th:if="${superAdmin}">
+                <div class="panel-heading"><div><h2 id="specialsHeading">Specials</h2><p>Build scheduled branch bundles without changing normal catalog prices.</p></div><button class="btn btn-primary" type="button" id="addSpecialButton"><i class="bi bi-plus-lg me-1"></i>Add special</button></div>
+                <div id="specialsNotice" class="alert d-none" role="status"></div>
+                <div class="admin-table-wrap"><div class="table-responsive"><table class="table admin-table"><thead><tr><th>Special</th><th>Branch</th><th>Days</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody id="specialsTableBody"><tr><td colspan="6" class="text-center text-secondary py-4">Loading specials...</td></tr></tbody></table></div></div>
+            </section>
+
             <section id="pricing" class="admin-panel" aria-labelledby="pricingHeading">
                 <div class="alert alert-success" role="status" th:if="${pricingMessage}" th:text="${pricingMessage}"></div>
                 <div class="panel-heading"><div><h2 id="pricingHeading">Branch Pricing</h2><p th:text="${superAdmin ? 'Set stored catalog prices for either branch.' : 'Set stored catalog prices for ' + adminBranchName + '.'}">Set branch prices.</p></div></div>
@@ -189,6 +197,30 @@
             </section>
         </div>
     </main>
+</div>
+
+<div class="modal fade" id="specialModal" tabindex="-1" aria-labelledby="specialModalTitle" aria-hidden="true" th:if="${superAdmin}">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><form id="specialForm">
+        <div class="modal-header"><h2 class="modal-title fs-5" id="specialModalTitle">Add special</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body">
+            <input type="hidden" id="specialId"><div id="specialFormError" class="alert alert-danger d-none" role="alert"></div>
+            <div class="row g-3">
+                <div class="col-md-3"><label class="form-label" for="specialCode">Stable code</label><input class="form-control" id="specialCode" maxlength="80" required></div>
+                <div class="col-md-3"><label class="form-label" for="specialBranch">Branch</label><select class="form-select" id="specialBranch" required></select></div>
+                <div class="col-md-4"><label class="form-label" for="specialName">Name</label><input class="form-control" id="specialName" maxlength="255" required></div>
+                <div class="col-md-2"><label class="form-label" for="specialPrice">Bundle price</label><input class="form-control" id="specialPrice" type="number" min="0" step="0.01" required></div>
+                <div class="col-12"><label class="form-label" for="specialDescriptionInput">Description</label><textarea class="form-control" id="specialDescriptionInput" maxlength="2000" rows="2"></textarea></div>
+                <div class="col-md-3"><label class="form-label" for="specialStartsOn">Starts on</label><input class="form-control" id="specialStartsOn" type="date"></div>
+                <div class="col-md-3"><label class="form-label" for="specialEndsOn">Ends on</label><input class="form-control" id="specialEndsOn" type="date"></div>
+                <div class="col-md-2"><label class="form-label" for="specialSortOrder">Sort order</label><input class="form-control" id="specialSortOrder" type="number" min="0" value="0"></div>
+                <div class="col-md-2 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input" id="specialActive" type="checkbox"><label class="form-check-label" for="specialActive">Active</label></div></div>
+                <div class="col-12"><span class="form-label d-block">Weekdays</span><div id="specialDays" class="d-flex flex-wrap gap-3"></div></div>
+            </div>
+            <div class="admin-section mt-4"><div class="section-title"><h3>Components</h3><button class="btn btn-sm btn-outline-primary" id="addSpecialComponent" type="button"><i class="bi bi-plus-lg me-1"></i>Add component</button></div><div id="specialComponents"></div></div>
+            <div class="admin-section"><div class="section-title"><h3>Add-ons</h3><button class="btn btn-sm btn-outline-primary" id="addSpecialAddon" type="button"><i class="bi bi-plus-lg me-1"></i>Add add-on</button></div><div id="specialAddons"></div></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save special</button></div>
+    </form></div></div>
 </div>
 
 <div class="modal fade" id="addAdminModal" tabindex="-1" aria-labelledby="addAdminModalTitle" aria-hidden="true" th:if="${superAdmin}">

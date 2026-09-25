@@ -10,4 +10,7 @@ if [[ "$MIGRATION_DATASOURCE_USERNAME" == "$SPRING_DATASOURCE_USERNAME" ]]; then
   exit 1
 fi
 # PGHOST/PGPORT/PGUSER/PGPASSWORD identify the administrator connection.
-psql -X --dbname="$PGDATABASE" --file="$(dirname "$0")/sql/provision-rls.sql"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+sql_file="${script_dir}/../SQL files/provision-rls.sql"
+test -f "$sql_file" || { echo "Missing SQL file: $sql_file" >&2; exit 1; }
+psql -X --dbname="$PGDATABASE" --file="$sql_file"

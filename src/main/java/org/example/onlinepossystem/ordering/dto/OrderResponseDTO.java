@@ -22,6 +22,7 @@ public class OrderResponseDTO {
     private String notes;
     private List<MenuItemDTO> menuItems = new ArrayList<>();
     private List<PizzaItemDTO> pizzaItems = new ArrayList<>();
+    private List<SpecialItemDTO> specialItems = new ArrayList<>();
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -57,6 +58,76 @@ public class OrderResponseDTO {
     public void setMenuItems(List<MenuItemDTO> menuItems) { this.menuItems = menuItems; }
     public List<PizzaItemDTO> getPizzaItems() { return pizzaItems; }
     public void setPizzaItems(List<PizzaItemDTO> pizzaItems) { this.pizzaItems = pizzaItems; }
+    public List<SpecialItemDTO> getSpecialItems() { return specialItems; }
+    public void setSpecialItems(List<SpecialItemDTO> specialItems) { this.specialItems = specialItems; }
+
+    public static class SpecialItemDTO {
+        private Long id;
+        private Long specialId;
+        private String name;
+        private String description;
+        private Integer quantity;
+        private Double basePriceAtTime;
+        private Double customizationTotalAtTime;
+        private Double addonTotalAtTime;
+        private Double finalLineTotalAtTime;
+        private List<SpecialSelectionDTO> selections = new ArrayList<>();
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public Long getSpecialId() { return specialId; }
+        public void setSpecialId(Long specialId) { this.specialId = specialId; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+        public Integer getQuantity() { return quantity; }
+        public void setQuantity(Integer quantity) { this.quantity = quantity; }
+        public Double getBasePriceAtTime() { return basePriceAtTime; }
+        public void setBasePriceAtTime(Double value) { basePriceAtTime = value; }
+        public Double getCustomizationTotalAtTime() { return customizationTotalAtTime; }
+        public void setCustomizationTotalAtTime(Double value) { customizationTotalAtTime = value; }
+        public Double getAddonTotalAtTime() { return addonTotalAtTime; }
+        public void setAddonTotalAtTime(Double value) { addonTotalAtTime = value; }
+        public Double getFinalLineTotalAtTime() { return finalLineTotalAtTime; }
+        public void setFinalLineTotalAtTime(Double value) { finalLineTotalAtTime = value; }
+        public List<SpecialSelectionDTO> getSelections() { return selections; }
+        public void setSelections(List<SpecialSelectionDTO> selections) { this.selections = selections; }
+    }
+
+    public static class SpecialSelectionDTO {
+        private String kind;
+        private Integer selectionIndex;
+        private String label;
+        private String productName;
+        private Integer pizzaSizeCm;
+        private Integer quantity;
+        private Double addonPriceAtTime;
+        private Double customizationChargeAtTime;
+        private MenuItemDTO menuItem;
+        private PizzaItemDTO pizzaItem;
+
+        public String getKind() { return kind; }
+        public void setKind(String kind) { this.kind = kind; }
+        public Integer getSelectionIndex() { return selectionIndex; }
+        public void setSelectionIndex(Integer selectionIndex) { this.selectionIndex = selectionIndex; }
+        public String getLabel() { return label; }
+        public void setLabel(String label) { this.label = label; }
+        public String getProductName() { return productName; }
+        public void setProductName(String productName) { this.productName = productName; }
+        public Integer getPizzaSizeCm() { return pizzaSizeCm; }
+        public void setPizzaSizeCm(Integer pizzaSizeCm) { this.pizzaSizeCm = pizzaSizeCm; }
+        public Integer getQuantity() { return quantity; }
+        public void setQuantity(Integer quantity) { this.quantity = quantity; }
+        public Double getAddonPriceAtTime() { return addonPriceAtTime; }
+        public void setAddonPriceAtTime(Double value) { addonPriceAtTime = value; }
+        public Double getCustomizationChargeAtTime() { return customizationChargeAtTime; }
+        public void setCustomizationChargeAtTime(Double value) { customizationChargeAtTime = value; }
+        public MenuItemDTO getMenuItem() { return menuItem; }
+        public void setMenuItem(MenuItemDTO menuItem) { this.menuItem = menuItem; }
+        public PizzaItemDTO getPizzaItem() { return pizzaItem; }
+        public void setPizzaItem(PizzaItemDTO pizzaItem) { this.pizzaItem = pizzaItem; }
+    }
 
     public static class MenuItemDTO {
         private Long id;
@@ -112,6 +183,7 @@ public class OrderResponseDTO {
         private Double pizzaBaseOptionPriceAtTime;
         private String notes;
         private List<PizzaItemExtraDTO> extras = new ArrayList<>();
+        private List<String> removedIngredients = new ArrayList<>();
 
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
@@ -137,6 +209,8 @@ public class OrderResponseDTO {
         public void setNotes(String notes) { this.notes = notes; }
         public List<PizzaItemExtraDTO> getExtras() { return extras; }
         public void setExtras(List<PizzaItemExtraDTO> extras) { this.extras = extras; }
+        public List<String> getRemovedIngredients() { return removedIngredients; }
+        public void setRemovedIngredients(List<String> values) { removedIngredients = values; }
     }
 
     public static class PizzaItemExtraDTO {

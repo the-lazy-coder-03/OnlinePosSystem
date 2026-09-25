@@ -25,6 +25,9 @@ public class OrderBurgerProtein {
     @Column(name = "component_id", nullable = false)
     private Integer componentId;
 
+    @Column(name = "component_name_at_time")
+    private String componentNameAtTime;
+
     @Column(name = "protein_qty_per_burger", nullable = false)
     private Integer proteinQtyPerBurger;
 
@@ -60,6 +63,9 @@ public class OrderBurgerProtein {
     public void setComponentId(Integer componentId) {
         this.componentId = componentId;
     }
+
+    public String getComponentNameAtTime() { return componentNameAtTime; }
+    public void setComponentNameAtTime(String componentNameAtTime) { this.componentNameAtTime = componentNameAtTime; }
 
     public Integer getProteinQtyPerBurger() {
         return proteinQtyPerBurger;

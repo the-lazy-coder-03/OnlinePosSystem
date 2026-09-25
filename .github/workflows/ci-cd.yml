@@ -148,6 +148,12 @@ jobs:
       - name: Validate deployment script
         run: |
           for script in scripts/*.sh; do bash -n "$script"; done
+          unexpected_sql="$(git ls-files | grep -Ei '\.sql$' | grep -v '^SQL files/' || true)"
+          if [[ -n "$unexpected_sql" ]]; then
+            echo "SQL files must be stored in SQL files/:" >&2
+            echo "$unexpected_sql" >&2
+            exit 1
+          fi
           for script in src/main/resources/static/js/*.js; do node --check "$script"; done
           python3 scripts/check-template-scripts.py
 

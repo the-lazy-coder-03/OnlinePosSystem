@@ -4,6 +4,8 @@ The application requires PostgreSQL 16 and separate administrator, migration-own
 and runtime accounts. Normal runtime uses `ddl-auto=validate`, verifies private-data
 RLS before JPA initialization, and never creates the schema. The `dev` profile uses
 the same protection. Do not use administrator or owner credentials for runtime.
+All SQL source files are stored in the top-level `SQL files/` directory and are
+packaged under `sql/` inside the application jar.
 
 ## Setup
 

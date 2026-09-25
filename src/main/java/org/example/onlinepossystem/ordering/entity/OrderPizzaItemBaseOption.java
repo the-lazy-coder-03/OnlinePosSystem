@@ -23,6 +23,9 @@ public class OrderPizzaItemBaseOption {
     @Column(name = "pizza_base_option_id", nullable = false)
     private Integer pizzaBaseOptionId;
 
+    @Column(name = "base_option_name_at_time")
+    private String baseOptionNameAtTime;
+
     @Column(name = "unit_price_at_time", nullable = false)
     private Double unitPriceAtTime;
 
@@ -33,6 +36,8 @@ public class OrderPizzaItemBaseOption {
     public void setOrderPizzaItem(OrderPizzaItem orderPizzaItem) { this.orderPizzaItem = orderPizzaItem; }
     public Integer getPizzaBaseOptionId() { return pizzaBaseOptionId; }
     public void setPizzaBaseOptionId(Integer pizzaBaseOptionId) { this.pizzaBaseOptionId = pizzaBaseOptionId; }
+    public String getBaseOptionNameAtTime() { return baseOptionNameAtTime; }
+    public void setBaseOptionNameAtTime(String baseOptionNameAtTime) { this.baseOptionNameAtTime = baseOptionNameAtTime; }
     public Double getUnitPriceAtTime() { return unitPriceAtTime; }
     public void setUnitPriceAtTime(Double unitPriceAtTime) { this.unitPriceAtTime = unitPriceAtTime; }
 }

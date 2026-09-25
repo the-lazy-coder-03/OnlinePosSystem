@@ -27,7 +27,7 @@ These must be three separate accounts. See `SupportConfigFiles/.env.example` and
 [ROW_LEVEL_SECURITY.md](ROW_LEVEL_SECURITY.md) for provisioning and migration steps.
 
 The normal application never migrates its schema. Only the separate `migrate`
-profile runs `migration.sql` and the immutable RLS migration. `RUN_MIGRATION_SQL`
+profile runs `SQL files/migration.sql` and the immutable RLS migration. `RUN_MIGRATION_SQL`
 controls the catalog migration in that profile; it does not disable runtime RLS.
 Never edit an applied immutable migration. Add an ordered migration when changing
 SQL security definitions and update the reviewed security contract alongside it.

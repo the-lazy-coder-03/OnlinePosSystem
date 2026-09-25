@@ -40,11 +40,20 @@ public class OrderPizzaItem {
     @Column(name = "base_price_at_time", nullable = false)
     private Double basePriceAtTime;
 
+    @Column(name = "pizza_name_at_time")
+    private String pizzaNameAtTime;
+
+    @Column(name = "pizza_size_cm_at_time")
+    private Integer pizzaSizeCmAtTime;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 
     @OneToMany(mappedBy = "orderPizzaItem", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderPizzaItemExtra> extras = new ArrayList<>();
+
+    @OneToMany(mappedBy = "orderPizzaItem", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderPizzaItemRemovedIngredient> removedIngredients = new ArrayList<>();
 
     @OneToOne(mappedBy = "orderPizzaItem", cascade = CascadeType.ALL, orphanRemoval = true)
     private OrderPizzaItemBaseOption baseOption;
@@ -63,6 +72,10 @@ public class OrderPizzaItem {
     public void setQty(Integer qty) { this.qty = qty; }
     public Double getBasePriceAtTime() { return basePriceAtTime; }
     public void setBasePriceAtTime(Double basePriceAtTime) { this.basePriceAtTime = basePriceAtTime; }
+    public String getPizzaNameAtTime() { return pizzaNameAtTime; }
+    public void setPizzaNameAtTime(String pizzaNameAtTime) { this.pizzaNameAtTime = pizzaNameAtTime; }
+    public Integer getPizzaSizeCmAtTime() { return pizzaSizeCmAtTime; }
+    public void setPizzaSizeCmAtTime(Integer pizzaSizeCmAtTime) { this.pizzaSizeCmAtTime = pizzaSizeCmAtTime; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public List<OrderPizzaItemExtra> getExtras() { return extras; }
@@ -70,6 +83,11 @@ public class OrderPizzaItem {
     public void addExtra(OrderPizzaItemExtra extra) {
         extras.add(extra);
         extra.setOrderPizzaItem(this);
+    }
+    public List<OrderPizzaItemRemovedIngredient> getRemovedIngredients() { return removedIngredients; }
+    public void addRemovedIngredient(OrderPizzaItemRemovedIngredient removed) {
+        removedIngredients.add(removed);
+        removed.setOrderPizzaItem(this);
     }
     public OrderPizzaItemBaseOption getBaseOption() { return baseOption; }
     public void setBaseOption(OrderPizzaItemBaseOption baseOption) {
