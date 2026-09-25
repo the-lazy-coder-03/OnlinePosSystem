@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
@@ -18,6 +19,9 @@ public class OrderRequestDTO {
     private String city;
     private String postalCode;
     private String complexName;
+    @Size(max = 64, message = "Gate access code must be 64 characters or fewer.")
+    @Pattern(regexp = "[A-Za-z0-9 #*]*", message = "Gate access code may contain only letters, numbers, spaces, # and *.")
+    private String gateAccessCode;
     @NotBlank
     private String branchName;
     private String orderType; // "pickup" or "delivery"
@@ -43,6 +47,8 @@ public class OrderRequestDTO {
     public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
     public String getComplexName() { return complexName; }
     public void setComplexName(String complexName) { this.complexName = complexName; }
+    public String getGateAccessCode() { return gateAccessCode; }
+    public void setGateAccessCode(String gateAccessCode) { this.gateAccessCode = gateAccessCode; }
     public String getBranchName() { return branchName; }
     public void setBranchName(String branchName) { this.branchName = branchName; }
     public String getOrderType() { return orderType; }

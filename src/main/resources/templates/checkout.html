@@ -121,6 +121,16 @@
                             <input id="complexName" name="complexName" type="text" autocomplete="address-line2">
                         </div>
                     </div>
+                    <fieldset class="estate-access">
+                        <legend>Estate access</legend>
+                        <div class="form-group">
+                            <label for="gateAccessCode">Gate access code <span>(optional)</span></label>
+                            <input id="gateAccessCode" name="gateAccessCode" type="text" maxlength="64"
+                                   pattern="[A-Za-z0-9 #*]*" autocomplete="off" spellcheck="false"
+                                   aria-describedby="gateAccessHint">
+                            <small id="gateAccessHint" class="field-hint">For estates or complexes with controlled access. Letters, numbers, spaces, # and * only.</small>
+                        </div>
+                    </fieldset>
                 </div>
             </form>
         </article>

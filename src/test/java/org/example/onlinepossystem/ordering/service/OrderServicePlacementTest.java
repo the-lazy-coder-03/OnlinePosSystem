@@ -133,6 +133,46 @@ class OrderServicePlacementTest {
     private EntityManager entityManager;
 
     @Test
+    void storesTrimmedGateAccessCodeForDeliveryAndReturnsIt() {
+        MenuFixture fixture = createMenuFixture();
+        OrderRequestDTO request = request(fixture.branch().getName(), menuItem(fixture.menuItem().getId(), 1));
+        request.setOrderType("delivery");
+        request.setGateAccessCode("  Gate 4*  ");
+
+        OrderResponseDTO response = orderOperations.placeOrder(request);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(response.getGateAccessCode()).isEqualTo("Gate 4*");
+        assertThat(orderRepository.findById(response.getId()).orElseThrow().getGateAccessCode()).isEqualTo("Gate 4*");
+    }
+
+    @Test
+    void discardsGateAccessCodeForCollectionOrders() {
+        MenuFixture fixture = createMenuFixture();
+        OrderRequestDTO request = request(fixture.branch().getName(), menuItem(fixture.menuItem().getId(), 1));
+        request.setGateAccessCode("0123#");
+
+        OrderResponseDTO response = orderOperations.placeOrder(request);
+        entityManager.flush();
+
+        assertThat(response.getGateAccessCode()).isNull();
+        assertThat(orderRepository.findById(response.getId()).orElseThrow().getGateAccessCode()).isNull();
+    }
+
+    @Test
+    void storesBlankDeliveryGateAccessCodeAsNull() {
+        MenuFixture fixture = createMenuFixture();
+        OrderRequestDTO request = request(fixture.branch().getName(), menuItem(fixture.menuItem().getId(), 1));
+        request.setOrderType("delivery");
+        request.setGateAccessCode("   ");
+
+        OrderResponseDTO response = orderOperations.placeOrder(request);
+
+        assertThat(response.getGateAccessCode()).isNull();
+    }
+
+    @Test
     void placesPizzaItemsWithExtraIngredients() {
         PizzaFixture fixture = createPizzaFixture();
 

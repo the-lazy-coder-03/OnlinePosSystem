@@ -9,7 +9,7 @@
     const pickupButton = document.getElementById("pickupButton");
     const placeOrderButton = document.getElementById("placeOrderButton");
     const notice = document.getElementById("checkoutNotice");
-    const fieldIds = ["fullName", "phone", "houseNumber", "street", "area", "city", "postalCode", "complexName"];
+    const fieldIds = ["fullName", "phone", "houseNumber", "street", "area", "city", "postalCode", "complexName", "gateAccessCode"];
 
     const serverCustomer = {
         fullName: defaultsElement?.dataset.fullName || "",
@@ -167,7 +167,8 @@
             area: document.getElementById("area").value.trim(),
             city: document.getElementById("city").value.trim(),
             postalCode: document.getElementById("postalCode").value.trim(),
-            complexName: document.getElementById("complexName").value.trim()
+            complexName: document.getElementById("complexName").value.trim(),
+            gateAccessCode: document.getElementById("gateAccessCode").value.trim()
         };
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
     }
@@ -210,6 +211,7 @@
             city: delivery ? document.getElementById("city").value.trim() : "",
             postalCode: delivery ? document.getElementById("postalCode").value.trim() : "",
             complexName: delivery ? document.getElementById("complexName").value.trim() : "",
+            gateAccessCode: delivery ? document.getElementById("gateAccessCode").value.trim() : "",
             branchName: draft.branch.name,
             orderType: document.getElementById("orderType").value,
             items: orderItems(),

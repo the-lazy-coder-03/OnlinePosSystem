@@ -49,6 +49,7 @@ public class OrderResponseMapper {
         dto.setCity(order.getCity());
         dto.setPostalCode(order.getPostalCode());
         dto.setComplexName(order.getComplexName());
+        dto.setGateAccessCode(order.getGateAccessCode());
         dto.setNotes(order.getNotes());
         Set<OrderMenuItem> bundledMenuItems = new HashSet<>();
         Set<OrderPizzaItem> bundledPizzaItems = new HashSet<>();

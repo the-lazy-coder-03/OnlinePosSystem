@@ -13,6 +13,7 @@ class AdminLiveOrderRenderingTest {
     @Test
     void adminOrdersRenderItemSpecificDetails() throws IOException {
         String adminJs = resourceText("static/js/admin.js");
+        String orderRendererJs = resourceText("static/js/pos-order-renderer.js");
         String adminCss = resourceText("static/css/admin.css");
 
         assertThat(adminJs)
@@ -24,6 +25,15 @@ class AdminLiveOrderRenderingTest {
                 .contains("item.pizzaBaseOptionName")
                 .contains("Extra topping:")
                 .contains("Notes:");
+
+        assertThat(adminJs)
+                .contains("appendLine(body, \"Gate access\", accessCode)")
+                .contains("appendLine(content, \"Gate access\", accessCode)")
+                .contains("function gateAccessSummary(order)");
+        assertThat(orderRendererJs)
+                .contains("`Gate access: ${accessCode}`")
+                .contains("['Gate access:', accessCode]")
+                .contains("function gateAccess(order)");
 
         assertThat(adminJs)
                 .doesNotContain("appendLine(body, \"Items\", itemSummary(order))")

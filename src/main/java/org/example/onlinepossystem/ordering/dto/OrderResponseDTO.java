@@ -19,6 +19,7 @@ public class OrderResponseDTO {
     private String city;
     private String postalCode;
     private String complexName;
+    private String gateAccessCode;
     private String notes;
     private List<MenuItemDTO> menuItems = new ArrayList<>();
     private List<PizzaItemDTO> pizzaItems = new ArrayList<>();
@@ -52,6 +53,8 @@ public class OrderResponseDTO {
     public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
     public String getComplexName() { return complexName; }
     public void setComplexName(String complexName) { this.complexName = complexName; }
+    public String getGateAccessCode() { return gateAccessCode; }
+    public void setGateAccessCode(String gateAccessCode) { this.gateAccessCode = gateAccessCode; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public List<MenuItemDTO> getMenuItems() { return menuItems; }

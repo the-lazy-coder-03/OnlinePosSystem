@@ -166,6 +166,8 @@
         appendOrderItems(body, order);
         if ((order.orderType || "").toLowerCase() === "delivery") {
             appendLine(body, "Address", addressSummary(order));
+            const accessCode = gateAccessSummary(order);
+            if (accessCode) appendLine(body, "Gate access", accessCode);
         }
         if (order.notes) appendLine(body, "Notes", order.notes);
 
@@ -646,6 +648,8 @@
         appendOrderItems(content, order);
         appendLine(content, "Order address", [order.houseNumber, order.street, order.area,
             order.complexName, order.city, order.postalCode].filter(Boolean).join(", ") || "—");
+        const accessCode = gateAccessSummary(order);
+        if (accessCode) appendLine(content, "Gate access", accessCode);
         if (order.notes) appendLine(content, "Order notes", order.notes);
         details.appendChild(content);
         return details;
@@ -1088,6 +1092,11 @@
     function addressSummary(order) {
         return [order.houseNumber, order.street, order.area, order.city, order.postalCode]
             .filter(Boolean).join(", ") || "No address supplied";
+    }
+
+    function gateAccessSummary(order) {
+        if ((order.orderType || "").toLowerCase() !== "delivery") return "";
+        return String(order.gateAccessCode || "").trim();
     }
 
     function normalizedStatus(status) {

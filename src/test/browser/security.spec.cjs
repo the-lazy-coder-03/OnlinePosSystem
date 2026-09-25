@@ -19,7 +19,7 @@ test('order renderer treats every customer field as text and allows only known s
     const attack = '<img src=x onerror="window.compromised=true"><script>window.compromised=true</script>';
     await page.evaluate(attack => {
         const order = {
-            id: 1, customerName: attack, branchName: attack, orderType: attack,
+            id: 1, customerName: attack, branchName: attack, orderType: 'delivery', gateAccessCode: attack,
             houseNumber: attack, street: attack, area: attack, city: attack,
             postalCode: attack, complexName: attack, status: attack,
             menuItems: [{qty: 1, menuItemName: attack, extras: [{name: attack}]}],
@@ -85,10 +85,18 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await page.locator('#deliveryButton').click();
     await expect(page.locator('#deliveryFields')).toBeVisible();
     await expect(page.locator('#street')).toHaveAttribute('required', '');
+    await expect(page.locator('#gateAccessCode')).toHaveAttribute('maxlength', '64');
+    await page.locator('#gateAccessCode').fill('Gate 4*');
     await page.locator('#pickupButton').click();
     await expect(page.locator('#deliveryFields')).toBeHidden();
     await expect(page.locator('#street')).not.toHaveAttribute('required', '');
     await expect(page.locator('#placeOrderButton')).toBeEnabled();
+    await page.locator('#deliveryButton').click();
+    await expect(page.locator('#gateAccessCode')).toHaveValue('Gate 4*');
+    await page.locator('#street').fill('Main Street');
+    await page.locator('#area').fill('Kenridge');
+    await page.locator('#city').fill('Cape Town');
+    await page.locator('#postalCode').fill('7550');
     await page.locator('#fullName').fill(maliciousName);
     await page.locator('#phone').fill('0712345678');
 
@@ -97,7 +105,9 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     const response = await placed;
     expect(response.status()).toBe(200);
     const order = await response.json();
+    expect(order.gateAccessCode).toBe('Gate 4*');
     await expect(admin.locator('#orderListQueue')).toContainText(maliciousName);
+    await expect(admin.locator('#orderListQueue')).toContainText('Gate access: Gate 4*');
     await expect(admin.locator('#orderListQueue img')).toHaveCount(0);
     expect(await admin.evaluate(() => window.compromised)).toBeUndefined();
 

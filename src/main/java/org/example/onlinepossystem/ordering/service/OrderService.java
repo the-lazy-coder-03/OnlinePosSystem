@@ -99,7 +99,10 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         order.setCity(request.getCity());
         order.setPostalCode(request.getPostalCode());
         order.setComplexName(request.getComplexName());
-        order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "pickup");
+        String orderType = request.getOrderType() != null ? request.getOrderType() : "pickup";
+        order.setOrderType(orderType);
+        order.setGateAccessCode("delivery".equalsIgnoreCase(orderType)
+                ? trimToNull(request.getGateAccessCode()) : null);
         order.setCreatedAt(createdAt);
         order.setStatus("Pending");
         if (customer != null) {
@@ -125,6 +128,11 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
 
     private <T> List<T> safe(List<T> values) {
         return values == null ? List.of() : values;
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) return null;
+        return value.trim();
     }
 
     @Override

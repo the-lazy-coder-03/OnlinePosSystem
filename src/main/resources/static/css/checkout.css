@@ -68,6 +68,8 @@ a { color: inherit; }
 .form-group input:read-only { color: var(--muted); background: #f4f7fb; cursor: not-allowed; }
 .form-group input:user-invalid { border-color: var(--danger); }
 .field-hint { display: block; margin-top: 5px; color: var(--muted); font-size: .75rem; }
+.estate-access { min-width: 0; margin: 2px 0 0; padding: 10px 16px 0; background: var(--blue-100); border: 1px solid var(--blue-200); border-radius: 12px; }
+.estate-access legend { padding: 0 5px; color: var(--blue-950); font-size: .88rem; font-weight: 900; }
 #deliveryFields[hidden] { display: none; }
 .payment-card { padding-bottom: 22px; }
 .payment-option { padding: 15px 16px; display: flex; align-items: center; gap: 12px; background: var(--blue-100); border: 1px solid var(--blue-200); border-radius: 12px; }

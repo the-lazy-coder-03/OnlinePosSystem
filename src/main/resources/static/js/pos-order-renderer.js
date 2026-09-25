@@ -23,6 +23,11 @@ const PosOrderRenderer = (() => {
         ].filter(Boolean).join(', ') || 'N/A';
     }
 
+    function gateAccess(order) {
+        if ((order.orderType || '').toLowerCase() !== 'delivery') return '';
+        return String(order.gateAccessCode || '').trim();
+    }
+
     function itemLines(order, withExtras) {
         const specials = (order.specialItems || []).map(item => {
             const selections = (item.selections || []).map(selection => {
@@ -70,23 +75,34 @@ const PosOrderRenderer = (() => {
         items.style.cssText = 'font-size:0.95rem;color:#003366;';
         const location = element('div', `Address: ${address(order)}`);
         location.style.cssText = 'font-size:0.9rem;color:#003366;';
-        row.append(main, items, location, actions(order, onStatusChange));
+        row.append(main, items, location);
+        const accessCode = gateAccess(order);
+        if (accessCode) {
+            const access = element('div', `Gate access: ${accessCode}`);
+            access.style.cssText = 'font-size:0.9rem;color:#003366;font-weight:700;';
+            row.appendChild(access);
+        }
+        row.appendChild(actions(order, onStatusChange));
         return row;
     }
 
     function orderCard(order, {onStatusChange}) {
         const card = element('div', undefined, 'orderCard');
-        for (const [label, value] of [
+        const lines = [
             [`Order #${order.id}`, ''], ['Customer:', order.customerName || 'Guest'],
-            ['Type:', order.orderType || 'N/A'], ['Address:', address(order)], ['Items:', '']
-        ]) {
+            ['Type:', order.orderType || 'N/A'], ['Address:', address(order)]
+        ];
+        const accessCode = gateAccess(order);
+        if (accessCode) lines.push(['Gate access:', accessCode]);
+        lines.push(['Items:', '']);
+        for (const [label, value] of lines) {
             const line = element('p');
             line.append(element('strong', label), document.createTextNode(` ${value}`));
             card.appendChild(line);
         }
         const list = element('ul');
-        const lines = itemLines(order, true);
-        for (const text of lines.length ? lines : ['No items']) list.appendChild(element('li', text));
+        const items = itemLines(order, true);
+        for (const text of items.length ? items : ['No items']) list.appendChild(element('li', text));
         card.append(list, actions(order, onStatusChange, 'acceptBtn'));
         return card;
     }

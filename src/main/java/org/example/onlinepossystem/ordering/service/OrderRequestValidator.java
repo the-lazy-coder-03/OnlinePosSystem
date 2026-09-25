@@ -5,10 +5,13 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class OrderRequestValidator {
+    private static final String GATE_ACCESS_PATTERN = "[A-Za-z0-9 #*]*";
+
     public void validate(OrderRequestDTO request) {
         if (request == null) {
             throw new IllegalArgumentException("Order request is required.");
         }
+        validateGateAccessCode(request.getGateAccessCode());
         boolean hasItems = request.getItems() != null && !request.getItems().isEmpty();
         boolean hasSpecials = request.getSpecialItems() != null && !request.getSpecialItems().isEmpty();
         if (!hasItems && !hasSpecials) {
@@ -26,6 +29,16 @@ public class OrderRequestValidator {
             if (hasMenuItem == hasPizza) {
                 throw new IllegalArgumentException("Each item must include exactly one of menuItemId or pizzaId.");
             }
+        }
+    }
+
+    private void validateGateAccessCode(String value) {
+        if (value == null) return;
+        if (value.length() > 64) {
+            throw new IllegalArgumentException("Gate access code must be 64 characters or fewer.");
+        }
+        if (!value.matches(GATE_ACCESS_PATTERN)) {
+            throw new IllegalArgumentException("Gate access code may contain only letters, numbers, spaces, # and *.");
         }
     }
 }

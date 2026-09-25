@@ -95,6 +95,13 @@ class MigrationSqlCatalogTest {
     }
 
     @Test
+    void addsOptionalGateAccessCodeToNewAndExistingOrders() throws IOException {
+        assertThat(migrationSql())
+                .contains("gate_access_code VARCHAR(64)")
+                .contains("ADD COLUMN IF NOT EXISTS gate_access_code VARCHAR(64)");
+    }
+
+    @Test
     void migratesAndConstrainsCustomerAccessLevels() throws IOException {
         String sql = migrationSql();
 

@@ -480,6 +480,7 @@ CREATE TABLE IF NOT EXISTS customer_order (
                                               city           VARCHAR(255),
                                               postal_code    VARCHAR(255),
                                               complex_name   VARCHAR(255),
+                                              gate_access_code VARCHAR(64),
                                               notes          TEXT
 );
 
@@ -489,7 +490,8 @@ ALTER TABLE customer_order
     ADD COLUMN IF NOT EXISTS area VARCHAR(255),
     ADD COLUMN IF NOT EXISTS city VARCHAR(255),
     ADD COLUMN IF NOT EXISTS postal_code VARCHAR(255),
-    ADD COLUMN IF NOT EXISTS complex_name VARCHAR(255);
+    ADD COLUMN IF NOT EXISTS complex_name VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS gate_access_code VARCHAR(64);
 
 -- Menu order lines
 CREATE TABLE IF NOT EXISTS order_menu_item (

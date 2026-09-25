@@ -61,6 +61,9 @@ public class Order {
     @Column(name = "complex_name")
     private String complexName;
 
+    @Column(name = "gate_access_code", length = 64)
+    private String gateAccessCode;
+
     @Column(columnDefinition = "TEXT")
     private String notes;
 
@@ -103,6 +106,8 @@ public class Order {
     public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
     public String getComplexName() { return complexName; }
     public void setComplexName(String complexName) { this.complexName = complexName; }
+    public String getGateAccessCode() { return gateAccessCode; }
+    public void setGateAccessCode(String gateAccessCode) { this.gateAccessCode = gateAccessCode; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
     public List<OrderMenuItem> getMenuItems() { return menuItems; }
