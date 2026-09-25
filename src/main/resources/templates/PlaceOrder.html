@@ -4072,7 +4072,7 @@
             const quote = await api.quoteSpecial(state.branch.id, state.special.active.id, specialPayload());
             state.special.quote = quote;
             $("specialQuoteStatus").textContent = `Bundle ${money(quote.basePrice)} · Customizations ${money(quote.customizationTotal)} · Add-ons ${money(quote.addonTotal)}`;
-            $("specialTotal").textContent = money(quote.finalTotal);
+            $("specialTotal").textContent = money(quote.lineTotal);
             $("specialAdd").disabled = MENU_ONLY;
         } catch (error) {
             $("specialQuoteStatus").textContent = error.message || "This selection is not available.";
@@ -4235,7 +4235,7 @@
             quantity: state.special.quantity,
             specialRequest: specialPayload(),
             selections: quote.selections || [],
-            pricing: {subtotal: Number(quote.finalTotal) / state.special.quantity, lineTotal: Number(quote.finalTotal)}
+            pricing: {subtotal: Number(quote.lineTotal) / state.special.quantity, lineTotal: Number(quote.lineTotal)}
         });
         closeSpecialOverlay();
         alert("Special added to cart!");
