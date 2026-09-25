@@ -16,16 +16,19 @@ public class SpecialCatalogService implements SpecialCatalogAccess {
     private final PizzaCategoryRepository pizzaCategories;
     private final PizzaSizeRepository pizzaSizes;
     private final BranchMenuItemPriceRepository menuPrices;
+    private final BranchPizzaPriceRepository pizzaPrices;
 
     public SpecialCatalogService(MenuItemRepository menuItems, PizzaRepository pizzas,
                                  MenuCategoryRepository menuCategories, PizzaCategoryRepository pizzaCategories,
-                                 PizzaSizeRepository pizzaSizes, BranchMenuItemPriceRepository menuPrices) {
+                                 PizzaSizeRepository pizzaSizes, BranchMenuItemPriceRepository menuPrices,
+                                 BranchPizzaPriceRepository pizzaPrices) {
         this.menuItems = menuItems;
         this.pizzas = pizzas;
         this.menuCategories = menuCategories;
         this.pizzaCategories = pizzaCategories;
         this.pizzaSizes = pizzaSizes;
         this.menuPrices = menuPrices;
+        this.pizzaPrices = pizzaPrices;
     }
 
     public Optional<MenuItem> findMenuItem(Integer id) { return menuItems.findById(id); }
@@ -39,6 +42,10 @@ public class SpecialCatalogService implements SpecialCatalogAccess {
     public List<Pizza> activePizzas() { return pizzas.findAllByActiveTrue(); }
     public Optional<BigDecimal> menuPrice(Integer branchId, Integer menuItemId) {
         return menuPrices.findByBranchIdAndMenuItemId(branchId, menuItemId).map(value -> BigDecimal.valueOf(value.getPrice()));
+    }
+    public Optional<BigDecimal> pizzaPrice(Integer branchId, Integer pizzaId, Integer pizzaSizeId) {
+        return pizzaPrices.findByBranchIdAndPizzaIdAndPizzaSizeId(branchId, pizzaId, pizzaSizeId)
+                .map(value -> BigDecimal.valueOf(value.getPrice()));
     }
     public List<Reference> menuCategories() { return menuCategories.findAll().stream().map(value -> new Reference(value.getId(), value.getName(), null)).toList(); }
     public List<Reference> pizzaCategories() { return pizzaCategories.findAll().stream().map(value -> new Reference(value.getId(), value.getName(), null)).toList(); }

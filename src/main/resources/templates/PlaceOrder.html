@@ -565,6 +565,21 @@
             margin-left: 10px;
             flex-shrink: 0;
         }
+        .form-select{
+            min-width: 0;
+            flex: 1 1 220px;
+            padding: 10px 36px 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fff;
+            color: var(--ink);
+            font: inherit;
+            font-weight: 750;
+        }
+        .form-select:focus{
+            outline: 3px solid rgba(37,99,235,.16);
+            border-color: var(--blue-650);
+        }
 
         .group-title{
             display:flex;
@@ -912,6 +927,19 @@
         .overlay .btn-ghost.choice-btn:hover{
             background: #f1f6ff;
         }
+        .overlay .btn-ghost:not(.choice-btn){
+            background: #fff;
+            color: var(--blue-800);
+            border: 1px solid var(--line);
+        }
+        .overlay .btn-ghost:not(.choice-btn):hover{
+            background: var(--blue-100);
+        }
+        .overlay .btn-primary{
+            background: var(--blue-650);
+            color: #fff;
+            border-color: var(--blue-650);
+        }
         .choice-btn.selected{
             background: var(--blue-650) !important;
             color: #fff !important;
@@ -931,6 +959,27 @@
                 position: relative;
                 top: 0;
                 max-height: none;
+                display: block;
+                overflow: hidden;
+            }
+            .sidebar-header,
+            .sidebar-footer{
+                display: none;
+            }
+            .catlist{
+                display: flex;
+                gap: 8px;
+                padding: 8px;
+                overflow-x: auto;
+                overscroll-behavior-inline: contain;
+                scrollbar-width: thin;
+            }
+            .catbtn{
+                width: auto;
+                flex: 0 0 auto;
+                margin: 0;
+                padding: 10px 12px;
+                white-space: nowrap;
             }
             .brand .sub{ max-width: 45vw; }
             .search{ width: 100%; min-width: 0; max-width: none; }
@@ -950,6 +999,14 @@
             .top-actions .pill{ min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
             .top-actions .btn{ min-width: 0; flex: 0 1 auto; }
             .sticky-center{ display:none; }
+            #specialSlots .special-choice{
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                align-items: center;
+            }
+            #specialSlots .special-choice > span:first-child{
+                grid-column: 1 / -1;
+            }
         }
     </style>
 </head>
@@ -1603,7 +1660,7 @@
             if (specials.length) {
                 const heading = document.createElement("div");
                 heading.className = "group-title";
-                heading.textContent = "Kenridge Specials";
+                heading.textContent = `${state.branch.name} Specials`;
                 body.appendChild(heading);
                 for (const special of specials) {
                     const row = document.createElement("div");
@@ -4047,7 +4104,7 @@
                 for (let index = 1; index <= component.quantity; index++) {
                     const key = specialSelectionKey(component.id, index);
                     const row = document.createElement("div");
-                    row.className = "opt";
+                    row.className = "opt special-choice";
                     const select = document.createElement("select");
                     select.className = "form-select";
                     select.setAttribute("aria-label", `${component.label} ${index}`);

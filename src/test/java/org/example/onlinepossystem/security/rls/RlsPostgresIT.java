@@ -30,6 +30,7 @@ import org.springframework.web.context.WebApplicationContext;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
@@ -225,12 +226,60 @@ class RlsPostgresIT {
     void runtimeIsRestrictedAndEveryProtectedTableHasForcedRls() throws Exception {
         try (Connection c = pool.getConnection()) { RlsRuntimeVerifier.verify(c); }
         assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relrowsecurity AND c.relforcerowsecurity", Integer.class)).isEqualTo(RlsRuntimeVerifier.REQUIRED_POLICIES.size() + 1);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname='public' AND policyname LIKE 'child_%'", Integer.class)).isEqualTo(32);
+        int childPolicyCount = RlsRuntimeVerifier.REQUIRED_POLICIES.values().stream()
+                .flatMap(Arrays::stream).mapToInt(policy -> policy.startsWith("child_") ? 1 : 0).sum();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_policies WHERE schemaname='public' AND policyname LIKE 'child_%'", Integer.class))
+                .isEqualTo(childPolicyCount);
         try (Connection c = ownerConnection()) {
             assertThatThrownBy(() -> RlsRuntimeVerifier.verify(c)).isInstanceOf(IllegalStateException.class);
         }
         assertThatThrownBy(() -> jdbc.execute("TRUNCATE customer_order CASCADE")).hasRootCauseInstanceOf(SQLException.class);
         assertThatThrownBy(() -> jdbc.execute("SET ROLE " + owner)).hasRootCauseInstanceOf(SQLException.class);
+    }
+
+    @Test @Order(1)
+    void seedsCompleteKenridgeAndUitzichtSpecialMatricesAsReadOnlyPublicData() {
+        Map<String, BigDecimal> prices = jdbc.query(
+                "SELECT code, bundle_price FROM special ORDER BY code",
+                result -> {
+                    Map<String, BigDecimal> values = new LinkedHashMap<>();
+                    while (result.next()) values.put(result.getString(1), result.getBigDecimal(2));
+                    return values;
+                });
+
+        assertThat(prices).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
+                Map.entry("KEN-MON-2-LARGE-FAVOURITES", new BigDecimal("234.00")),
+                Map.entry("KEN-MON-STEAK-BURGERS", new BigDecimal("330.00")),
+                Map.entry("KEN-TUE-FAVOURITE-SUPREME", new BigDecimal("246.00")),
+                Map.entry("KEN-TUE-CHEESE-BURGERS", new BigDecimal("170.00")),
+                Map.entry("KEN-WED-2-LARGE-SUPREMES", new BigDecimal("260.00")),
+                Map.entry("KEN-WED-TOASTIES", new BigDecimal("135.00")),
+                Map.entry("KEN-THU-RIBS", new BigDecimal("290.00")),
+                Map.entry("KEN-SUN-PASTA", new BigDecimal("169.00")),
+                Map.entry("KEN-SUN-RIBS-PIZZAS", new BigDecimal("365.00")),
+                Map.entry("UIT-MON-2-LARGE-FAVOURITES", new BigDecimal("225.00")),
+                Map.entry("UIT-MON-STEAK-BURGERS", new BigDecimal("295.00")),
+                Map.entry("UIT-TUE-FAVOURITE-SUPREME", new BigDecimal("236.00")),
+                Map.entry("UIT-TUE-CHEESE-BURGERS", new BigDecimal("160.00")),
+                Map.entry("UIT-WED-2-LARGE-SUPREMES", new BigDecimal("247.00")),
+                Map.entry("UIT-WED-TOASTIES", new BigDecimal("120.00")),
+                Map.entry("UIT-THU-RIBS", new BigDecimal("276.00")),
+                Map.entry("UIT-SUN-PASTA", new BigDecimal("159.00")),
+                Map.entry("UIT-SUN-RIBS-PIZZAS", new BigDecimal("360.00"))
+        ));
+        assertThat(jdbc.queryForList("SELECT DISTINCT day_of_week FROM special_day ORDER BY day_of_week", Integer.class))
+                .containsExactly(1, 2, 3, 4, 7);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM special WHERE branch_id=1", Integer.class)).isEqualTo(9);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM special WHERE branch_id=2", Integer.class)).isEqualTo(9);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM special_component", Integer.class)).isEqualTo(38);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM special_component_menu_item", Integer.class)).isEqualTo(40);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM special_component_pizza", Integer.class)).isEqualTo(68);
+        assertThat(jdbc.queryForObject("SELECT price FROM special_addon a JOIN special s ON s.special_id=a.special_id WHERE s.code='KEN-THU-RIBS'", BigDecimal.class))
+                .isEqualByComparingTo("100.00");
+        assertThat(jdbc.queryForObject("SELECT price FROM special_addon a JOIN special s ON s.special_id=a.special_id WHERE s.code='UIT-THU-RIBS'", BigDecimal.class))
+                .isEqualByComparingTo("95.00");
+        assertThat(jdbc.update("UPDATE special SET active=false WHERE code='UIT-MON-STEAK-BURGERS'"))
+                .isZero();
     }
 
     @Test @Order(2)
@@ -278,8 +327,12 @@ class RlsPostgresIT {
 
     @Test @Order(4)
     void missingEmptyMalformedAndUnknownContextsExposeNothing() {
+        Set<String> publicSpecialTables = Set.of("special", "special_day", "special_component",
+                "special_component_menu_item", "special_component_pizza", "special_addon");
         for (String table : RlsRuntimeVerifier.REQUIRED_POLICIES.keySet()) {
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM " + table, Integer.class)).as(table).isZero();
+            Integer count = jdbc.queryForObject("SELECT count(*) FROM " + table, Integer.class);
+            if (publicSpecialTables.contains(table)) assertThat(count).as(table).isPositive();
+            else assertThat(count).as(table).isZero();
         }
         assertThat(jdbc.queryForObject("SELECT count(*) FROM orders", Integer.class)).isZero();
         transaction.executeWithoutResult(s -> {

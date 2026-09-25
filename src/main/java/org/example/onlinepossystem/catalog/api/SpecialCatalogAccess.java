@@ -21,6 +21,7 @@ public interface SpecialCatalogAccess {
     List<MenuItem> activeMenuItems();
     List<Pizza> activePizzas();
     Optional<BigDecimal> menuPrice(Integer branchId, Integer menuItemId);
+    Optional<BigDecimal> pizzaPrice(Integer branchId, Integer pizzaId, Integer pizzaSizeId);
     List<Reference> menuCategories();
     List<Reference> pizzaCategories();
     List<Reference> pizzaSizes();
