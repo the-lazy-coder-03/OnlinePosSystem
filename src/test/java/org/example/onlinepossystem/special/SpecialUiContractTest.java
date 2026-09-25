@@ -18,6 +18,8 @@ class SpecialUiContractTest {
             assertThat(template)
                     .contains("money(quote.lineTotal)")
                     .contains("Number(quote.lineTotal)")
+                    .contains("if (select.value) {")
+                    .doesNotContain("select.value && !component.allowCustomization")
                     .doesNotContain("quote.finalTotal");
         }
     }

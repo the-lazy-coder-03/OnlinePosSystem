@@ -4115,6 +4115,14 @@
                     if (component.selectionMode === "INCLUDED" && component.options?.length === 1) {
                         select.value = String(component.options[0].id);
                         select.disabled = true;
+                        if (!current) {
+                            state.special.selections.set(key, {
+                                component,
+                                index,
+                                productId: Number(select.value),
+                                item: plainSpecialItem(component, select.value)
+                            });
+                        }
                     }
                     const configure = document.createElement("button");
                     configure.type = "button";
@@ -4124,7 +4132,7 @@
                     select.addEventListener("change", () => {
                         state.special.selections.delete(key);
                         configure.disabled = !select.value;
-                        if (select.value && !component.allowCustomization) {
+                        if (select.value) {
                             state.special.selections.set(key, {component, index, productId: Number(select.value), item: plainSpecialItem(component, select.value)});
                         }
                         quoteActiveSpecial();
