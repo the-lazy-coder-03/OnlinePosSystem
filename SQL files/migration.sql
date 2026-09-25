@@ -1913,6 +1913,273 @@ CREATE INDEX IF NOT EXISTS idx_burger_item_default_component_component
 COMMIT;
 
 -- =========================================================
+-- 11) DATABASE-DRIVEN SPECIALS
+-- =========================================================
+
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS special (
+    special_id BIGSERIAL PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    branch_id INT NOT NULL REFERENCES branch(branch_id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    name TEXT NOT NULL,
+    description TEXT,
+    bundle_price NUMERIC(10,2) NOT NULL CHECK (bundle_price >= 0),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    archived BOOLEAN NOT NULL DEFAULT FALSE,
+    starts_on DATE,
+    ends_on DATE,
+    sort_order INT NOT NULL DEFAULT 0,
+    CONSTRAINT chk_special_date_range CHECK (starts_on IS NULL OR ends_on IS NULL OR starts_on <= ends_on)
+);
+
+CREATE TABLE IF NOT EXISTS special_day (
+    special_id BIGINT NOT NULL REFERENCES special(special_id) ON DELETE CASCADE,
+    day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
+    PRIMARY KEY (special_id, day_of_week)
+);
+
+CREATE TABLE IF NOT EXISTS special_component (
+    special_component_id BIGSERIAL PRIMARY KEY,
+    special_id BIGINT NOT NULL REFERENCES special(special_id) ON DELETE CASCADE,
+    component_code TEXT NOT NULL,
+    label TEXT NOT NULL,
+    product_type TEXT NOT NULL CHECK (product_type IN ('MENU_ITEM', 'PIZZA')),
+    quantity INT NOT NULL CHECK (quantity > 0),
+    selection_mode TEXT NOT NULL CHECK (selection_mode IN ('INCLUDED', 'CUSTOMER_CHOICE')),
+    menu_category_id INT REFERENCES menu_category(id) ON DELETE RESTRICT,
+    pizza_category_id INT REFERENCES pizza_category(pizza_category_id) ON DELETE RESTRICT,
+    pizza_size_id INT REFERENCES pizza_size(pizza_size_id) ON DELETE RESTRICT,
+    allow_repeats BOOLEAN NOT NULL DEFAULT FALSE,
+    allow_customization BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INT NOT NULL DEFAULT 0,
+    UNIQUE (special_id, component_code),
+    CONSTRAINT chk_special_component_category CHECK (
+        (product_type = 'MENU_ITEM' AND pizza_category_id IS NULL AND pizza_size_id IS NULL)
+        OR (product_type = 'PIZZA' AND menu_category_id IS NULL)
+    )
+);
+
+CREATE TABLE IF NOT EXISTS special_component_menu_item (
+    special_component_id BIGINT NOT NULL REFERENCES special_component(special_component_id) ON DELETE CASCADE,
+    menu_item_id INT NOT NULL REFERENCES menu_item(id) ON DELETE RESTRICT,
+    PRIMARY KEY (special_component_id, menu_item_id)
+);
+
+CREATE TABLE IF NOT EXISTS special_component_pizza (
+    special_component_id BIGINT NOT NULL REFERENCES special_component(special_component_id) ON DELETE CASCADE,
+    pizza_id INT NOT NULL REFERENCES pizza(pizza_id) ON DELETE RESTRICT,
+    PRIMARY KEY (special_component_id, pizza_id)
+);
+
+CREATE TABLE IF NOT EXISTS special_addon (
+    special_addon_id BIGSERIAL PRIMARY KEY,
+    special_id BIGINT NOT NULL REFERENCES special(special_id) ON DELETE CASCADE,
+    addon_code TEXT NOT NULL,
+    label TEXT NOT NULL,
+    product_type TEXT NOT NULL CHECK (product_type IN ('MENU_ITEM', 'PIZZA')),
+    menu_item_id INT REFERENCES menu_item(id) ON DELETE RESTRICT,
+    pizza_id INT REFERENCES pizza(pizza_id) ON DELETE RESTRICT,
+    pizza_size_id INT REFERENCES pizza_size(pizza_size_id) ON DELETE RESTRICT,
+    price NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+    max_quantity INT NOT NULL DEFAULT 1 CHECK (max_quantity > 0),
+    allow_customization BOOLEAN NOT NULL DEFAULT TRUE,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INT NOT NULL DEFAULT 0,
+    UNIQUE (special_id, addon_code),
+    CONSTRAINT chk_special_addon_product CHECK (
+        (product_type = 'MENU_ITEM' AND menu_item_id IS NOT NULL AND pizza_id IS NULL AND pizza_size_id IS NULL)
+        OR (product_type = 'PIZZA' AND pizza_id IS NOT NULL AND menu_item_id IS NULL AND pizza_size_id IS NOT NULL)
+    )
+);
+
+CREATE TABLE IF NOT EXISTS order_special_item (
+    order_special_item_id BIGSERIAL PRIMARY KEY,
+    order_id BIGINT NOT NULL REFERENCES customer_order(order_id) ON DELETE CASCADE,
+    special_id BIGINT REFERENCES special(special_id) ON DELETE SET NULL,
+    special_name_at_time TEXT NOT NULL,
+    special_description_at_time TEXT,
+    quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    base_price_at_time NUMERIC(10,2) NOT NULL CHECK (base_price_at_time >= 0),
+    customization_total_at_time NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (customization_total_at_time >= 0),
+    addon_total_at_time NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (addon_total_at_time >= 0),
+    final_line_total_at_time NUMERIC(10,2) NOT NULL CHECK (final_line_total_at_time >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS order_special_selection (
+    order_special_selection_id BIGSERIAL PRIMARY KEY,
+    order_special_item_id BIGINT NOT NULL REFERENCES order_special_item(order_special_item_id) ON DELETE CASCADE,
+    selection_kind TEXT NOT NULL CHECK (selection_kind IN ('COMPONENT', 'ADDON')),
+    special_component_id BIGINT REFERENCES special_component(special_component_id) ON DELETE SET NULL,
+    special_addon_id BIGINT REFERENCES special_addon(special_addon_id) ON DELETE SET NULL,
+    selection_index INT NOT NULL DEFAULT 1 CHECK (selection_index > 0),
+    label_at_time TEXT NOT NULL,
+    product_name_at_time TEXT NOT NULL,
+    pizza_size_cm_at_time INT,
+    selection_quantity INT NOT NULL DEFAULT 1 CHECK (selection_quantity > 0),
+    addon_price_at_time NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (addon_price_at_time >= 0),
+    customization_charge_at_time NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (customization_charge_at_time >= 0),
+    order_menu_item_id BIGINT REFERENCES order_menu_item(order_menu_item_id) ON DELETE CASCADE,
+    order_pizza_item_id BIGINT REFERENCES order_pizza_item(order_pizza_item_id) ON DELETE CASCADE,
+    CONSTRAINT chk_order_special_selection_source CHECK (
+        (selection_kind = 'COMPONENT' AND special_addon_id IS NULL)
+        OR (selection_kind = 'ADDON' AND special_component_id IS NULL)
+    ),
+    CONSTRAINT chk_order_special_selection_item CHECK (
+        (order_menu_item_id IS NOT NULL AND order_pizza_item_id IS NULL)
+        OR (order_menu_item_id IS NULL AND order_pizza_item_id IS NOT NULL)
+    )
+);
+
+ALTER TABLE order_special_selection ADD COLUMN IF NOT EXISTS selection_quantity INT NOT NULL DEFAULT 1;
+ALTER TABLE order_special_selection ADD COLUMN IF NOT EXISTS addon_price_at_time NUMERIC(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE order_special_selection ADD COLUMN IF NOT EXISTS customization_charge_at_time NUMERIC(10,2) NOT NULL DEFAULT 0;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_order_special_selection_menu_item
+    ON order_special_selection(order_menu_item_id) WHERE order_menu_item_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_order_special_selection_pizza_item
+    ON order_special_selection(order_pizza_item_id) WHERE order_pizza_item_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_special_availability ON special(branch_id, active, archived, starts_on, ends_on);
+CREATE INDEX IF NOT EXISTS idx_order_special_item_order ON order_special_item(order_id);
+CREATE INDEX IF NOT EXISTS idx_order_special_selection_parent ON order_special_selection(order_special_item_id);
+
+ALTER TABLE order_pizza_item ADD COLUMN IF NOT EXISTS pizza_name_at_time TEXT;
+ALTER TABLE order_pizza_item ADD COLUMN IF NOT EXISTS pizza_size_cm_at_time INT;
+ALTER TABLE order_pizza_item_extra ADD COLUMN IF NOT EXISTS ingredient_name_at_time TEXT;
+ALTER TABLE order_pizza_item_base_option ADD COLUMN IF NOT EXISTS base_option_name_at_time TEXT;
+ALTER TABLE order_burger_protein ADD COLUMN IF NOT EXISTS component_name_at_time TEXT;
+ALTER TABLE order_burger_removed_component ADD COLUMN IF NOT EXISTS component_name_at_time TEXT;
+ALTER TABLE order_burger_extra_component ADD COLUMN IF NOT EXISTS component_name_at_time TEXT;
+
+CREATE TABLE IF NOT EXISTS order_pizza_item_removed_ingredient (
+    order_pizza_item_id BIGINT NOT NULL REFERENCES order_pizza_item(order_pizza_item_id) ON DELETE CASCADE,
+    ingredient_id INT NOT NULL REFERENCES ingredient(ingredient_id) ON DELETE RESTRICT,
+    ingredient_name_at_time TEXT NOT NULL,
+    PRIMARY KEY (order_pizza_item_id, ingredient_id)
+);
+
+-- Seed only missing specials. Existing rows are administrator-managed and are never overwritten.
+CREATE TEMP TABLE new_special_seed (special_id BIGINT, code TEXT) ON COMMIT DROP;
+WITH inserted AS (
+    INSERT INTO special (code, branch_id, name, description, bundle_price, sort_order)
+    VALUES
+        ('KEN-MON-2-LARGE-FAVOURITES', 1, 'Monday: 2 Large Favourite Pizzas', 'Choose two 30cm Favourite pizzas.', 234.00, 10),
+        ('KEN-MON-STEAK-BURGERS', 1, 'Monday: Steak Burger Deal', 'Two 200g steak burgers, medium chips and two premium sauces.', 330.00, 20),
+        ('KEN-TUE-FAVOURITE-SUPREME', 1, 'Tuesday: Favourite + Supreme', 'One 30cm Favourite and one 30cm Supreme pizza.', 246.00, 30),
+        ('KEN-TUE-CHEESE-BURGERS', 1, 'Tuesday: 2 Cheese Burgers', 'Two Cheese Burgers with small chips.', 170.00, 40),
+        ('KEN-WED-2-LARGE-SUPREMES', 1, 'Wednesday: 2 Large Supreme Pizzas', 'Choose two 30cm Supreme pizzas.', 260.00, 50),
+        ('KEN-WED-TOASTIES', 1, 'Wednesday: Toasted Sandwich Deal', 'Choose two toasted sandwiches with small chips.', 135.00, 60),
+        ('KEN-THU-RIBS', 1, 'Thursday: 1kg Ribs Deal', '1kg ribs, medium chips and onion rings.', 290.00, 70),
+        ('KEN-SUN-PASTA', 1, 'Sunday: Large Pasta + Garlic Pita', 'Choose a Large pasta and receive a 23cm Garlic Pita.', 169.00, 80),
+        ('KEN-SUN-RIBS-PIZZAS', 1, 'Sunday: Ribs + 2 Medium Pizzas', '400g ribs, small chips and two 23cm pizzas.', 365.00, 90)
+    ON CONFLICT (code) DO NOTHING
+    RETURNING special_id, code
+)
+INSERT INTO new_special_seed SELECT special_id, code FROM inserted;
+
+INSERT INTO special_day(special_id, day_of_week)
+SELECT special_id, CASE
+    WHEN code LIKE 'KEN-MON-%' THEN 1 WHEN code LIKE 'KEN-TUE-%' THEN 2
+    WHEN code LIKE 'KEN-WED-%' THEN 3 WHEN code LIKE 'KEN-THU-%' THEN 4 ELSE 7 END
+FROM new_special_seed;
+
+-- Category-based pizza choices.
+INSERT INTO special_component (special_id, component_code, label, product_type, quantity, selection_mode,
+                               pizza_category_id, pizza_size_id, allow_repeats, allow_customization, sort_order)
+SELECT seed.special_id, values.component_code, values.label, 'PIZZA', values.quantity, 'CUSTOMER_CHOICE',
+       category.pizza_category_id, size.pizza_size_id, values.allow_repeats, TRUE, values.sort_order
+FROM new_special_seed seed
+JOIN (VALUES
+    ('KEN-MON-2-LARGE-FAVOURITES','pizzas','Large Favourite pizzas',2,'Favourite',30,TRUE,10),
+    ('KEN-TUE-FAVOURITE-SUPREME','favourite','Large Favourite pizza',1,'Favourite',30,FALSE,10),
+    ('KEN-TUE-FAVOURITE-SUPREME','supreme','Large Supreme pizza',1,'Supreme',30,FALSE,20),
+    ('KEN-WED-2-LARGE-SUPREMES','pizzas','Large Supreme pizzas',2,'Supreme',30,TRUE,10)
+) AS values(code,component_code,label,quantity,category_name,size_cm,allow_repeats,sort_order) ON values.code=seed.code
+JOIN pizza_category category
+  ON regexp_replace(lower(category.name), 's$', '') = regexp_replace(lower(values.category_name), 's$', '')
+JOIN pizza_size size ON size.cm=values.size_cm;
+
+-- Menu components and explicit-choice components.
+INSERT INTO special_component (special_id, component_code, label, product_type, quantity, selection_mode,
+                               menu_category_id, allow_repeats, allow_customization, sort_order)
+SELECT seed.special_id, values.component_code, values.label, 'MENU_ITEM', values.quantity, values.selection_mode,
+       category.id, values.allow_repeats, values.allow_customization, values.sort_order
+FROM new_special_seed seed
+JOIN (VALUES
+    ('KEN-WED-TOASTIES','sandwiches','Toasted sandwiches',2,'CUSTOMER_CHOICE','Toasted Sandwiches',TRUE,TRUE,10)
+) AS values(code,component_code,label,quantity,selection_mode,category_name,allow_repeats,allow_customization,sort_order) ON values.code=seed.code
+JOIN menu_category category ON lower(category.name)=lower(values.category_name);
+
+INSERT INTO special_component (special_id, component_code, label, product_type, quantity, selection_mode,
+                               allow_repeats, allow_customization, sort_order)
+SELECT seed.special_id, values.component_code, values.label, values.product_type, values.quantity,
+       values.selection_mode, values.allow_repeats, values.allow_customization, values.sort_order
+FROM new_special_seed seed
+JOIN (VALUES
+    ('KEN-MON-STEAK-BURGERS','burgers','200g Steak Burgers','MENU_ITEM',2,'CUSTOMER_CHOICE',TRUE,TRUE,10),
+    ('KEN-MON-STEAK-BURGERS','chips','Medium chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('KEN-MON-STEAK-BURGERS','sauces','Premium sauces','MENU_ITEM',2,'CUSTOMER_CHOICE',TRUE,FALSE,30),
+    ('KEN-TUE-CHEESE-BURGERS','burgers','Cheese Burgers','MENU_ITEM',2,'CUSTOMER_CHOICE',TRUE,TRUE,10),
+    ('KEN-TUE-CHEESE-BURGERS','chips','Small chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('KEN-WED-TOASTIES','chips','Small chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('KEN-THU-RIBS','ribs','Ribs 1kg','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,10),
+    ('KEN-THU-RIBS','chips','Medium chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('KEN-THU-RIBS','rings','Onion rings','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,30),
+    ('KEN-SUN-PASTA','pasta','Large pasta','MENU_ITEM',1,'CUSTOMER_CHOICE',FALSE,TRUE,10),
+    ('KEN-SUN-PASTA','pita','23cm Garlic Pita','PIZZA',1,'INCLUDED',FALSE,TRUE,20),
+    ('KEN-SUN-RIBS-PIZZAS','ribs','Ribs 400g','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,10),
+    ('KEN-SUN-RIBS-PIZZAS','chips','Small chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('KEN-SUN-RIBS-PIZZAS','pizzas','Medium pizzas','PIZZA',2,'CUSTOMER_CHOICE',TRUE,TRUE,30)
+) AS values(code,component_code,label,product_type,quantity,selection_mode,allow_repeats,allow_customization,sort_order)
+ON values.code=seed.code;
+
+UPDATE special_component component SET pizza_size_id=size.pizza_size_id
+FROM pizza_size size WHERE size.cm=23 AND component.product_type='PIZZA' AND component.pizza_size_id IS NULL
+  AND component.special_id IN (SELECT special_id FROM new_special_seed);
+
+-- Resolve explicit products without embedding catalog IDs in special rules.
+INSERT INTO special_component_menu_item(special_component_id, menu_item_id)
+SELECT component.special_component_id, item.id
+FROM special_component component JOIN special special ON special.special_id=component.special_id
+JOIN (VALUES
+    ('KEN-MON-STEAK-BURGERS','burgers','Steak Burger'),('KEN-MON-STEAK-BURGERS','chips','Chips Med'),
+    ('KEN-MON-STEAK-BURGERS','sauces','Cheese Sauce'),('KEN-MON-STEAK-BURGERS','sauces','Pepper Sauce'),
+    ('KEN-MON-STEAK-BURGERS','sauces','Mushroom Sauce'),('KEN-TUE-CHEESE-BURGERS','burgers','Cheese Burger'),
+    ('KEN-TUE-CHEESE-BURGERS','chips','Chips Small'),('KEN-WED-TOASTIES','chips','Chips Small'),
+    ('KEN-THU-RIBS','ribs','Ribs 1kg'),('KEN-THU-RIBS','chips','Chips Med'),('KEN-THU-RIBS','rings','5 x Onion Rings'),
+    ('KEN-SUN-PASTA','pasta','Lasagne Large'),('KEN-SUN-PASTA','pasta','Bolognaise Large'),
+    ('KEN-SUN-PASTA','pasta','Chicken Pasta Large'),('KEN-SUN-PASTA','pasta','Carbonara Large'),
+    ('KEN-SUN-PASTA','pasta','Alfredo Large'),('KEN-SUN-PASTA','pasta','Cheesy Mac Large'),
+    ('KEN-SUN-PASTA','pasta','Vegetarian Pasta Large'),('KEN-SUN-RIBS-PIZZAS','ribs','Ribs 400g'),
+    ('KEN-SUN-RIBS-PIZZAS','chips','Chips Small')
+) AS option(code,component_code,item_name) ON option.code=special.code AND option.component_code=component.component_code
+JOIN menu_item item ON item.name=option.item_name;
+
+INSERT INTO special_component_pizza(special_component_id, pizza_id)
+SELECT component.special_component_id, pizza.pizza_id
+FROM special_component component JOIN special special ON special.special_id=component.special_id
+JOIN (VALUES ('KEN-SUN-PASTA','pita','Garlic Pita')) AS option(code,component_code,pizza_name)
+  ON option.code=special.code AND option.component_code=component.component_code
+JOIN pizza ON pizza.name=option.pizza_name;
+
+-- Sunday permits both current pizza categories at 23cm.
+INSERT INTO special_component_pizza(special_component_id, pizza_id)
+SELECT component.special_component_id, pizza.pizza_id
+FROM special_component component JOIN special ON special.special_id=component.special_id
+JOIN pizza ON pizza.pizza_category_id IN (1,2)
+WHERE special.code='KEN-SUN-RIBS-PIZZAS' AND component.component_code='pizzas'
+  AND special.special_id IN (SELECT special_id FROM new_special_seed);
+
+INSERT INTO special_addon(special_id, addon_code, label, product_type, pizza_id, pizza_size_id, price,
+                          max_quantity, allow_customization, sort_order)
+SELECT seed.special_id, 'cheesy-garlic', 'Large Cheesy Garlic Pizza', 'PIZZA', pizza.pizza_id,
+       size.pizza_size_id, 100.00, 1, TRUE, 10
+FROM new_special_seed seed JOIN pizza ON pizza.name='Cheesy Pita' JOIN pizza_size size ON size.cm=30
+WHERE seed.code='KEN-THU-RIBS';
+
+COMMIT;
+
+-- =========================================================
 -- 10) NORMALIZE PIZZA CATEGORY IDS (FAVOURITE / SUPREME)
 -- =========================================================
 

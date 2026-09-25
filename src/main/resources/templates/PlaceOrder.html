@@ -1051,6 +1051,31 @@
     </div>
 </div>
 
+<!-- ===== Special Bundle Overlay ===== -->
+<div class="overlay" id="specialOverlay" aria-hidden="true">
+    <div class="overlay-card" style="max-width:760px;max-height:90vh;overflow:auto;">
+        <h2 id="specialTitle">Special</h2>
+        <p id="specialDescription"></p>
+        <div id="specialSlots"></div>
+        <div class="qty ordering-only" style="margin-top:12px;">
+            <div class="qty-controls">
+                <button class="qty-btn" id="specialQtyMinus" type="button" aria-label="Decrease bundle quantity">−</button>
+                <div class="qty-val" id="specialQtyValue">1</div>
+                <button class="qty-btn" id="specialQtyPlus" type="button" aria-label="Increase bundle quantity">+</button>
+            </div>
+            <div style="color:var(--muted);font-weight:750;">Bundle quantity</div>
+        </div>
+        <div class="card" style="margin-top:12px;">
+            <div id="specialQuoteStatus" class="sub">Complete every required selection for a live quote.</div>
+            <div style="display:flex;justify-content:space-between;gap:10px;margin-top:8px;"><strong>Total</strong><strong id="specialTotal">R0.00</strong></div>
+        </div>
+        <div class="formrow">
+            <button class="btn btn-ghost" id="specialCancel" type="button">Cancel</button>
+            <button class="btn btn-primary ordering-only" id="specialAdd" type="button" disabled>Add Special to Cart</button>
+        </div>
+    </div>
+</div>
+
 <!-- ===== Main Shell ===== -->
 <div class="shell">
     <!-- Sidebar categories (kept on left) -->
@@ -1143,7 +1168,7 @@
                 </div>
 
                 <!-- Quantity -->
-                <div class="card ordering-only">
+                <div class="card ordering-only" id="cardQuantity">
                     <h3>Quantity</h3>
                     <div class="qty">
                         <div class="qty-controls">
@@ -1248,7 +1273,17 @@
             favouritePizzas: [],
             supremePizzas: [],
             menuItems: [],
+            specials: [],
             byId: new Map()                // pizzaId -> lightweight list item
+        },
+
+        special: {
+            active: null,
+            quantity: 1,
+            selections: new Map(),
+            addons: new Map(),
+            pending: null,
+            quote: null
         },
 
         // Customize view selection
@@ -1398,6 +1433,16 @@
         async getMenuItems(branchId){
             return api.fetchJson(`${state.apiBase}/${branchId}/menu-items`);
         },
+        async getSpecials(branchId){
+            return api.fetchJson(`${state.apiBase}/${branchId}/specials`);
+        },
+        async quoteSpecial(branchId, specialId, payload){
+            return api.fetchJson(`${state.apiBase}/${branchId}/specials/${specialId}/quote`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", [document.querySelector('meta[name="_csrf_header"]').content]: document.querySelector('meta[name="_csrf"]').content },
+                body: JSON.stringify(payload)
+            });
+        },
 
         async getPizzaDetail(branchId, pizzaId, sizeCm){
             const qs = sizeCm ? `?sizeCm=${encodeURIComponent(sizeCm)}` : "";
@@ -1425,6 +1470,7 @@
             state.data.favouritePizzas = [];
             state.data.supremePizzas = [];
             state.data.menuItems = [];
+            state.data.specials = [];
             state.data.byId = new Map();
             state.ui.activeCategory = "all";
             state.ui.coolDrinkSizeFilter = new Set();
@@ -1477,6 +1523,7 @@
         categories(){
             const out = [
                 { key: "all", label: "Everything" },
+                ...(state.data.specials.length ? [{ key: "specials", label: "Specials" }] : []),
                 { key: "pizza-1", label: "Favourite" },
                 { key: "pizza-2", label: "Supreme" }
             ];
@@ -1521,9 +1568,9 @@
                 return;
             }
 
-            const { favourites, supremes, menuGroups } = getFilteredLists();
+            const { favourites, supremes, menuGroups, specials } = getFilteredLists();
             const menuCount = menuGroups.reduce((sum, g) => sum + g.items.length, 0);
-            const totalCount = favourites.length + supremes.length + menuCount;
+            const totalCount = favourites.length + supremes.length + menuCount + specials.length;
 
             if (!totalCount){
                 body.innerHTML = `<div class="empty">No items match this category/search.</div>`;
@@ -1552,6 +1599,20 @@
                     body.appendChild(row);
                 }
             };
+
+            if (specials.length) {
+                const heading = document.createElement("div");
+                heading.className = "group-title";
+                heading.textContent = "Kenridge Specials";
+                body.appendChild(heading);
+                for (const special of specials) {
+                    const row = document.createElement("div");
+                    row.className = "row";
+                    row.innerHTML = `<div class="row-top"><div class="row-title">${escapeHtml(special.name)}</div><div class="row-price">${money(special.price)}</div></div><div class="row-sub">${escapeHtml(special.description || "Available today")}</div><div class="row-cta">${MENU_ONLY ? "View deal" : "Choose bundle"}</div>`;
+                    row.addEventListener("click", () => actions.openSpecial(special.id));
+                    body.appendChild(row);
+                }
+            }
 
             const renderMenuSection = (title, items) => {
                 if (!items.length) return;
@@ -1638,6 +1699,7 @@
             $("cardDefaults").style.display = "";
             $("cardExtras").style.display = "";
             $("cardQuote").style.display = "";
+            $("cardQuantity").style.display = state.special.pending ? "none" : "";
             $("btnAddToCart").textContent = "Add to cart";
 
             const d = state.customize.detail;
@@ -1656,7 +1718,8 @@
 
             // Sizes
             $("sizeOptions").innerHTML = "";
-            const sizes = normalizeSizes(d);
+            const requiredSpecialSize = state.special.pending?.sizeCm;
+            const sizes = normalizeSizes(d).filter(size => !requiredSpecialSize || Number(size.sizeCm) === Number(requiredSpecialSize));
             if (!sizes.length){
                 $("sizeOptions").innerHTML = `<div class="empty">No sizes available for this pizza.</div>`;
             } else {
@@ -1767,6 +1830,7 @@
 
         burgerCustomize(){
             const item = state.menuCustomize.menuItem;
+            $("cardQuantity").style.display = state.special.pending ? "none" : "";
             $("btnAddToCart").textContent = "Add to cart";
             $("cardSizes").style.display = "";
             $("cardBaseOptions").style.display = "none";
@@ -1969,6 +2033,7 @@
 
         genericMenuCustomize(){
             const item = state.menuCustomize.menuItem;
+            $("cardQuantity").style.display = state.special.pending ? "none" : "";
             $("btnAddToCart").textContent = "Add to cart";
             const pastaVariants = getPastaVariantFamily(item);
             $("cardSizes").style.display = pastaVariants.length ? "" : "none";
@@ -2339,6 +2404,10 @@
             $("menuQtyPlus").addEventListener("click", () => actions.setMenuQty(state.menuCustomize.qty + 1));
             $("menuItemCancel").addEventListener("click", () => actions.closeMenuItemOverlay());
             $("menuItemAdd").addEventListener("click", () => actions.addMenuItemToCartFromOverlay());
+            $("specialCancel").addEventListener("click", closeSpecialOverlay);
+            $("specialQtyMinus").addEventListener("click", () => setSpecialQuantity(state.special.quantity - 1));
+            $("specialQtyPlus").addEventListener("click", () => setSpecialQuantity(state.special.quantity + 1));
+            $("specialAdd").addEventListener("click", addSpecialToCart);
 
             render.updateTopBar();
             render.sidebar();
@@ -2385,6 +2454,20 @@
             actions.loadBranch(branchId, branchName).catch(e => alert(e.message));
         },
 
+        openSpecial(specialId){
+            const special = state.data.specials.find(value => Number(value.id) === Number(specialId));
+            if (!special) return;
+            state.special.active = special;
+            state.special.quantity = 1;
+            state.special.selections = new Map();
+            state.special.addons = new Map();
+            state.special.pending = null;
+            state.special.quote = null;
+            renderSpecialOverlay();
+            $("specialOverlay").classList.add("show");
+            $("specialOverlay").setAttribute("aria-hidden", "false");
+        },
+
         async loadBranch(branchId, branchName){
             const switchingBranch = !MENU_ONLY && state.branch.id && state.branch.id !== branchId;
             // If switching branch, clear cart to avoid mixed pricing
@@ -2404,9 +2487,10 @@
             }
 
             try {
-                const [pizzaPayload, menuPayload] = await Promise.all([
+                const [pizzaPayload, menuPayload, specialsPayload] = await Promise.all([
                     api.getPizzas(branchId),
-                    api.getMenuItems(branchId)
+                    api.getMenuItems(branchId),
+                    api.getSpecials(branchId)
                 ]);
 
                 const favouriteRaw = Array.isArray(pizzaPayload.favouritePizzas) ? pizzaPayload.favouritePizzas : [];
@@ -2428,6 +2512,7 @@
                 state.data.favouritePizzas = favourites;
                 state.data.supremePizzas = supremes;
                 state.data.menuItems = menuItems;
+                state.data.specials = Array.isArray(specialsPayload) ? specialsPayload : [];
                 state.data.byId = new Map([...favourites, ...supremes].map(p => [Number(p.pizzaId), p]));
             } catch (err) {
                 console.error("Failed to load menu data:", err);
@@ -2633,7 +2718,7 @@
             const subtotal = Number(state.customize.lastQuote.total || 0);
             const lineTotal = subtotal * qty;
 
-            store.addToCart({
+            const cartItem = {
                 type: "pizza",
                 branchId: state.branch.id,
                 pizzaId: Number(state.customize.pizzaId),
@@ -2643,6 +2728,7 @@
                 pizzaBaseOptionName: selectedBaseOption?.name || "",
                 quantity: qty,
                 selectedToppingIds: selectedIds,
+                defaultToppingIds: Array.from(state.customize.defaultToppingIds),
                 selectedToppingNames: selectedNames,
                 selectedExtraToppingIds: extraIds,
                 selectedExtraToppingNames: extraNames,
@@ -2653,7 +2739,13 @@
                     subtotal: subtotal,
                     lineTotal: lineTotal
                 }
-            });
+            };
+
+            if (state.special.pending) {
+                captureSpecialSelection(cartItem);
+                return;
+            }
+            store.addToCart(cartItem);
 
             alert("Added to cart!");
             view.show("list");
@@ -2855,7 +2947,7 @@
 
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
 
-            store.addToCart({
+            const cartItem = {
                 type: "menu",
                 branchId: state.branch.id,
                 menuItemId: Number(item.menuItemId),
@@ -2871,7 +2963,14 @@
                     subtotal: pricing.subtotal,
                     lineTotal: pricing.lineTotal
                 }
-            });
+            };
+
+            if (state.special.pending) {
+                captureSpecialSelection(cartItem);
+                actions.closeMenuItemOverlay();
+                return;
+            }
+            store.addToCart(cartItem);
 
             actions.closeMenuItemOverlay();
             alert("Added to cart!");
@@ -2890,7 +2989,7 @@
 
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
 
-            store.addToCart({
+            const cartItem = {
                 type: "menu",
                 branchId: state.branch.id,
                 menuItemId: Number(item.menuItemId),
@@ -2906,7 +3005,13 @@
                     subtotal: pricing.subtotal,
                     lineTotal: pricing.lineTotal
                 }
-            });
+            };
+
+            if (state.special.pending) {
+                captureSpecialSelection(cartItem);
+                return;
+            }
+            store.addToCart(cartItem);
 
             state.customize.kind = null;
             state.menuCustomize.menuItem = null;
@@ -2932,7 +3037,7 @@
 
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
 
-            store.addToCart({
+            const cartItem = {
                 type: "menu",
                 branchId: state.branch.id,
                 menuItemId: Number(item.menuItemId),
@@ -2948,7 +3053,13 @@
                     subtotal: pricing.subtotal,
                     lineTotal: pricing.lineTotal
                 }
-            });
+            };
+
+            if (state.special.pending) {
+                captureSpecialSelection(cartItem);
+                return;
+            }
+            store.addToCart(cartItem);
 
             state.customize.kind = null;
             state.menuCustomize.menuItem = null;
@@ -3831,6 +3942,249 @@
         return { ok: true };
     }
 
+    function specialSelectionKey(componentId, index){
+        return `${componentId}:${index}`;
+    }
+
+    function orderItemFromCart(item){
+        if (item.type === "menu") {
+            return {
+                menuItemId: Number(item.menuItemId), quantity: 1,
+                customizations: [
+                    ...(item.selectedBurgerToppingIds || []).map(id => ({ id: Number(id), quantity: 1, type: "burgerComponent" })),
+                    ...(item.selectedBurgerExtraToppingIds || []).map(id => ({ id: Number(id), quantity: 1, type: "burgerExtraComponent" })),
+                    ...(item.selectedModifierOptionIds || []).map(id => ({ id: Number(id), quantity: 1, type: "modifierOption" }))
+                ]
+            };
+        }
+        const selected = new Set((item.selectedToppingIds || []).map(Number));
+        return {
+            pizzaId: Number(item.pizzaId), sizeCm: Number(item.sizeCm),
+            pizzaBaseOptionId: item.pizzaBaseOptionId ? Number(item.pizzaBaseOptionId) : null,
+            quantity: 1,
+            customizations: [
+                ...(item.selectedExtraToppingIds || []).map(id => ({ id: Number(id), quantity: 1 })),
+                ...(item.defaultToppingIds || []).filter(id => !selected.has(Number(id)))
+                    .map(id => ({ id: Number(id), quantity: 1, type: "removedPizzaIngredient" }))
+            ]
+        };
+    }
+
+    function plainSpecialItem(rule, productId){
+        return rule.productType === "PIZZA"
+            ? { pizzaId: Number(productId), sizeCm: Number(rule.sizeCm), quantity: 1, customizations: [] }
+            : { menuItemId: Number(productId), quantity: 1, customizations: [] };
+    }
+
+    function specialPayload(){
+        const special = state.special.active;
+        return {
+            quantity: state.special.quantity,
+            selections: Array.from(state.special.selections.values()).map(value => ({
+                componentId: value.component.id,
+                selectionIndex: value.index,
+                item: value.item
+            })),
+            addons: Array.from(state.special.addons.values()).filter(value => value.enabled).map(value => ({
+                addonId: value.addon.id,
+                quantity: value.quantity,
+                item: value.item
+            }))
+        };
+    }
+
+    function specialIsComplete(){
+        const special = state.special.active;
+        if (!special) return false;
+        return (special.components || []).filter(component => component.selectionMode !== "INCLUDED" || component.allowCustomization)
+            .every(component => Array.from({length: component.quantity}, (_, index) => index + 1)
+                .every(index => state.special.selections.has(specialSelectionKey(component.id, index))))
+            && Array.from(state.special.addons.values()).every(value => !value.enabled || value.item);
+    }
+
+    async function quoteActiveSpecial(){
+        state.special.quote = null;
+        $("specialAdd").disabled = true;
+        if (!specialIsComplete()) {
+            $("specialQuoteStatus").textContent = "Complete every required selection for a live quote.";
+            $("specialTotal").textContent = money(0);
+            return;
+        }
+        $("specialQuoteStatus").textContent = "Checking availability and price...";
+        try {
+            const quote = await api.quoteSpecial(state.branch.id, state.special.active.id, specialPayload());
+            state.special.quote = quote;
+            $("specialQuoteStatus").textContent = `Bundle ${money(quote.basePrice)} · Customizations ${money(quote.customizationTotal)} · Add-ons ${money(quote.addonTotal)}`;
+            $("specialTotal").textContent = money(quote.finalTotal);
+            $("specialAdd").disabled = MENU_ONLY;
+        } catch (error) {
+            $("specialQuoteStatus").textContent = error.message || "This selection is not available.";
+            $("specialTotal").textContent = money(0);
+        }
+    }
+
+    function renderSpecialOverlay(){
+        const special = state.special.active;
+        if (!special) return;
+        $("specialTitle").textContent = special.name;
+        $("specialDescription").textContent = special.description || "";
+        $("specialQtyValue").textContent = String(state.special.quantity);
+        const slots = $("specialSlots");
+        slots.replaceChildren();
+
+        for (const component of (special.components || [])) {
+            const section = document.createElement("div");
+            section.className = "card";
+            const title = document.createElement("h3");
+            title.textContent = `${component.label}${component.sizeCm ? ` · ${component.sizeCm}cm` : ""}`;
+            section.appendChild(title);
+            if (component.selectionMode === "INCLUDED" && !component.allowCustomization) {
+                const included = document.createElement("div");
+                included.className = "sub";
+                included.textContent = (component.options || []).map(option => option.name).join(", ") || "Included";
+                section.appendChild(included);
+            } else {
+                for (let index = 1; index <= component.quantity; index++) {
+                    const key = specialSelectionKey(component.id, index);
+                    const row = document.createElement("div");
+                    row.className = "opt";
+                    const select = document.createElement("select");
+                    select.className = "form-select";
+                    select.setAttribute("aria-label", `${component.label} ${index}`);
+                    select.innerHTML = `<option value="">Choose ${escapeHtml(component.label.toLowerCase())}</option>`
+                        + (component.options || []).map(option => `<option value="${option.id}">${escapeHtml(option.name)}</option>`).join("");
+                    const current = state.special.selections.get(key);
+                    if (current) select.value = String(current.productId);
+                    if (component.selectionMode === "INCLUDED" && component.options?.length === 1) {
+                        select.value = String(component.options[0].id);
+                        select.disabled = true;
+                    }
+                    const configure = document.createElement("button");
+                    configure.type = "button";
+                    configure.className = "btn btn-ghost";
+                    configure.textContent = component.allowCustomization ? (current ? "Edit" : "Customize") : "Set";
+                    configure.disabled = !select.value;
+                    select.addEventListener("change", () => {
+                        state.special.selections.delete(key);
+                        configure.disabled = !select.value;
+                        if (select.value && !component.allowCustomization) {
+                            state.special.selections.set(key, {component, index, productId: Number(select.value), item: plainSpecialItem(component, select.value)});
+                        }
+                        quoteActiveSpecial();
+                    });
+                    configure.addEventListener("click", () => configureSpecialProduct({component, index, productId: Number(select.value)}));
+                    const label = document.createElement("span");
+                    label.textContent = `Choice ${index}`;
+                    row.append(label, select, configure);
+                    section.appendChild(row);
+                }
+            }
+            slots.appendChild(section);
+        }
+
+        for (const addon of (special.addons || []).filter(value => value.active)) {
+            const section = document.createElement("div");
+            section.className = "card";
+            const current = state.special.addons.get(addon.id);
+            const check = document.createElement("input");
+            check.type = "checkbox";
+            check.checked = Boolean(current?.enabled);
+            check.id = `specialAddon${addon.id}`;
+            const label = document.createElement("label");
+            label.htmlFor = check.id;
+            label.textContent = `${addon.label} · ${money(addon.price)}`;
+            const configure = document.createElement("button");
+            configure.type = "button";
+            configure.className = "btn btn-ghost";
+            configure.textContent = current?.item ? "Edit" : "Customize";
+            configure.hidden = !addon.allowCustomization || !check.checked;
+            check.addEventListener("change", () => {
+                if (check.checked) state.special.addons.set(addon.id, {addon, enabled: true, quantity: 1, item: plainSpecialItem(addon, addon.productId)});
+                else state.special.addons.delete(addon.id);
+                renderSpecialOverlay();
+                quoteActiveSpecial();
+            });
+            configure.addEventListener("click", () => configureSpecialProduct({addon, productId: addon.productId}));
+            const row = document.createElement("div");
+            row.className = "opt";
+            row.append(check, label, configure);
+            section.appendChild(row);
+            slots.appendChild(section);
+        }
+        quoteActiveSpecial();
+    }
+
+    async function configureSpecialProduct(target){
+        const rule = target.component || target.addon;
+        if (!target.productId) return;
+        state.special.pending = {...target, sizeCm: rule.sizeCm};
+        $("specialOverlay").classList.remove("show");
+        $("specialOverlay").setAttribute("aria-hidden", "true");
+        if (rule.productType === "PIZZA") {
+            await actions.openCustomize(target.productId);
+            if (rule.sizeCm && Number(state.customize.sizeCm) !== Number(rule.sizeCm)) await actions.setSize(rule.sizeCm);
+            state.customize.qty = 1;
+            render.customize();
+            return;
+        }
+        const item = state.data.menuItems.find(value => Number(value.menuItemId) === Number(target.productId));
+        if (!item || !hasMenuCustomizations(item)) {
+            captureSpecialSelection({type: "menu", menuItemId: Number(target.productId), name: item?.name || rule.label,
+                quantity: 1, selectedBurgerToppingIds: [], selectedBurgerExtraToppingIds: [], selectedModifierOptionIds: [], pricing: {lineTotal: 0}});
+        } else if (isBurgerMenuItem(item)) actions.openBurgerCustomize(target.productId);
+        else actions.openMenuItem(target.productId);
+    }
+
+    function captureSpecialSelection(cartItem){
+        const pending = state.special.pending;
+        if (!pending) return;
+        const item = orderItemFromCart(cartItem);
+        if (pending.component) {
+            state.special.selections.set(specialSelectionKey(pending.component.id, pending.index),
+                {component: pending.component, index: pending.index, productId: pending.productId, item, display: cartItem});
+        } else {
+            state.special.addons.set(pending.addon.id,
+                {addon: pending.addon, enabled: true, quantity: 1, item, display: cartItem});
+        }
+        state.special.pending = null;
+        discardCustomization();
+        view.show("list");
+        renderSpecialOverlay();
+        $("specialOverlay").classList.add("show");
+        $("specialOverlay").setAttribute("aria-hidden", "false");
+    }
+
+    function setSpecialQuantity(value){
+        state.special.quantity = clamp(Number(value) || 1, 1, 99);
+        $("specialQtyValue").textContent = String(state.special.quantity);
+        quoteActiveSpecial();
+    }
+
+    function closeSpecialOverlay(){
+        state.special.active = null;
+        state.special.pending = null;
+        $("specialOverlay").classList.remove("show");
+        $("specialOverlay").setAttribute("aria-hidden", "true");
+    }
+
+    function addSpecialToCart(){
+        if (!state.special.quote || !specialIsComplete()) return;
+        const special = state.special.active;
+        const quote = state.special.quote;
+        store.addToCart({
+            type: "special",
+            specialId: special.id,
+            name: special.name,
+            quantity: state.special.quantity,
+            specialRequest: specialPayload(),
+            selections: quote.selections || [],
+            pricing: {subtotal: Number(quote.finalTotal) / state.special.quantity, lineTotal: Number(quote.finalTotal)}
+        });
+        closeSpecialOverlay();
+        alert("Special added to cart!");
+        render.updateCartBadges();
+    }
+
     /************************************************************
      * Category + filtering (required)
      ************************************************************/
@@ -3842,8 +4196,10 @@
         const favCount = state.data.favouritePizzas.length;
         const supCount = state.data.supremePizzas.length;
         const menuCount = state.data.menuItems.filter(item => shouldShowMenuListItem(item, "all")).length;
+        const specialCount = state.data.specials.length;
 
-        map.set("all", favCount + supCount + menuCount);
+        map.set("all", favCount + supCount + menuCount + specialCount);
+        map.set("specials", specialCount);
         map.set("pizza-1", favCount);
         map.set("pizza-2", supCount);
 
@@ -3900,18 +4256,26 @@
         let favourites = state.data.favouritePizzas.filter(p => matchesSearchPizza(p, q));
         let supremes = state.data.supremePizzas.filter(p => matchesSearchPizza(p, q));
         let menuItems = state.data.menuItems.filter(m => matchesSearchMenu(m, q));
+        let specials = state.data.specials.filter(s => !q || `${s.name || ""} ${s.description || ""}`.toLowerCase().includes(q));
 
-        if (cat === "pizza-1"){
+        if (cat === "specials") {
+            favourites = [];
             supremes = [];
             menuItems = [];
+        } else if (cat === "pizza-1"){
+            supremes = [];
+            menuItems = [];
+            specials = [];
         } else if (cat === "pizza-2"){
             favourites = [];
             menuItems = [];
+            specials = [];
         } else if (cat && cat.startsWith("menu-")){
             const id = Number(cat.replace("menu-",""));
             favourites = [];
             supremes = [];
             menuItems = menuItems.filter(m => Number(m.categoryId) === id);
+            specials = [];
         }
 
         menuItems = menuItems.filter(m => shouldShowMenuListItem(m, cat));
@@ -3925,6 +4289,7 @@
         return {
             favourites,
             supremes,
+            specials,
             menuGroups: groupMenuItems(menuItems)
         };
     }
@@ -3984,17 +4349,22 @@
             const div = document.createElement("div");
             div.className = "sum-item";
 
+            const isSpecial = it.type === "special";
             const isPizza = it.type === "pizza";
             const tops = isPizza ? (it.selectedToppingNames || []).join(", ") : "";
-            const mods = !isPizza ? (it.selectedModifierNames || []).join(", ") : "";
+            const mods = !isPizza && !isSpecial ? (it.selectedModifierNames || []).join(", ") : "";
             const meta = isPizza ? ` (${it.sizeCm} cm)` : "";
-            const detailLine = isPizza
+            const detailLine = isSpecial
+                ? (it.selections || []).map(value => `${escapeHtml(value.label)}: ${escapeHtml(value.productName)}`).join(" • ")
+                : isPizza
                 ? [
                     it.pizzaBaseOptionName ? ("Base: " + escapeHtml(it.pizzaBaseOptionName)) : "",
                     tops ? escapeHtml(tops) : "No toppings selected."
                   ].filter(Boolean).join(" • ")
                 : (mods ? ("Modifiers: " + escapeHtml(mods)) : "No modifiers selected.");
-            const pricingLine = isPizza
+            const pricingLine = isSpecial
+                ? `Authoritative bundle total: ${money(it.pricing?.lineTotal || 0)}`
+                : isPizza
                 ? `Subtotal (1): ${money(it.pricing?.subtotal || 0)} • Base: ${money(it.pricing?.base || 0)}${Number(it.pricing?.baseOption || 0) > 0 ? ` • Base option: ${money(it.pricing.baseOption)}` : ""} • Toppings: ${money(it.pricing?.toppings || 0)}`
                 : `Subtotal (1): ${money(it.pricing?.subtotal || 0)} • Base: ${money(it.pricing?.base || 0)} • Modifiers: ${money(it.pricing?.modifiers || 0)}`;
             div.innerHTML = `
@@ -4071,6 +4441,7 @@
         const nextQty = clamp((Number(it.quantity) || 1) + (action === "inc" ? 1 : -1), 1, 99);
         it.quantity = nextQty;
         it.pricing.lineTotal = (Number(it.pricing.subtotal) || 0) * nextQty;
+        if (it.type === "special" && it.specialRequest) it.specialRequest.quantity = nextQty;
 
         renderSummary();
     }

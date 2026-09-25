@@ -11,6 +11,9 @@ import java.util.List;
 public class OrderTotalCalculator {
     public BigDecimal total(OrderResponseDTO order) {
         BigDecimal total = BigDecimal.ZERO;
+        for (OrderResponseDTO.SpecialItemDTO item : safeList(order.getSpecialItems())) {
+            total = total.add(money(item.getFinalLineTotalAtTime()));
+        }
         for (OrderResponseDTO.MenuItemDTO item : safeList(order.getMenuItems())) {
             int itemQuantity = quantity(item.getQty());
             total = total.add(money(item.getUnitPriceAtTime()).multiply(BigDecimal.valueOf(itemQuantity)));

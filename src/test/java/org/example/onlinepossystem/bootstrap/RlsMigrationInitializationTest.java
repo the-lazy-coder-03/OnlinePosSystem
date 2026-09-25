@@ -17,14 +17,16 @@ class RlsMigrationInitializationTest {
         String source = sourceFile("src/main/java/org/example/onlinepossystem/bootstrap/MigrationSqlRunner.java");
 
         assertThat(source)
-                .contains("private static final String CATALOG_MIGRATION = \"migration.sql\"")
-                .contains("private static final String RLS_MIGRATION = \"db/rls-v1.sql\"")
+                .contains("private static final String CATALOG_MIGRATION_ID = \"migration.sql\"")
+                .contains("private static final String RLS_MIGRATION_ID = \"db/rls-v1.sql\"")
+                .contains("private static final String CATALOG_MIGRATION_RESOURCE = \"sql/migration.sql\"")
+                .contains("private static final String RLS_MIGRATION_RESOURCE = \"sql/rls-v1.sql\"")
                 .contains("setRuntimeRole(connection)")
                 .contains("An applied immutable migration was changed")
-                .contains("recordAppliedChecksum(connection, resource, checksum)");
+                .contains("recordAppliedChecksum(connection, migrationId, checksum)");
 
         assertThat(sourceFile("scripts/provision-rls.sh"))
-                .contains("sql/provision-rls.sql")
+                .contains("SQL files/provision-rls.sql")
                 .contains("MIGRATION_DATASOURCE_USERNAME")
                 .contains("SPRING_DATASOURCE_USERNAME");
 
@@ -34,7 +36,7 @@ class RlsMigrationInitializationTest {
 
     @Test
     void rlsMigrationIsRerunnableWithoutDroppingApplicationData() throws IOException {
-        String sql = new ClassPathResource("db/rls-v1.sql").getContentAsString(StandardCharsets.UTF_8);
+        String sql = new ClassPathResource("sql/rls-v1.sql").getContentAsString(StandardCharsets.UTF_8);
         String lowered = sql.toLowerCase();
 
         assertThat(sql)
@@ -52,6 +54,15 @@ class RlsMigrationInitializationTest {
                 .doesNotContain("drop schema")
                 .doesNotContain("drop table")
                 .doesNotContain("truncate ");
+    }
+
+    @Test
+    void consolidatedSqlDirectoryIsPackagedUnderOneClasspathPrefix() {
+        assertThat(new ClassPathResource("sql/migration.sql").exists()).isTrue();
+        assertThat(new ClassPathResource("sql/rls-v1.sql").exists()).isTrue();
+        assertThat(new ClassPathResource("sql/rls-contract-query.sql").exists()).isTrue();
+        assertThat(new ClassPathResource("sql/provision-rls.sql").exists()).isTrue();
+        assertThat(new ClassPathResource("sql/tessql.sql").exists()).isTrue();
     }
 
     @Test

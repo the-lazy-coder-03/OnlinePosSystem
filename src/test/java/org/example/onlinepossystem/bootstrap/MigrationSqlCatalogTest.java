@@ -210,7 +210,7 @@ class MigrationSqlCatalogTest {
     }
 
     private String migrationSql() throws IOException {
-        ClassPathResource resource = new ClassPathResource("migration.sql");
+        ClassPathResource resource = new ClassPathResource("sql/migration.sql");
         return resource.getContentAsString(StandardCharsets.UTF_8);
     }
 

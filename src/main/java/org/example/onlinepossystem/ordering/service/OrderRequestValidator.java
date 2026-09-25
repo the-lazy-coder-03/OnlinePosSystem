@@ -9,8 +9,13 @@ public class OrderRequestValidator {
         if (request == null) {
             throw new IllegalArgumentException("Order request is required.");
         }
-        if (request.getItems() == null || request.getItems().isEmpty()) {
+        boolean hasItems = request.getItems() != null && !request.getItems().isEmpty();
+        boolean hasSpecials = request.getSpecialItems() != null && !request.getSpecialItems().isEmpty();
+        if (!hasItems && !hasSpecials) {
             throw new IllegalArgumentException("Order must include at least one item.");
+        }
+        if (!hasItems) {
+            return;
         }
         for (OrderRequestDTO.OrderItemRequestDTO item : request.getItems()) {
             if (item == null) {

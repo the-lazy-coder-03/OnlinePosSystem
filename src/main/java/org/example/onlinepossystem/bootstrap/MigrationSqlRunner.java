@@ -27,8 +27,13 @@ import java.util.Locale;
 public class MigrationSqlRunner implements CommandLineRunner {
     private static final Logger logger = LoggerFactory.getLogger(MigrationSqlRunner.class);
     private static final long MIGRATION_LOCK_ID = 721946110L;
-    private static final String CATALOG_MIGRATION = "migration.sql";
-    private static final String RLS_MIGRATION = "db/rls-v1.sql";
+    // Keep these IDs stable because they are persisted in app_migration_state.
+    private static final String CATALOG_MIGRATION_ID = "migration.sql";
+    private static final String RLS_MIGRATION_ID = "db/rls-v1.sql";
+    private static final String RLS_SPECIALS_MIGRATION_ID = "db/rls-v2-specials.sql";
+    private static final String CATALOG_MIGRATION_RESOURCE = "sql/migration.sql";
+    private static final String RLS_MIGRATION_RESOURCE = "sql/rls-v1.sql";
+    private static final String RLS_SPECIALS_MIGRATION_RESOURCE = "sql/rls-v2-specials.sql";
 
     private final DataSource dataSource;
     private final boolean catalogEnabled;
@@ -54,7 +59,7 @@ public class MigrationSqlRunner implements CommandLineRunner {
                 if (catalogEnabled) {
                     applyCatalogMigration(connection);
                 } else {
-                    logger.info("{} startup runner is disabled.", CATALOG_MIGRATION);
+                    logger.info("{} startup runner is disabled.", CATALOG_MIGRATION_RESOURCE);
                 }
                 applyRlsMigration(connection);
             } finally {
@@ -65,22 +70,25 @@ public class MigrationSqlRunner implements CommandLineRunner {
     }
 
     private void applyCatalogMigration(Connection connection) throws Exception {
-        applyMigration(connection, CATALOG_MIGRATION, false, () -> {});
+        applyMigration(connection, CATALOG_MIGRATION_ID, CATALOG_MIGRATION_RESOURCE, false, () -> {});
     }
 
     private void applyRlsMigration(Connection connection) throws Exception {
-        applyMigration(connection, RLS_MIGRATION, true, () -> setRuntimeRole(connection));
+        applyMigration(connection, RLS_MIGRATION_ID, RLS_MIGRATION_RESOURCE, true, () -> setRuntimeRole(connection));
+        applyMigration(connection, RLS_SPECIALS_MIGRATION_ID, RLS_SPECIALS_MIGRATION_RESOURCE, true,
+                () -> setRuntimeRole(connection));
     }
 
     private void applyMigration(
             Connection connection,
+            String migrationId,
             String resource,
             boolean immutable,
             SqlPreparation preparation
     ) throws Exception {
         String sql = readResource(resource);
         String checksum = sha256(sql);
-        String previousChecksum = findLastAppliedChecksum(connection, resource);
+        String previousChecksum = findLastAppliedChecksum(connection, migrationId);
         if (checksum.equals(previousChecksum)) {
             logger.info("{} already applied for checksum {}.", resource, shortChecksum(checksum));
             return;
@@ -96,7 +104,7 @@ public class MigrationSqlRunner implements CommandLineRunner {
             try (Statement statement = connection.createStatement()) {
                 statement.execute(sql);
             }
-            recordAppliedChecksum(connection, resource, checksum);
+            recordAppliedChecksum(connection, migrationId, checksum);
             if (immutable) connection.commit();
             logger.info("{} applied successfully for checksum {}.", resource, shortChecksum(checksum));
         } catch (Exception failure) {

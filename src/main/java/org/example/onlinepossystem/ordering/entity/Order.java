@@ -70,6 +70,9 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderPizzaItem> pizzaItems = new ArrayList<>();
 
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderSpecialItem> specialItems = new ArrayList<>();
+
     public Order() {}
 
     public Long getId() { return id; }
@@ -112,6 +115,12 @@ public class Order {
     public void setPizzaItems(List<OrderPizzaItem> pizzaItems) { this.pizzaItems = pizzaItems; }
     public void addPizzaItem(OrderPizzaItem item) {
         pizzaItems.add(item);
+        item.setOrder(this);
+    }
+    public List<OrderSpecialItem> getSpecialItems() { return specialItems; }
+    public void setSpecialItems(List<OrderSpecialItem> specialItems) { this.specialItems = specialItems; }
+    public void addSpecialItem(OrderSpecialItem item) {
+        specialItems.add(item);
         item.setOrder(this);
     }
 }

@@ -22,7 +22,9 @@ SELECT format('ALTER TABLE public.%I OWNER TO %I', tablename, :'owner_name')
 FROM pg_tables WHERE schemaname='public' AND tablename IN (
     'customers','customer_notes','password_reset_tokens','staff','orders','customer_order','order_menu_item','order_menu_item_extra',
     'order_burger_protein','order_burger_removed_component','order_burger_extra_component','order_pizza_item',
-    'order_pizza_item_extra','order_pizza_item_base_option','app_migration_state','branch','menu_category','menu_item',
+    'order_pizza_item_extra','order_pizza_item_base_option','order_pizza_item_removed_ingredient',
+    'order_special_item','order_special_selection','special','special_day','special_component',
+    'special_component_menu_item','special_component_pizza','special_addon','app_migration_state','branch','menu_category','menu_item',
     'branch_menu_item_price','modifier_group','modifier_option','menu_item_modifier_group','burger_component',
     'burger_recipe','burger_recipe_component','burger_recipe_assignment','burger_item_default_component',
     'branch_burger_component_price','salad_ingredients','pizza_category','pizza','pizza_size','pizza_allowed_size',

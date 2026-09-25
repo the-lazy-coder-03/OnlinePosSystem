@@ -204,7 +204,7 @@ public class BurgerComponentReadRepository {
         }
         warnedMissingBurgerTables = true;
         logger.warn(
-                "Normalized burger tables are missing. Run src/main/resources/migration.sql to enable burger proteins, defaults, and extras."
+                "Normalized burger tables are missing. Run SQL files/migration.sql to enable burger proteins, defaults, and extras."
         );
     }
 }

@@ -75,6 +75,13 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await expect(page.locator('#deliveryButton')).not.toHaveClass(/active/);
     await expect(page.locator('#pickupButton')).not.toHaveClass(/active/);
     await expect(page.locator('#placeOrderButton')).toBeDisabled();
+    const desktopSummary = await page.locator('.order-summary').boundingBox();
+    const desktopLayout = await page.locator('.checkout-layout').boundingBox();
+    expect(desktopSummary.width).toBeGreaterThanOrEqual(380);
+    expect(desktopSummary.width / desktopLayout.width).toBeGreaterThan(0.39);
+    await page.setViewportSize({width: 390, height: 844});
+    await expect(page.locator('.order-summary')).toHaveCSS('position', 'static');
+    await page.setViewportSize({width: 1280, height: 720});
     await page.locator('#deliveryButton').click();
     await expect(page.locator('#deliveryFields')).toBeVisible();
     await expect(page.locator('#street')).toHaveAttribute('required', '');

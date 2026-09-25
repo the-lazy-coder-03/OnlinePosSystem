@@ -27,6 +27,9 @@ public class OrderBurgerExtraComponent {
     @Column(name = "unit_price_at_time", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPriceAtTime = BigDecimal.ZERO;
 
+    @Column(name = "component_name_at_time")
+    private String componentNameAtTime;
+
     public OrderBurgerExtraComponent() {
     }
 
@@ -72,4 +75,6 @@ public class OrderBurgerExtraComponent {
     public void setUnitPriceAtTime(BigDecimal unitPriceAtTime) {
         this.unitPriceAtTime = unitPriceAtTime;
     }
+    public String getComponentNameAtTime() { return componentNameAtTime; }
+    public void setComponentNameAtTime(String componentNameAtTime) { this.componentNameAtTime = componentNameAtTime; }
 }

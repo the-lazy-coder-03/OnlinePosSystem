@@ -797,6 +797,7 @@
         list.className = "order-item-list";
 
         const items = [
+            ...(order.specialItems || []).map(renderSpecialOrderItem),
             ...(order.menuItems || []).map(renderMenuOrderItem),
             ...(order.pizzaItems || []).map(renderPizzaOrderItem)
         ];
@@ -812,6 +813,15 @@
 
         section.appendChild(list);
         parent.appendChild(section);
+    }
+
+    function renderSpecialOrderItem(item) {
+        const details = (item.selections || []).map(selection => {
+            const size = selection.pizzaSizeCm ? ` (${selection.pizzaSizeCm}cm)` : "";
+            return `${selection.label || "Selection"}: ${selection.productName || "Item"}${size}`;
+        });
+        details.push(`Bundle total: ${currency(item.finalLineTotalAtTime)}`);
+        return renderOrderItem(`${item.quantity || 1}× ${item.name || "Special"}`, details);
     }
 
     function renderMenuOrderItem(item) {
@@ -840,6 +850,7 @@
         (item.extras || [])
             .filter(extra => extra && extra.ingredientName)
             .forEach(extra => details.push(`Extra topping: ${quantityLabel(extra.qty, extra.ingredientName)}`));
+        (item.removedIngredients || []).forEach(name => details.push(`No ${name}`));
         if (item.notes) details.push(`Notes: ${item.notes}`);
 
         return renderOrderItem(title, details);
@@ -866,6 +877,207 @@
         }
 
         return item;
+    }
+
+    let specialCatalog = null;
+    let specialRows = [];
+
+    async function setupSpecials() {
+        if (adminLevel !== 3 || !document.getElementById("specialsTableBody")) return;
+        document.getElementById("addSpecialButton")?.addEventListener("click", () => openSpecialEditor());
+        document.getElementById("addSpecialComponent")?.addEventListener("click", () => addSpecialComponentRow());
+        document.getElementById("addSpecialAddon")?.addEventListener("click", () => addSpecialAddonRow());
+        document.getElementById("specialForm")?.addEventListener("submit", saveSpecial);
+        const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        const days = document.getElementById("specialDays");
+        dayNames.forEach((name, index) => {
+            const wrapper = document.createElement("div");
+            wrapper.className = "form-check";
+            wrapper.innerHTML = `<input class="form-check-input" type="checkbox" value="${index + 1}" id="specialDay${index + 1}"><label class="form-check-label" for="specialDay${index + 1}">${name}</label>`;
+            days.appendChild(wrapper);
+        });
+        try {
+            const [catalogResponse, specialsResponse] = await Promise.all([
+                fetch("/api/admin/specials/catalog"), fetch("/api/admin/specials")
+            ]);
+            if (!catalogResponse.ok || !specialsResponse.ok) throw new Error("Could not load specials.");
+            specialCatalog = await catalogResponse.json();
+            specialRows = await specialsResponse.json();
+            renderSpecialsTable();
+        } catch (error) {
+            showSpecialNotice(error.message, "danger");
+        }
+    }
+
+    function renderSpecialsTable() {
+        const body = document.getElementById("specialsTableBody");
+        body.replaceChildren();
+        const branches = new Map((specialCatalog?.branches || []).map(value => [value.id, value.name]));
+        const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        specialRows.forEach(special => {
+            const row = document.createElement("tr");
+            const status = special.archived ? "Archived" : (special.active ? "Active" : "Inactive");
+            [special.name, branches.get(special.branchId) || special.branchId,
+                (special.days || []).sort().map(day => dayNames[day - 1]).join(", "), currency(special.price), status]
+                .forEach(value => { const cell = document.createElement("td"); cell.textContent = value; row.appendChild(cell); });
+            const actions = document.createElement("td");
+            const edit = document.createElement("button");
+            edit.type = "button"; edit.className = "btn btn-sm btn-outline-primary me-2"; edit.innerHTML = '<i class="bi bi-pencil"></i><span class="visually-hidden">Edit</span>';
+            edit.addEventListener("click", () => openSpecialEditor(special));
+            const archive = document.createElement("button");
+            archive.type = "button"; archive.className = `btn btn-sm ${special.archived ? "btn-outline-success" : "btn-outline-danger"}`;
+            archive.textContent = special.archived ? "Restore" : "Archive";
+            archive.addEventListener("click", () => changeSpecialArchive(special));
+            actions.append(edit, archive); row.appendChild(actions); body.appendChild(row);
+        });
+        if (!specialRows.length) body.innerHTML = '<tr><td colspan="6" class="text-center text-secondary py-4">No specials configured.</td></tr>';
+    }
+
+    function optionList(values, selected, placeholder = "None") {
+        const selectedSet = new Set((selected || []).map(Number));
+        return `<option value="">${placeholder}</option>` + (values || []).map(value =>
+            `<option value="${value.id}" ${selectedSet.has(Number(value.id)) ? "selected" : ""}>${escapeAdmin(value.name)}</option>`).join("");
+    }
+
+    function productOptions(values, selected) {
+        const selectedSet = new Set((selected || []).map(Number));
+        return (values || []).map(value => `<option value="${value.id}" ${selectedSet.has(Number(value.id)) ? "selected" : ""}>${escapeAdmin(value.name)}</option>`).join("");
+    }
+
+    function openSpecialEditor(special = null) {
+        const form = document.getElementById("specialForm");
+        form.reset();
+        document.getElementById("specialFormError").classList.add("d-none");
+        setValue("specialId", special?.id || "");
+        setValue("specialCode", special?.code || "");
+        setValue("specialName", special?.name || "");
+        setValue("specialDescriptionInput", special?.description || "");
+        setValue("specialPrice", special?.price ?? "");
+        setValue("specialStartsOn", special?.startsOn || "");
+        setValue("specialEndsOn", special?.endsOn || "");
+        setValue("specialSortOrder", special?.sortOrder ?? 0);
+        setChecked("specialActive", Boolean(special?.active));
+        document.getElementById("specialBranch").innerHTML = optionList(specialCatalog.branches, special ? [special.branchId] : [1], "Choose branch");
+        document.querySelectorAll("#specialDays input").forEach(input => input.checked = (special?.days || []).includes(Number(input.value)));
+        document.getElementById("specialComponents").replaceChildren();
+        document.getElementById("specialAddons").replaceChildren();
+        (special?.components || []).forEach(addSpecialComponentRow);
+        (special?.addons || []).forEach(addSpecialAddonRow);
+        if (!special) addSpecialComponentRow();
+        document.getElementById("specialModalTitle").textContent = special ? "Edit special" : "Add special";
+        bootstrap.Modal.getOrCreateInstance(document.getElementById("specialModal")).show();
+    }
+
+    function addSpecialComponentRow(component = {}) {
+        const row = document.createElement("div");
+        row.className = "border rounded p-3 mb-3 special-component-row";
+        const optionIds = (component.options || []).map(value => value.id);
+        row.innerHTML = `<div class="row g-2">
+            <div class="col-md-2"><label class="form-label">Code</label><input class="form-control" data-field="code" value="${escapeAdmin(component.code || "")}" required></div>
+            <div class="col-md-3"><label class="form-label">Label</label><input class="form-control" data-field="label" value="${escapeAdmin(component.label || "")}" required></div>
+            <div class="col-md-2"><label class="form-label">Product type</label><select class="form-select" data-field="productType"><option value="MENU_ITEM">Menu item</option><option value="PIZZA">Pizza</option></select></div>
+            <div class="col-md-2"><label class="form-label">Quantity</label><input class="form-control" data-field="quantity" type="number" min="1" max="20" value="${component.quantity || 1}" required></div>
+            <div class="col-md-2"><label class="form-label">Mode</label><select class="form-select" data-field="selectionMode"><option value="CUSTOMER_CHOICE">Customer choice</option><option value="INCLUDED">Included</option></select></div>
+            <div class="col-md-1 d-flex align-items-end"><button class="btn btn-outline-danger" type="button" data-remove><i class="bi bi-trash"></i></button></div>
+            <div class="col-md-3 menu-rule"><label class="form-label">Menu category</label><select class="form-select" data-field="menuCategoryId">${optionList(specialCatalog.menuCategories, component.menuCategoryId ? [component.menuCategoryId] : [])}</select></div>
+            <div class="col-md-3 pizza-rule"><label class="form-label">Pizza category</label><select class="form-select" data-field="pizzaCategoryId">${optionList(specialCatalog.pizzaCategories, component.pizzaCategoryId ? [component.pizzaCategoryId] : [])}</select></div>
+            <div class="col-md-2 pizza-rule"><label class="form-label">Locked size</label><select class="form-select" data-field="pizzaSizeId">${optionList(specialCatalog.pizzaSizes, component.pizzaSizeId ? [component.pizzaSizeId] : [], "Choose size")}</select></div>
+            <div class="col-md-4 menu-rule"><label class="form-label">Eligible menu items</label><select class="form-select" data-field="menuItemIds" multiple size="4">${productOptions(specialCatalog.menuItems, optionIds)}</select></div>
+            <div class="col-md-4 pizza-rule"><label class="form-label">Eligible pizzas</label><select class="form-select" data-field="pizzaIds" multiple size="4">${productOptions(specialCatalog.pizzas, optionIds)}</select></div>
+            <div class="col-md-2"><label class="form-label">Sort</label><input class="form-control" data-field="sortOrder" type="number" min="0" value="${component.sortOrder || 0}"></div>
+            <div class="col-md-2 d-flex align-items-center"><div class="form-check"><input class="form-check-input" data-field="allowRepeats" type="checkbox" ${component.allowRepeats ? "checked" : ""}><label class="form-check-label">Allow repeats</label></div></div>
+            <div class="col-md-2 d-flex align-items-center"><div class="form-check"><input class="form-check-input" data-field="allowCustomization" type="checkbox" ${component.allowCustomization ? "checked" : ""}><label class="form-check-label">Customizable</label></div></div>
+        </div>`;
+        row.querySelector('[data-field="productType"]').value = component.productType || "MENU_ITEM";
+        row.querySelector('[data-field="selectionMode"]').value = component.selectionMode || "CUSTOMER_CHOICE";
+        const refresh = () => row.querySelectorAll(".pizza-rule").forEach(el => el.classList.toggle("d-none", row.querySelector('[data-field="productType"]').value !== "PIZZA"))
+            || row.querySelectorAll(".menu-rule").forEach(el => el.classList.toggle("d-none", row.querySelector('[data-field="productType"]').value !== "MENU_ITEM"));
+        row.querySelector('[data-field="productType"]').addEventListener("change", refresh);
+        row.querySelector("[data-remove]").addEventListener("click", () => row.remove());
+        document.getElementById("specialComponents").appendChild(row); refresh();
+    }
+
+    function addSpecialAddonRow(addon = {}) {
+        const row = document.createElement("div");
+        row.className = "border rounded p-3 mb-3 special-addon-row";
+        row.innerHTML = `<div class="row g-2">
+            <div class="col-md-2"><label class="form-label">Code</label><input class="form-control" data-field="code" value="${escapeAdmin(addon.code || "")}" required></div>
+            <div class="col-md-3"><label class="form-label">Label</label><input class="form-control" data-field="label" value="${escapeAdmin(addon.label || "")}" required></div>
+            <div class="col-md-2"><label class="form-label">Type</label><select class="form-select" data-field="productType"><option value="MENU_ITEM">Menu item</option><option value="PIZZA">Pizza</option></select></div>
+            <div class="col-md-3 menu-rule"><label class="form-label">Menu item</label><select class="form-select" data-field="menuItemId">${optionList(specialCatalog.menuItems, addon.productType === "MENU_ITEM" ? [addon.productId] : [])}</select></div>
+            <div class="col-md-3 pizza-rule"><label class="form-label">Pizza</label><select class="form-select" data-field="pizzaId">${optionList(specialCatalog.pizzas, addon.productType === "PIZZA" ? [addon.productId] : [])}</select></div>
+            <div class="col-md-2 pizza-rule"><label class="form-label">Size</label><select class="form-select" data-field="pizzaSizeId">${optionList(specialCatalog.pizzaSizes, addon.pizzaSizeId ? [addon.pizzaSizeId] : [])}</select></div>
+            <div class="col-md-2"><label class="form-label">Price</label><input class="form-control" data-field="price" type="number" min="0" step="0.01" value="${addon.price ?? 0}" required></div>
+            <div class="col-md-2"><label class="form-label">Limit</label><input class="form-control" data-field="maxQuantity" type="number" min="1" value="${addon.maxQuantity || 1}"></div>
+            <div class="col-md-2"><label class="form-label">Sort</label><input class="form-control" data-field="sortOrder" type="number" min="0" value="${addon.sortOrder || 0}"></div>
+            <div class="col-md-2 d-flex align-items-center"><div class="form-check"><input class="form-check-input" data-field="allowCustomization" type="checkbox" ${addon.allowCustomization ? "checked" : ""}><label class="form-check-label">Customizable</label></div></div>
+            <div class="col-md-1 d-flex align-items-center"><div class="form-check"><input class="form-check-input" data-field="active" type="checkbox" ${addon.active !== false ? "checked" : ""}><label class="form-check-label">Active</label></div></div>
+            <div class="col-md-1"><button class="btn btn-outline-danger" type="button" data-remove><i class="bi bi-trash"></i></button></div>
+        </div>`;
+        row.querySelector('[data-field="productType"]').value = addon.productType || "PIZZA";
+        const refresh = () => { const pizza = row.querySelector('[data-field="productType"]').value === "PIZZA"; row.querySelectorAll(".pizza-rule").forEach(el => el.classList.toggle("d-none", !pizza)); row.querySelectorAll(".menu-rule").forEach(el => el.classList.toggle("d-none", pizza)); };
+        row.querySelector('[data-field="productType"]').addEventListener("change", refresh);
+        row.querySelector("[data-remove]").addEventListener("click", () => row.remove());
+        document.getElementById("specialAddons").appendChild(row); refresh();
+    }
+
+    function field(row, name) { return row.querySelector(`[data-field="${name}"]`); }
+    function nullableNumber(value) { return value === "" || value == null ? null : Number(value); }
+    function selectedNumbers(select) { return Array.from(select.selectedOptions).map(option => Number(option.value)); }
+
+    async function saveSpecial(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        if (!form.checkValidity()) { form.reportValidity(); return; }
+        const components = Array.from(document.querySelectorAll(".special-component-row")).map(row => ({
+            code: field(row, "code").value, label: field(row, "label").value, productType: field(row, "productType").value,
+            quantity: Number(field(row, "quantity").value), selectionMode: field(row, "selectionMode").value,
+            menuCategoryId: nullableNumber(field(row, "menuCategoryId").value), pizzaCategoryId: nullableNumber(field(row, "pizzaCategoryId").value),
+            pizzaSizeId: nullableNumber(field(row, "pizzaSizeId").value), allowRepeats: field(row, "allowRepeats").checked,
+            allowCustomization: field(row, "allowCustomization").checked, sortOrder: Number(field(row, "sortOrder").value || 0),
+            menuItemIds: selectedNumbers(field(row, "menuItemIds")), pizzaIds: selectedNumbers(field(row, "pizzaIds"))
+        }));
+        const addons = Array.from(document.querySelectorAll(".special-addon-row")).map(row => ({
+            code: field(row, "code").value, label: field(row, "label").value, productType: field(row, "productType").value,
+            menuItemId: nullableNumber(field(row, "menuItemId").value), pizzaId: nullableNumber(field(row, "pizzaId").value),
+            pizzaSizeId: nullableNumber(field(row, "pizzaSizeId").value), price: Number(field(row, "price").value),
+            maxQuantity: Number(field(row, "maxQuantity").value), allowCustomization: field(row, "allowCustomization").checked,
+            active: field(row, "active").checked, sortOrder: Number(field(row, "sortOrder").value || 0)
+        }));
+        const payload = {code: document.getElementById("specialCode").value, branchId: Number(document.getElementById("specialBranch").value),
+            name: document.getElementById("specialName").value, description: document.getElementById("specialDescriptionInput").value,
+            bundlePrice: Number(document.getElementById("specialPrice").value), active: document.getElementById("specialActive").checked,
+            startsOn: document.getElementById("specialStartsOn").value || null, endsOn: document.getElementById("specialEndsOn").value || null,
+            days: Array.from(document.querySelectorAll("#specialDays input:checked")).map(input => Number(input.value)),
+            sortOrder: Number(document.getElementById("specialSortOrder").value || 0), components, addons};
+        const id = document.getElementById("specialId").value;
+        try {
+            const response = await fetch(id ? `/api/admin/specials/${id}` : "/api/admin/specials", {method: id ? "PUT" : "POST",
+                headers: {"Content-Type": "application/json", "X-CSRF-TOKEN": csrfToken}, body: JSON.stringify(payload)});
+            if (!response.ok) throw new Error(await response.text() || "Could not save special.");
+            bootstrap.Modal.getInstance(document.getElementById("specialModal"))?.hide();
+            const updated = await response.json();
+            specialRows = id ? specialRows.map(value => value.id === updated.id ? updated : value) : [...specialRows, updated];
+            renderSpecialsTable(); showSpecialNotice("Special saved.", "success");
+        } catch (error) { const box = document.getElementById("specialFormError"); box.textContent = error.message; box.classList.remove("d-none"); }
+    }
+
+    async function changeSpecialArchive(special) {
+        const action = special.archived ? "restore" : "archive";
+        const response = await fetch(`/api/admin/specials/${special.id}/${action}`, {method: "POST", headers: {"X-CSRF-TOKEN": csrfToken}});
+        if (!response.ok) { showSpecialNotice(await response.text() || `Could not ${action} special.`, "danger"); return; }
+        const updated = await response.json(); specialRows = specialRows.map(value => value.id === updated.id ? updated : value); renderSpecialsTable();
+        showSpecialNotice(special.archived ? "Special restored as inactive." : "Special archived.", "success");
+    }
+
+    function showSpecialNotice(message, type) {
+        const notice = document.getElementById("specialsNotice");
+        if (!notice) return;
+        notice.textContent = message; notice.className = `alert alert-${type}`;
+    }
+
+    function escapeAdmin(value) {
+        return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
     }
 
     function quantityLabel(qty, name) {
@@ -918,6 +1130,7 @@
         setupCatalogModals();
         setupUsers();
         setupAccountSearch();
+        setupSpecials();
         refreshOverview();
         refreshOrders();
         connectLiveOrders();
