@@ -1935,9 +1935,12 @@ CREATE TABLE IF NOT EXISTS special (
 
 CREATE TABLE IF NOT EXISTS special_day (
     special_id BIGINT NOT NULL REFERENCES special(special_id) ON DELETE CASCADE,
-    day_of_week SMALLINT NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
+    day_of_week INT NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
     PRIMARY KEY (special_id, day_of_week)
 );
+
+ALTER TABLE special_day
+    ALTER COLUMN day_of_week TYPE INT USING day_of_week::INT;
 
 CREATE TABLE IF NOT EXISTS special_component (
     special_component_id BIGSERIAL PRIMARY KEY,
@@ -2071,7 +2074,16 @@ WITH inserted AS (
         ('KEN-WED-TOASTIES', 1, 'Wednesday: Toasted Sandwich Deal', 'Choose two toasted sandwiches with small chips.', 135.00, 60),
         ('KEN-THU-RIBS', 1, 'Thursday: 1kg Ribs Deal', '1kg ribs, medium chips and onion rings.', 290.00, 70),
         ('KEN-SUN-PASTA', 1, 'Sunday: Large Pasta + Garlic Pita', 'Choose a Large pasta and receive a 23cm Garlic Pita.', 169.00, 80),
-        ('KEN-SUN-RIBS-PIZZAS', 1, 'Sunday: Ribs + 2 Medium Pizzas', '400g ribs, small chips and two 23cm pizzas.', 365.00, 90)
+        ('KEN-SUN-RIBS-PIZZAS', 1, 'Sunday: Ribs + 2 Medium Pizzas', '400g ribs, small chips and two 23cm pizzas.', 365.00, 90),
+        ('UIT-MON-2-LARGE-FAVOURITES', 2, 'Monday: 2 Large Favourite Pizzas', 'Choose two 30cm Favourite pizzas.', 225.00, 10),
+        ('UIT-MON-STEAK-BURGERS', 2, 'Monday: Steak Burger Deal', 'Two 200g sirloin steak burgers, medium chips and two premium sauces.', 295.00, 20),
+        ('UIT-TUE-FAVOURITE-SUPREME', 2, 'Tuesday: Favourite + Supreme', 'One 30cm Favourite and one 30cm Supreme pizza.', 236.00, 30),
+        ('UIT-TUE-CHEESE-BURGERS', 2, 'Tuesday: 2 Cheese Burgers', 'Two Cheese Burgers with small chips.', 160.00, 40),
+        ('UIT-WED-2-LARGE-SUPREMES', 2, 'Wednesday: 2 Large Supreme Pizzas', 'Choose two 30cm Supreme pizzas.', 247.00, 50),
+        ('UIT-WED-TOASTIES', 2, 'Wednesday: Toasted Sandwich Deal', 'Choose two toasted sandwiches with small chips.', 120.00, 60),
+        ('UIT-THU-RIBS', 2, 'Thursday: 1kg Ribs Deal', '1kg ribs, medium chips and onion rings.', 276.00, 70),
+        ('UIT-SUN-PASTA', 2, 'Sunday: Large Pasta + Garlic Pita', 'Choose a Large pasta and receive a 23cm Garlic Pita.', 159.00, 80),
+        ('UIT-SUN-RIBS-PIZZAS', 2, 'Sunday: Ribs + 2 Medium Pizzas', '400g ribs, small chips and two 23cm pizzas.', 360.00, 90)
     ON CONFLICT (code) DO NOTHING
     RETURNING special_id, code
 )
@@ -2079,8 +2091,8 @@ INSERT INTO new_special_seed SELECT special_id, code FROM inserted;
 
 INSERT INTO special_day(special_id, day_of_week)
 SELECT special_id, CASE
-    WHEN code LIKE 'KEN-MON-%' THEN 1 WHEN code LIKE 'KEN-TUE-%' THEN 2
-    WHEN code LIKE 'KEN-WED-%' THEN 3 WHEN code LIKE 'KEN-THU-%' THEN 4 ELSE 7 END
+    WHEN code LIKE '%-MON-%' THEN 1 WHEN code LIKE '%-TUE-%' THEN 2
+    WHEN code LIKE '%-WED-%' THEN 3 WHEN code LIKE '%-THU-%' THEN 4 ELSE 7 END
 FROM new_special_seed;
 
 -- Category-based pizza choices.
@@ -2093,7 +2105,11 @@ JOIN (VALUES
     ('KEN-MON-2-LARGE-FAVOURITES','pizzas','Large Favourite pizzas',2,'Favourite',30,TRUE,10),
     ('KEN-TUE-FAVOURITE-SUPREME','favourite','Large Favourite pizza',1,'Favourite',30,FALSE,10),
     ('KEN-TUE-FAVOURITE-SUPREME','supreme','Large Supreme pizza',1,'Supreme',30,FALSE,20),
-    ('KEN-WED-2-LARGE-SUPREMES','pizzas','Large Supreme pizzas',2,'Supreme',30,TRUE,10)
+    ('KEN-WED-2-LARGE-SUPREMES','pizzas','Large Supreme pizzas',2,'Supreme',30,TRUE,10),
+    ('UIT-MON-2-LARGE-FAVOURITES','pizzas','Large Favourite pizzas',2,'Favourite',30,TRUE,10),
+    ('UIT-TUE-FAVOURITE-SUPREME','favourite','Large Favourite pizza',1,'Favourite',30,FALSE,10),
+    ('UIT-TUE-FAVOURITE-SUPREME','supreme','Large Supreme pizza',1,'Supreme',30,FALSE,20),
+    ('UIT-WED-2-LARGE-SUPREMES','pizzas','Large Supreme pizzas',2,'Supreme',30,TRUE,10)
 ) AS values(code,component_code,label,quantity,category_name,size_cm,allow_repeats,sort_order) ON values.code=seed.code
 JOIN pizza_category category
   ON regexp_replace(lower(category.name), 's$', '') = regexp_replace(lower(values.category_name), 's$', '')
@@ -2106,7 +2122,8 @@ SELECT seed.special_id, values.component_code, values.label, 'MENU_ITEM', values
        category.id, values.allow_repeats, values.allow_customization, values.sort_order
 FROM new_special_seed seed
 JOIN (VALUES
-    ('KEN-WED-TOASTIES','sandwiches','Toasted sandwiches',2,'CUSTOMER_CHOICE','Toasted Sandwiches',TRUE,TRUE,10)
+    ('KEN-WED-TOASTIES','sandwiches','Toasted sandwiches',2,'CUSTOMER_CHOICE','Toasted Sandwiches',TRUE,TRUE,10),
+    ('UIT-WED-TOASTIES','sandwiches','Toasted sandwiches',2,'CUSTOMER_CHOICE','Toasted Sandwiches',TRUE,TRUE,10)
 ) AS values(code,component_code,label,quantity,selection_mode,category_name,allow_repeats,allow_customization,sort_order) ON values.code=seed.code
 JOIN menu_category category ON lower(category.name)=lower(values.category_name);
 
@@ -2129,7 +2146,21 @@ JOIN (VALUES
     ('KEN-SUN-PASTA','pita','23cm Garlic Pita','PIZZA',1,'INCLUDED',FALSE,TRUE,20),
     ('KEN-SUN-RIBS-PIZZAS','ribs','Ribs 400g','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,10),
     ('KEN-SUN-RIBS-PIZZAS','chips','Small chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
-    ('KEN-SUN-RIBS-PIZZAS','pizzas','Medium pizzas','PIZZA',2,'CUSTOMER_CHOICE',TRUE,TRUE,30)
+    ('KEN-SUN-RIBS-PIZZAS','pizzas','Medium pizzas','PIZZA',2,'CUSTOMER_CHOICE',TRUE,TRUE,30),
+    ('UIT-MON-STEAK-BURGERS','burgers','200g Sirloin Steak Burgers','MENU_ITEM',2,'CUSTOMER_CHOICE',TRUE,TRUE,10),
+    ('UIT-MON-STEAK-BURGERS','chips','Medium chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('UIT-MON-STEAK-BURGERS','sauces','Premium sauces','MENU_ITEM',2,'CUSTOMER_CHOICE',TRUE,FALSE,30),
+    ('UIT-TUE-CHEESE-BURGERS','burgers','Cheese Burgers','MENU_ITEM',2,'CUSTOMER_CHOICE',TRUE,TRUE,10),
+    ('UIT-TUE-CHEESE-BURGERS','chips','Small chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('UIT-WED-TOASTIES','chips','Small chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('UIT-THU-RIBS','ribs','Ribs 1kg','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,10),
+    ('UIT-THU-RIBS','chips','Medium chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('UIT-THU-RIBS','rings','Onion rings','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,30),
+    ('UIT-SUN-PASTA','pasta','Large pasta','MENU_ITEM',1,'CUSTOMER_CHOICE',FALSE,TRUE,10),
+    ('UIT-SUN-PASTA','pita','23cm Garlic Pita','PIZZA',1,'INCLUDED',FALSE,TRUE,20),
+    ('UIT-SUN-RIBS-PIZZAS','ribs','Ribs 400g','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,10),
+    ('UIT-SUN-RIBS-PIZZAS','chips','Small chips','MENU_ITEM',1,'INCLUDED',FALSE,FALSE,20),
+    ('UIT-SUN-RIBS-PIZZAS','pizzas','Medium pizzas','PIZZA',2,'CUSTOMER_CHOICE',TRUE,TRUE,30)
 ) AS values(code,component_code,label,product_type,quantity,selection_mode,allow_repeats,allow_customization,sort_order)
 ON values.code=seed.code;
 
@@ -2140,7 +2171,8 @@ FROM pizza_size size WHERE size.cm=23 AND component.product_type='PIZZA' AND com
 -- Resolve explicit products without embedding catalog IDs in special rules.
 INSERT INTO special_component_menu_item(special_component_id, menu_item_id)
 SELECT component.special_component_id, item.id
-FROM special_component component JOIN special special ON special.special_id=component.special_id
+FROM special_component component
+JOIN new_special_seed seed ON seed.special_id=component.special_id
 JOIN (VALUES
     ('KEN-MON-STEAK-BURGERS','burgers','Steak Burger'),('KEN-MON-STEAK-BURGERS','chips','Chips Med'),
     ('KEN-MON-STEAK-BURGERS','sauces','Cheese Sauce'),('KEN-MON-STEAK-BURGERS','sauces','Pepper Sauce'),
@@ -2151,15 +2183,29 @@ JOIN (VALUES
     ('KEN-SUN-PASTA','pasta','Chicken Pasta Large'),('KEN-SUN-PASTA','pasta','Carbonara Large'),
     ('KEN-SUN-PASTA','pasta','Alfredo Large'),('KEN-SUN-PASTA','pasta','Cheesy Mac Large'),
     ('KEN-SUN-PASTA','pasta','Vegetarian Pasta Large'),('KEN-SUN-RIBS-PIZZAS','ribs','Ribs 400g'),
-    ('KEN-SUN-RIBS-PIZZAS','chips','Chips Small')
-) AS option(code,component_code,item_name) ON option.code=special.code AND option.component_code=component.component_code
+    ('KEN-SUN-RIBS-PIZZAS','chips','Chips Small'),
+    ('UIT-MON-STEAK-BURGERS','burgers','Steak Burger'),('UIT-MON-STEAK-BURGERS','chips','Chips Med'),
+    ('UIT-MON-STEAK-BURGERS','sauces','Cheese Sauce'),('UIT-MON-STEAK-BURGERS','sauces','Pepper Sauce'),
+    ('UIT-MON-STEAK-BURGERS','sauces','Mushroom Sauce'),('UIT-TUE-CHEESE-BURGERS','burgers','Cheese Burger'),
+    ('UIT-TUE-CHEESE-BURGERS','chips','Chips Small'),('UIT-WED-TOASTIES','chips','Chips Small'),
+    ('UIT-THU-RIBS','ribs','Ribs 1kg'),('UIT-THU-RIBS','chips','Chips Med'),('UIT-THU-RIBS','rings','5 x Onion Rings'),
+    ('UIT-SUN-PASTA','pasta','Lasagne Large'),('UIT-SUN-PASTA','pasta','Bolognaise Large'),
+    ('UIT-SUN-PASTA','pasta','Chicken Pasta Large'),('UIT-SUN-PASTA','pasta','Carbonara Large'),
+    ('UIT-SUN-PASTA','pasta','Alfredo Large'),('UIT-SUN-PASTA','pasta','Cheesy Mac Large'),
+    ('UIT-SUN-PASTA','pasta','Vegetarian Pasta Large'),('UIT-SUN-RIBS-PIZZAS','ribs','Ribs 400g'),
+    ('UIT-SUN-RIBS-PIZZAS','chips','Chips Small')
+) AS option(code,component_code,item_name) ON option.code=seed.code AND option.component_code=component.component_code
 JOIN menu_item item ON item.name=option.item_name;
 
 INSERT INTO special_component_pizza(special_component_id, pizza_id)
 SELECT component.special_component_id, pizza.pizza_id
-FROM special_component component JOIN special special ON special.special_id=component.special_id
-JOIN (VALUES ('KEN-SUN-PASTA','pita','Garlic Pita')) AS option(code,component_code,pizza_name)
-  ON option.code=special.code AND option.component_code=component.component_code
+FROM special_component component
+JOIN new_special_seed seed ON seed.special_id=component.special_id
+JOIN (VALUES
+    ('KEN-SUN-PASTA','pita','Garlic Pita'),
+    ('UIT-SUN-PASTA','pita','Garlic Pita')
+) AS option(code,component_code,pizza_name)
+  ON option.code=seed.code AND option.component_code=component.component_code
 JOIN pizza ON pizza.name=option.pizza_name;
 
 -- Sunday permits both current pizza categories at 23cm.
@@ -2167,7 +2213,7 @@ INSERT INTO special_component_pizza(special_component_id, pizza_id)
 SELECT component.special_component_id, pizza.pizza_id
 FROM special_component component JOIN special ON special.special_id=component.special_id
 JOIN pizza ON pizza.pizza_category_id IN (1,2)
-WHERE special.code='KEN-SUN-RIBS-PIZZAS' AND component.component_code='pizzas'
+WHERE special.code IN ('KEN-SUN-RIBS-PIZZAS', 'UIT-SUN-RIBS-PIZZAS') AND component.component_code='pizzas'
   AND special.special_id IN (SELECT special_id FROM new_special_seed);
 
 INSERT INTO special_addon(special_id, addon_code, label, product_type, pizza_id, pizza_size_id, price,
@@ -2175,7 +2221,13 @@ INSERT INTO special_addon(special_id, addon_code, label, product_type, pizza_id,
 SELECT seed.special_id, 'cheesy-garlic', 'Large Cheesy Garlic Pizza', 'PIZZA', pizza.pizza_id,
        size.pizza_size_id, 100.00, 1, TRUE, 10
 FROM new_special_seed seed JOIN pizza ON pizza.name='Cheesy Pita' JOIN pizza_size size ON size.cm=30
-WHERE seed.code='KEN-THU-RIBS';
+WHERE seed.code IN ('KEN-THU-RIBS', 'UIT-THU-RIBS');
+
+UPDATE special_addon
+SET price = 95.00
+WHERE special_id IN (
+    SELECT special_id FROM new_special_seed WHERE code = 'UIT-THU-RIBS'
+);
 
 COMMIT;
 

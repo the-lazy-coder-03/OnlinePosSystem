@@ -206,7 +206,7 @@ public class SpecialService {
         for (SpecialComponent component : special.getComponents()) {
             List<OrderRequestDTO.SpecialSelectionRequestDTO> supplied = new ArrayList<>(byComponent.getOrDefault(component.getId(), List.of()));
             if (supplied.isEmpty() && "INCLUDED".equals(component.getSelectionMode())) {
-                supplied = autoIncluded(component);
+                supplied = autoIncluded(component, branchId);
             }
             if (supplied.size() != component.getQuantity()) {
                 throw new IllegalArgumentException(component.getLabel() + " requires exactly " + component.getQuantity() + " selection(s).");
@@ -341,8 +341,8 @@ public class SpecialService {
         return line;
     }
 
-    private List<OrderRequestDTO.SpecialSelectionRequestDTO> autoIncluded(SpecialComponent component) {
-        List<SpecialView.Option> options = componentOptions(component);
+    private List<OrderRequestDTO.SpecialSelectionRequestDTO> autoIncluded(SpecialComponent component, Integer branchId) {
+        List<SpecialView.Option> options = componentOptions(component, branchId, true);
         if (options.size() != 1 || component.isAllowCustomization()) return List.of();
         List<OrderRequestDTO.SpecialSelectionRequestDTO> result = new ArrayList<>();
         for (int index = 1; index <= component.getQuantity(); index++) {
@@ -435,6 +435,8 @@ public class SpecialService {
     }
 
     private SpecialView toView(Special special, boolean includeInactiveAddons) {
+        Integer branchId = special.getBranch().getId();
+        boolean branchAvailableOnly = !includeInactiveAddons;
         List<SpecialView.Component> components = special.getComponents().stream().map(component ->
                 new SpecialView.Component(component.getId(), component.getCode(), component.getLabel(), component.getProductType(),
                         component.getQuantity(), component.getSelectionMode(),
@@ -442,9 +444,11 @@ public class SpecialService {
                         component.getPizzaCategory() == null ? null : component.getPizzaCategory().getId(),
                         component.getPizzaSize() == null ? null : component.getPizzaSize().getId(),
                         component.getPizzaSize() == null ? null : component.getPizzaSize().getCm(),
-                        component.isAllowRepeats(), component.isAllowCustomization(), component.getSortOrder(), componentOptions(component))).toList();
+                        component.isAllowRepeats(), component.isAllowCustomization(), component.getSortOrder(),
+                        componentOptions(component, branchId, branchAvailableOnly))).toList();
         List<SpecialView.Addon> addons = special.getAddons().stream()
-                .filter(addon -> includeInactiveAddons || addon.isActive()).map(addon -> {
+                .filter(addon -> includeInactiveAddons || addon.isActive())
+                .filter(addon -> !branchAvailableOnly || addonAvailable(addon, branchId)).map(addon -> {
             boolean menu = "MENU_ITEM".equals(addon.getProductType());
             return new SpecialView.Addon(addon.getId(), addon.getCode(), addon.getLabel(), addon.getProductType(),
                     menu ? addon.getMenuItem().getId() : addon.getPizza().getId(),
@@ -458,21 +462,35 @@ public class SpecialService {
                 special.getDays(), special.getSortOrder(), components, addons);
     }
 
-    private List<SpecialView.Option> componentOptions(SpecialComponent component) {
+    private List<SpecialView.Option> componentOptions(SpecialComponent component, Integer branchId,
+                                                      boolean branchAvailableOnly) {
         if ("MENU_ITEM".equals(component.getProductType())) {
             Collection<MenuItem> choices = component.getMenuItems().isEmpty()
                     ? catalog.activeMenuItems().stream().filter(value -> component.getMenuCategory() != null
                     && Objects.equals(value.getCategory().getId(), component.getMenuCategory().getId())).toList()
                     : component.getMenuItems();
-            return choices.stream().filter(MenuItem::isActive).sorted(Comparator.comparing(MenuItem::getName))
+            return choices.stream().filter(MenuItem::isActive)
+                    .filter(value -> !branchAvailableOnly || catalog.menuPrice(branchId, value.getId()).isPresent())
+                    .sorted(Comparator.comparing(MenuItem::getName))
                     .map(value -> new SpecialView.Option(value.getId(), value.getName(), value.getCategory().getName())).toList();
         }
         Collection<Pizza> choices = component.getPizzas().isEmpty()
                 ? catalog.activePizzas().stream().filter(value -> component.getPizzaCategory() != null
                 && Objects.equals(value.getCategory().getId(), component.getPizzaCategory().getId())).toList()
                 : component.getPizzas();
-        return choices.stream().filter(Pizza::isActive).sorted(Comparator.comparing(Pizza::getName))
+        Integer sizeId = component.getPizzaSize() == null ? null : component.getPizzaSize().getId();
+        return choices.stream().filter(Pizza::isActive)
+                .filter(value -> !branchAvailableOnly || sizeId == null
+                        || catalog.pizzaPrice(branchId, value.getId(), sizeId).isPresent())
+                .sorted(Comparator.comparing(Pizza::getName))
                 .map(value -> new SpecialView.Option(value.getId(), value.getName(), value.getCategory().getName())).toList();
+    }
+
+    private boolean addonAvailable(SpecialAddon addon, Integer branchId) {
+        if ("MENU_ITEM".equals(addon.getProductType())) {
+            return catalog.menuPrice(branchId, addon.getMenuItem().getId()).isPresent();
+        }
+        return catalog.pizzaPrice(branchId, addon.getPizza().getId(), addon.getPizzaSize().getId()).isPresent();
     }
 
     private BigDecimal money(Number value) { return value == null ? BigDecimal.ZERO.setScale(2) : new BigDecimal(value.toString()).setScale(2, RoundingMode.HALF_UP); }

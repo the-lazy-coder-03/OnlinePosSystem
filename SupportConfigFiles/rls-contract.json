@@ -1,575 +1,994 @@
 {
-  "functions": {
-    "account_context(account_id bigint)": "CREATE OR REPLACE FUNCTION app_security.account_context(account_id bigint)\n RETURNS TABLE(access_level smallint)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT c.access_level FROM public.customers c WHERE c.id = account_id\n$function$\n",
-    "account_exists(email_value text, phone_value text)": "CREATE OR REPLACE FUNCTION app_security.account_exists(email_value text, phone_value text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT EXISTS (SELECT 1 FROM public.customers c WHERE c.email = email_value OR c.phone1 = phone_value)\n$function$\n",
-    "actor_role()": "CREATE OR REPLACE FUNCTION app_security.actor_role()\n RETURNS text\n LANGUAGE sql\n STABLE\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT CASE\n        WHEN current_setting('app.role', true) = 'SUPER_ADMIN' THEN 'SUPER_ADMIN'\n        WHEN app_security.setting_id('app.customer_id') > 0\n         AND app_security.setting_id('app.user_id') = app_security.setting_id('app.customer_id')\n         AND current_setting('app.role', true) IN ('USER', 'DRIVER')\n            THEN current_setting('app.role', true)\n        WHEN app_security.setting_id('app.customer_id') > 0\n         AND app_security.setting_id('app.user_id') = app_security.setting_id('app.customer_id')\n         AND app_security.setting_id('app.branch_id') IN (1, 2)\n         AND current_setting('app.role', true) = 'ADMIN' THEN 'ADMIN'\n        ELSE '' END\n$function$\n",
-    "cancel_reset(hash_value text)": "CREATE OR REPLACE FUNCTION app_security.cancel_reset(hash_value text)\n RETURNS void\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    DELETE FROM public.password_reset_tokens WHERE token_hash = hash_value AND NOT used\n$function$\n",
-    "consume_reset(hash_value text, password_value text)": "CREATE OR REPLACE FUNCTION app_security.consume_reset(hash_value text, password_value text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE account_id bigint; token_id bigint;\nBEGIN\n    SELECT customer_id INTO account_id FROM public.password_reset_tokens WHERE token_hash = hash_value;\n    IF account_id IS NULL THEN RETURN false; END IF;\n    -- Lock account first, consistently with create_reset, so competing resets cannot both succeed.\n    PERFORM id FROM public.customers WHERE id = account_id FOR UPDATE;\n    SELECT id INTO token_id FROM public.password_reset_tokens\n        WHERE token_hash = hash_value AND NOT used AND expires_at > LOCALTIMESTAMP FOR UPDATE;\n    IF token_id IS NULL THEN RETURN false; END IF;\n    UPDATE public.customers SET password = password_value WHERE id = account_id;\n    UPDATE public.password_reset_tokens SET used = true WHERE id = token_id;\n    DELETE FROM public.password_reset_tokens WHERE customer_id = account_id AND NOT used;\n    RETURN true;\nEND $function$\n",
-    "create_reset(email_value text, hash_value text, expiry timestamp without time zone)": "CREATE OR REPLACE FUNCTION app_security.create_reset(email_value text, hash_value text, expiry timestamp without time zone)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE account_id bigint; recipient text;\nBEGIN\n    SELECT id, email INTO account_id, recipient FROM public.customers WHERE email = email_value FOR UPDATE;\n    IF account_id IS NULL THEN RETURN NULL; END IF;\n    IF hash_value !~ '^[0-9a-f]{64}$' OR expiry <= LOCALTIMESTAMP OR expiry > LOCALTIMESTAMP + interval '31 minutes' THEN\n        RAISE EXCEPTION 'Invalid recovery request' USING ERRCODE = '22023';\n    END IF;\n    DELETE FROM public.password_reset_tokens WHERE customer_id = account_id AND NOT used;\n    INSERT INTO public.password_reset_tokens (customer_id, token_hash, expires_at, created_at, used)\n    VALUES (account_id, hash_value, expiry, LOCALTIMESTAMP, false);\n    RETURN recipient;\nEND $function$\n",
-    "guard_account_update()": "CREATE OR REPLACE FUNCTION app_security.guard_account_update()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nBEGIN\n    IF current_user = pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid = TG_RELID)) THEN RETURN NEW; END IF;\n    IF NEW.id IS DISTINCT FROM OLD.id\n       OR ((NEW.access_level IS DISTINCT FROM OLD.access_level OR NEW.role IS DISTINCT FROM OLD.role)\n           AND app_security.actor_role() <> 'SUPER_ADMIN') THEN\n        RAISE EXCEPTION 'Operation is not permitted' USING ERRCODE = '42501';\n    END IF;\n    RETURN NEW;\nEND $function$\n",
-    "guard_order_relationship()": "CREATE OR REPLACE FUNCTION app_security.guard_order_relationship()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE column_name text;\nBEGIN\n    IF current_user = pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid = TG_RELID)) THEN RETURN NEW; END IF;\n    FOREACH column_name IN ARRAY TG_ARGV LOOP\n        IF (to_jsonb(NEW) -> column_name) IS DISTINCT FROM (to_jsonb(OLD) -> column_name) THEN\n            RAISE EXCEPTION 'Operation is not permitted' USING ERRCODE = '42501';\n        END IF;\n    END LOOP;\n    RETURN NEW;\nEND $function$\n",
-    "login_credentials(identifier text)": "CREATE OR REPLACE FUNCTION app_security.login_credentials(identifier text)\n RETURNS TABLE(id bigint, email character varying, password character varying, access_level smallint)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT c.id, c.email, c.password, c.access_level FROM public.customers c\n    WHERE c.email = identifier OR c.phone1 = identifier OR c.phone2 = identifier\n    ORDER BY CASE WHEN c.email = identifier THEN 0 WHEN c.phone1 = identifier THEN 1 ELSE 2 END, c.id LIMIT 1\n$function$\n",
-    "register_customer(first_name_value text, last_name_value text, email_value text, password_value text, phone1_value text, phone2_value text, house_value text, street_value text, area_value text, complex_value text, store_value text, postal_value text, city_value text, ordered_at timestamp without time zone)": "CREATE OR REPLACE FUNCTION app_security.register_customer(first_name_value text, last_name_value text, email_value text, password_value text, phone1_value text, phone2_value text, house_value text, street_value text, area_value text, complex_value text, store_value text, postal_value text, city_value text, ordered_at timestamp without time zone)\n RETURNS bigint\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    INSERT INTO public.customers (first_name, last_name, email, password, phone1, phone2,\n        house_number, street, area, complex_name, preferred_store, postal_code, city, last_ordered_at, role, access_level)\n    VALUES (first_name_value, last_name_value, email_value, password_value, phone1_value, phone2_value,\n        house_value, street_value, area_value, complex_value, store_value, postal_value, city_value, ordered_at, 'USER', 0)\n    RETURNING id\n$function$\n",
-    "setting_id(setting_name text)": "CREATE OR REPLACE FUNCTION app_security.setting_id(setting_name text)\n RETURNS bigint\n LANGUAGE plpgsql\n STABLE\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nBEGIN\n    RETURN nullif(current_setting(setting_name, true), '')::bigint;\nEXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN\n    RETURN NULL;\nEND $function$\n"
-  },
   "policies": {
-    "customer_notes.customer_notes_insert": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.customer_id = customer_notes.customer_id) AND (o.branch_id = app_security.setting_id('app.branch_id'::text)))))))",
-      "command": "a",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": null
-    },
-    "customer_notes.customer_notes_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.customer_id = customer_notes.customer_id) AND (o.branch_id = app_security.setting_id('app.branch_id'::text)))))))"
-    },
-    "customer_notes.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "customer_order.orders_delete": {
-      "check": null,
-      "command": "d",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(app_security.actor_role() = 'SUPER_ADMIN'::text)"
-    },
-    "customer_order.orders_insert": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (customer_id = app_security.setting_id('app.customer_id'::text))))",
-      "command": "a",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": null
-    },
-    "customer_order.orders_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (customer_id = app_security.setting_id('app.customer_id'::text))) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.setting_id('app.branch_id'::text))))"
-    },
-    "customer_order.orders_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.setting_id('app.branch_id'::text))))",
-      "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.setting_id('app.branch_id'::text))))"
-    },
-    "customer_order.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "customers.customers_delete": {
-      "check": null,
-      "command": "d",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(app_security.actor_role() = 'SUPER_ADMIN'::text)"
-    },
-    "customers.customers_insert": {
+    "staff.staff_admin": {
       "check": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
-      "command": "a",
-      "permissive": true,
       "roles": [
         "PUBLIC"
       ],
-      "using": null
-    },
-    "customers.customers_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.setting_id('app.customer_id'::text))) OR ((app_security.actor_role() = 'ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.customer_id = customers.id) AND (o.branch_id = app_security.setting_id('app.branch_id'::text)))))))"
-    },
-    "customers.customers_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.setting_id('app.customer_id'::text))))",
-      "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.setting_id('app.customer_id'::text))))"
-    },
-    "customers.owner_maintenance": {
-      "check": "true",
+      "using": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
       "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
+      "permissive": true
     },
-    "order_burger_extra_component.child_delete": {
+    "special.special_read": {
       "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (active AND (NOT archived)))",
+      "command": "r",
+      "permissive": true
+    },
+    "special.special_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
       "command": "d",
-      "permissive": true,
+      "permissive": true
+    },
+    "special.special_insert": {
+      "check": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
       "roles": [
         "PUBLIC"
       ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id))))"
-    },
-    "order_burger_extra_component.child_insert": {
-      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id))))",
+      "using": null,
       "command": "a",
-      "permissive": true,
+      "permissive": true
+    },
+    "special.special_update": {
+      "check": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
       "roles": [
         "PUBLIC"
       ],
-      "using": null
-    },
-    "order_burger_extra_component.child_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id)))"
-    },
-    "order_burger_extra_component.child_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id))))",
+      "using": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
       "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id))))"
-    },
-    "order_burger_extra_component.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "order_burger_protein.child_delete": {
-      "check": null,
-      "command": "d",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id))))"
-    },
-    "order_burger_protein.child_insert": {
-      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id))))",
-      "command": "a",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": null
-    },
-    "order_burger_protein.child_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id)))"
-    },
-    "order_burger_protein.child_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id))))",
-      "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id))))"
-    },
-    "order_burger_protein.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "order_burger_removed_component.child_delete": {
-      "check": null,
-      "command": "d",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id))))"
-    },
-    "order_burger_removed_component.child_insert": {
-      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id))))",
-      "command": "a",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": null
-    },
-    "order_burger_removed_component.child_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id)))"
-    },
-    "order_burger_removed_component.child_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id))))",
-      "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id))))"
-    },
-    "order_burger_removed_component.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "order_menu_item.child_delete": {
-      "check": null,
-      "command": "d",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id))))"
-    },
-    "order_menu_item.child_insert": {
-      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id))))",
-      "command": "a",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": null
-    },
-    "order_menu_item.child_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id)))"
-    },
-    "order_menu_item.child_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id))))",
-      "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id))))"
-    },
-    "order_menu_item.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "order_menu_item_extra.child_delete": {
-      "check": null,
-      "command": "d",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id))))"
-    },
-    "order_menu_item_extra.child_insert": {
-      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id))))",
-      "command": "a",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": null
-    },
-    "order_menu_item_extra.child_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id)))"
-    },
-    "order_menu_item_extra.child_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id))))",
-      "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id))))"
-    },
-    "order_menu_item_extra.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "order_pizza_item.child_delete": {
-      "check": null,
-      "command": "d",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id))))"
-    },
-    "order_pizza_item.child_insert": {
-      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id))))",
-      "command": "a",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": null
-    },
-    "order_pizza_item.child_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id)))"
-    },
-    "order_pizza_item.child_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id))))",
-      "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id))))"
-    },
-    "order_pizza_item.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "order_pizza_item_base_option.child_delete": {
-      "check": null,
-      "command": "d",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id))))"
-    },
-    "order_pizza_item_base_option.child_insert": {
-      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id))))",
-      "command": "a",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": null
-    },
-    "order_pizza_item_base_option.child_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id)))"
-    },
-    "order_pizza_item_base_option.child_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id))))",
-      "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id))))"
-    },
-    "order_pizza_item_base_option.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "order_pizza_item_extra.child_delete": {
-      "check": null,
-      "command": "d",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id))))"
-    },
-    "order_pizza_item_extra.child_insert": {
-      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id))))",
-      "command": "a",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": null
-    },
-    "order_pizza_item_extra.child_read": {
-      "check": null,
-      "command": "r",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id)))"
-    },
-    "order_pizza_item_extra.child_update": {
-      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id))))",
-      "command": "w",
-      "permissive": true,
-      "roles": [
-        "PUBLIC"
-      ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id))))"
-    },
-    "order_pizza_item_extra.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
-    },
-    "password_reset_tokens.owner_maintenance": {
-      "check": "true",
-      "command": "*",
-      "permissive": true,
-      "roles": [
-        "TABLE_OWNER"
-      ],
-      "using": "true"
+      "permissive": true
     },
     "staff.owner_maintenance": {
       "check": "true",
-      "command": "*",
-      "permissive": true,
       "roles": [
         "TABLE_OWNER"
       ],
-      "using": "true"
-    },
-    "staff.staff_admin": {
-      "check": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
+      "using": "true",
       "command": "*",
-      "permissive": true,
+      "permissive": true
+    },
+    "customers.customers_read": {
+      "check": null,
       "roles": [
         "PUBLIC"
       ],
-      "using": "(app_security.actor_role() = 'SUPER_ADMIN'::text)"
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.setting_id('app.customer_id'::text))) OR ((app_security.actor_role() = 'ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.customer_id = customers.id) AND (o.branch_id = app_security.setting_id('app.branch_id'::text)))))))",
+      "command": "r",
+      "permissive": true
+    },
+    "special.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "customer_order.orders_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (customer_id = app_security.setting_id('app.customer_id'::text))) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.setting_id('app.branch_id'::text))))",
+      "command": "r",
+      "permissive": true
+    },
+    "customers.customers_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
+      "command": "d",
+      "permissive": true
+    },
+    "customers.customers_insert": {
+      "check": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "customers.customers_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.setting_id('app.customer_id'::text))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.setting_id('app.customer_id'::text))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_menu_item.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "customers.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_pizza_item.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "customer_order.orders_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(app_security.actor_role() = 'SUPER_ADMIN'::text)",
+      "command": "d",
+      "permissive": true
+    },
+    "customer_order.orders_insert": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (customer_id = app_security.setting_id('app.customer_id'::text))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "customer_order.orders_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.setting_id('app.branch_id'::text))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.setting_id('app.branch_id'::text))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_menu_item.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_menu_item.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_menu_item.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_menu_item.order_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_pizza_item.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_pizza_item.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_pizza_item.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_pizza_item.order_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_special_item.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_special_item.order_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "special_day.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "special_day.special_child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_day.special_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "order_burger_protein.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "order_special_item.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_special_item.order_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_special_item.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_special_item.order_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_special_item.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_special_item.order_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order p\n  WHERE (p.order_id = order_special_item.order_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "special_addon.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "customer_notes.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "customer_order.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_menu_item_extra.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "special_addon.special_child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_addon.special_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "special_day.special_child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_day.special_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "special_day.special_child_insert": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_day.special_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "special_day.special_child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_day.special_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_day.special_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_burger_protein.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_burger_protein.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_burger_protein.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_protein.order_menu_item_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_menu_item.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_pizza_item_extra.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "customer_notes.customer_notes_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.customer_id = customer_notes.customer_id) AND (o.branch_id = app_security.setting_id('app.branch_id'::text)))))))",
+      "command": "r",
+      "permissive": true
+    },
+    "order_menu_item_extra.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_menu_item_extra.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_menu_item_extra.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_menu_item_extra.order_menu_item_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_pizza_item.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_special_selection.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.order_special_item p\n  WHERE (p.order_special_item_id = order_special_selection.order_special_item_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "special_addon.special_child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_addon.special_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "special_addon.special_child_insert": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_addon.special_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "special_addon.special_child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_addon.special_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_addon.special_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_pizza_item_extra.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_pizza_item_extra.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_pizza_item_extra.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "special_component.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "customer_notes.customer_notes_insert": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.customer_id = customer_notes.customer_id) AND (o.branch_id = app_security.setting_id('app.branch_id'::text)))))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_special_item.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_special_selection.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_special_item p\n  WHERE (p.order_special_item_id = order_special_selection.order_special_item_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_special_selection.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_special_item p\n  WHERE (p.order_special_item_id = order_special_selection.order_special_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_special_selection.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_special_item p\n  WHERE (p.order_special_item_id = order_special_selection.order_special_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_special_item p\n  WHERE (p.order_special_item_id = order_special_selection.order_special_item_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "special_component.special_child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_component.special_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "order_burger_protein.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "special_component.special_child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_component.special_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "special_component.special_child_insert": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_component.special_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "special_component.special_child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_component.special_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special p\n  WHERE (p.special_id = special_component.special_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_burger_extra_component.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "order_menu_item_extra.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_pizza_item_base_option.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "password_reset_tokens.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_pizza_item_extra.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_burger_extra_component.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_burger_extra_component.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_burger_extra_component.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_extra_component.order_menu_item_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_burger_removed_component.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "order_pizza_item_base_option.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_pizza_item_base_option.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_pizza_item_base_option.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "order_special_selection.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "special_component_pizza.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_burger_removed_component.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_burger_removed_component.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_burger_removed_component.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_menu_item p\n  WHERE (p.order_menu_item_id = order_burger_removed_component.order_menu_item_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "special_component_pizza.special_option_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.special_component c\n  WHERE (c.special_component_id = special_component_pizza.special_component_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "special_component_menu_item.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "special_component_pizza.special_option_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special_component c\n  WHERE (c.special_component_id = special_component_pizza.special_component_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "special_component_pizza.special_option_insert": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special_component c\n  WHERE (c.special_component_id = special_component_pizza.special_component_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_burger_extra_component.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_pizza_item_base_option.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_pizza_item_removed_ingredient.child_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_removed_ingredient.order_pizza_item_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "special_component_menu_item.special_option_read": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.special_component c\n  WHERE (c.special_component_id = special_component_menu_item.special_component_id)))",
+      "command": "r",
+      "permissive": true
+    },
+    "order_burger_removed_component.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
+    },
+    "order_pizza_item_removed_ingredient.child_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_removed_ingredient.order_pizza_item_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "order_pizza_item_removed_ingredient.child_insert": {
+      "check": "((app_security.actor_role() = ANY (ARRAY['USER'::text, 'SUPER_ADMIN'::text])) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_removed_ingredient.order_pizza_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_pizza_item_removed_ingredient.child_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_removed_ingredient.order_pizza_item_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.order_pizza_item p\n  WHERE (p.order_pizza_item_id = order_pizza_item_removed_ingredient.order_pizza_item_id))))",
+      "command": "w",
+      "permissive": true
+    },
+    "special_component_menu_item.special_option_delete": {
+      "check": null,
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special_component c\n  WHERE (c.special_component_id = special_component_menu_item.special_component_id))))",
+      "command": "d",
+      "permissive": true
+    },
+    "special_component_menu_item.special_option_insert": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.special_component c\n  WHERE (c.special_component_id = special_component_menu_item.special_component_id))))",
+      "roles": [
+        "PUBLIC"
+      ],
+      "using": null,
+      "command": "a",
+      "permissive": true
+    },
+    "order_pizza_item_removed_ingredient.owner_maintenance": {
+      "check": "true",
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true",
+      "command": "*",
+      "permissive": true
     }
   },
   "triggers": {
-    "customer_order.guard_order_relationship": {
-      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.customer_order FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_id', 'customer_id', 'branch_id')",
-      "enabled": "O"
-    },
     "customers.guard_account_update": {
-      "definition": "CREATE TRIGGER guard_account_update BEFORE UPDATE ON public.customers FOR EACH ROW EXECUTE FUNCTION app_security.guard_account_update()",
-      "enabled": "O"
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_account_update BEFORE UPDATE ON public.customers FOR EACH ROW EXECUTE FUNCTION app_security.guard_account_update()"
     },
-    "order_burger_extra_component.guard_order_relationship": {
-      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_burger_extra_component FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_menu_item_id')",
-      "enabled": "O"
+    "special_day.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.special_day FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('special_id')"
     },
-    "order_burger_extra_component.trg_validate_extra_burger_component": {
-      "definition": "CREATE TRIGGER trg_validate_extra_burger_component BEFORE INSERT OR UPDATE ON public.order_burger_extra_component FOR EACH ROW EXECUTE FUNCTION public.validate_extra_burger_component()",
-      "enabled": "O"
+    "special_addon.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.special_addon FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('special_id')"
     },
-    "order_burger_protein.guard_order_relationship": {
-      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_burger_protein FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_menu_item_id')",
-      "enabled": "O"
-    },
-    "order_burger_protein.trg_validate_order_burger_protein": {
-      "definition": "CREATE TRIGGER trg_validate_order_burger_protein BEFORE INSERT OR UPDATE ON public.order_burger_protein FOR EACH ROW EXECUTE FUNCTION public.validate_order_burger_protein()",
-      "enabled": "O"
-    },
-    "order_burger_removed_component.guard_order_relationship": {
-      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_burger_removed_component FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_menu_item_id')",
-      "enabled": "O"
-    },
-    "order_burger_removed_component.trg_validate_removed_burger_component": {
-      "definition": "CREATE TRIGGER trg_validate_removed_burger_component BEFORE INSERT OR UPDATE ON public.order_burger_removed_component FOR EACH ROW EXECUTE FUNCTION public.validate_removed_burger_component()",
-      "enabled": "O"
+    "customer_order.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.customer_order FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_id', 'customer_id', 'branch_id')"
     },
     "order_menu_item.guard_order_relationship": {
-      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_menu_item FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_id')",
-      "enabled": "O"
-    },
-    "order_menu_item_extra.guard_order_relationship": {
-      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_menu_item_extra FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_menu_item_id')",
-      "enabled": "O"
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_menu_item FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_id')"
     },
     "order_pizza_item.guard_order_relationship": {
-      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_pizza_item FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_id')",
-      "enabled": "O"
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_pizza_item FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_id')"
     },
-    "order_pizza_item_base_option.guard_order_relationship": {
-      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_pizza_item_base_option FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_pizza_item_id')",
-      "enabled": "O"
+    "special_component.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.special_component FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('special_id')"
+    },
+    "order_special_item.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_special_item FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_id')"
+    },
+    "order_burger_protein.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_burger_protein FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_menu_item_id')"
+    },
+    "order_menu_item_extra.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_menu_item_extra FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_menu_item_id')"
     },
     "order_pizza_item_extra.guard_order_relationship": {
-      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_pizza_item_extra FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_pizza_item_id')",
-      "enabled": "O"
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_pizza_item_extra FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_pizza_item_id')"
+    },
+    "order_special_selection.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_special_selection FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_special_item_id', 'order_menu_item_id', 'order_pizza_item_id')"
+    },
+    "special_component_pizza.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.special_component_pizza FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('special_component_id')"
+    },
+    "special_component_menu_item.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.special_component_menu_item FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('special_component_id')"
+    },
+    "order_burger_extra_component.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_burger_extra_component FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_menu_item_id')"
+    },
+    "order_pizza_item_base_option.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_pizza_item_base_option FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_pizza_item_id')"
+    },
+    "order_burger_protein.trg_validate_order_burger_protein": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_validate_order_burger_protein BEFORE INSERT OR UPDATE ON public.order_burger_protein FOR EACH ROW EXECUTE FUNCTION public.validate_order_burger_protein()"
+    },
+    "order_burger_removed_component.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_burger_removed_component FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_menu_item_id')"
+    },
+    "order_pizza_item_removed_ingredient.guard_order_relationship": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER guard_order_relationship BEFORE UPDATE ON public.order_pizza_item_removed_ingredient FOR EACH ROW EXECUTE FUNCTION app_security.guard_order_relationship('order_pizza_item_id')"
+    },
+    "order_burger_extra_component.trg_validate_extra_burger_component": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_validate_extra_burger_component BEFORE INSERT OR UPDATE ON public.order_burger_extra_component FOR EACH ROW EXECUTE FUNCTION public.validate_extra_burger_component()"
+    },
+    "order_burger_removed_component.trg_validate_removed_burger_component": {
+      "enabled": "O",
+      "definition": "CREATE TRIGGER trg_validate_removed_burger_component BEFORE INSERT OR UPDATE ON public.order_burger_removed_component FOR EACH ROW EXECUTE FUNCTION public.validate_removed_burger_component()"
     }
+  },
+  "functions": {
+    "actor_role()": "CREATE OR REPLACE FUNCTION app_security.actor_role()\n RETURNS text\n LANGUAGE sql\n STABLE\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT CASE\n        WHEN current_setting('app.role', true) = 'SUPER_ADMIN' THEN 'SUPER_ADMIN'\n        WHEN app_security.setting_id('app.customer_id') > 0\n         AND app_security.setting_id('app.user_id') = app_security.setting_id('app.customer_id')\n         AND current_setting('app.role', true) IN ('USER', 'DRIVER')\n            THEN current_setting('app.role', true)\n        WHEN app_security.setting_id('app.customer_id') > 0\n         AND app_security.setting_id('app.user_id') = app_security.setting_id('app.customer_id')\n         AND app_security.setting_id('app.branch_id') IN (1, 2)\n         AND current_setting('app.role', true) = 'ADMIN' THEN 'ADMIN'\n        ELSE '' END\n$function$\n",
+    "guard_account_update()": "CREATE OR REPLACE FUNCTION app_security.guard_account_update()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nBEGIN\n    IF current_user = pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid = TG_RELID)) THEN RETURN NEW; END IF;\n    IF NEW.id IS DISTINCT FROM OLD.id\n       OR ((NEW.access_level IS DISTINCT FROM OLD.access_level OR NEW.role IS DISTINCT FROM OLD.role)\n           AND app_security.actor_role() <> 'SUPER_ADMIN') THEN\n        RAISE EXCEPTION 'Operation is not permitted' USING ERRCODE = '42501';\n    END IF;\n    RETURN NEW;\nEND $function$\n",
+    "guard_order_relationship()": "CREATE OR REPLACE FUNCTION app_security.guard_order_relationship()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE column_name text;\nBEGIN\n    IF current_user = pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid = TG_RELID)) THEN RETURN NEW; END IF;\n    FOREACH column_name IN ARRAY TG_ARGV LOOP\n        IF (to_jsonb(NEW) -> column_name) IS DISTINCT FROM (to_jsonb(OLD) -> column_name) THEN\n            RAISE EXCEPTION 'Operation is not permitted' USING ERRCODE = '42501';\n        END IF;\n    END LOOP;\n    RETURN NEW;\nEND $function$\n",
+    "cancel_reset(hash_value text)": "CREATE OR REPLACE FUNCTION app_security.cancel_reset(hash_value text)\n RETURNS void\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    DELETE FROM public.password_reset_tokens WHERE token_hash = hash_value AND NOT used\n$function$\n",
+    "setting_id(setting_name text)": "CREATE OR REPLACE FUNCTION app_security.setting_id(setting_name text)\n RETURNS bigint\n LANGUAGE plpgsql\n STABLE\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nBEGIN\n    RETURN nullif(current_setting(setting_name, true), '')::bigint;\nEXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN\n    RETURN NULL;\nEND $function$\n",
+    "account_context(account_id bigint)": "CREATE OR REPLACE FUNCTION app_security.account_context(account_id bigint)\n RETURNS TABLE(access_level smallint)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT c.access_level FROM public.customers c WHERE c.id = account_id\n$function$\n",
+    "login_credentials(identifier text)": "CREATE OR REPLACE FUNCTION app_security.login_credentials(identifier text)\n RETURNS TABLE(id bigint, email character varying, password character varying, access_level smallint)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT c.id, c.email, c.password, c.access_level FROM public.customers c\n    WHERE c.email = identifier OR c.phone1 = identifier OR c.phone2 = identifier\n    ORDER BY CASE WHEN c.email = identifier THEN 0 WHEN c.phone1 = identifier THEN 1 ELSE 2 END, c.id LIMIT 1\n$function$\n",
+    "account_exists(email_value text, phone_value text)": "CREATE OR REPLACE FUNCTION app_security.account_exists(email_value text, phone_value text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT EXISTS (SELECT 1 FROM public.customers c WHERE c.email = email_value OR c.phone1 = phone_value)\n$function$\n",
+    "consume_reset(hash_value text, password_value text)": "CREATE OR REPLACE FUNCTION app_security.consume_reset(hash_value text, password_value text)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE account_id bigint; token_id bigint;\nBEGIN\n    SELECT customer_id INTO account_id FROM public.password_reset_tokens WHERE token_hash = hash_value;\n    IF account_id IS NULL THEN RETURN false; END IF;\n    -- Lock account first, consistently with create_reset, so competing resets cannot both succeed.\n    PERFORM id FROM public.customers WHERE id = account_id FOR UPDATE;\n    SELECT id INTO token_id FROM public.password_reset_tokens\n        WHERE token_hash = hash_value AND NOT used AND expires_at > LOCALTIMESTAMP FOR UPDATE;\n    IF token_id IS NULL THEN RETURN false; END IF;\n    UPDATE public.customers SET password = password_value WHERE id = account_id;\n    UPDATE public.password_reset_tokens SET used = true WHERE id = token_id;\n    DELETE FROM public.password_reset_tokens WHERE customer_id = account_id AND NOT used;\n    RETURN true;\nEND $function$\n",
+    "create_reset(email_value text, hash_value text, expiry timestamp without time zone)": "CREATE OR REPLACE FUNCTION app_security.create_reset(email_value text, hash_value text, expiry timestamp without time zone)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE account_id bigint; recipient text;\nBEGIN\n    SELECT id, email INTO account_id, recipient FROM public.customers WHERE email = email_value FOR UPDATE;\n    IF account_id IS NULL THEN RETURN NULL; END IF;\n    IF hash_value !~ '^[0-9a-f]{64}$' OR expiry <= LOCALTIMESTAMP OR expiry > LOCALTIMESTAMP + interval '31 minutes' THEN\n        RAISE EXCEPTION 'Invalid recovery request' USING ERRCODE = '22023';\n    END IF;\n    DELETE FROM public.password_reset_tokens WHERE customer_id = account_id AND NOT used;\n    INSERT INTO public.password_reset_tokens (customer_id, token_hash, expires_at, created_at, used)\n    VALUES (account_id, hash_value, expiry, LOCALTIMESTAMP, false);\n    RETURN recipient;\nEND $function$\n",
+    "register_customer(first_name_value text, last_name_value text, email_value text, password_value text, phone1_value text, phone2_value text, house_value text, street_value text, area_value text, complex_value text, store_value text, postal_value text, city_value text, ordered_at timestamp without time zone)": "CREATE OR REPLACE FUNCTION app_security.register_customer(first_name_value text, last_name_value text, email_value text, password_value text, phone1_value text, phone2_value text, house_value text, street_value text, area_value text, complex_value text, store_value text, postal_value text, city_value text, ordered_at timestamp without time zone)\n RETURNS bigint\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    INSERT INTO public.customers (first_name, last_name, email, password, phone1, phone2,\n        house_number, street, area, complex_name, preferred_store, postal_code, city, last_ordered_at, role, access_level)\n    VALUES (first_name_value, last_name_value, email_value, password_value, phone1_value, phone2_value,\n        house_value, street_value, area_value, complex_value, store_value, postal_value, city_value, ordered_at, 'USER', 0)\n    RETURNING id\n$function$\n"
   }
 }
