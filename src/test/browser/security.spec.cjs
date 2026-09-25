@@ -51,7 +51,7 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await page.locator('#branchKenridge').click();
     await expect(page.locator('#branchOverlay')).not.toHaveClass(/show/);
     await expect(page.locator('#typeCollection, #typeDelivery')).toHaveCount(0);
-    await page.locator('#listBody .row').first().click();
+    await page.locator('#listBody .row').filter({hasText: /Click to customize|Click to add/}).first().click();
     await expect(page.locator('#btnAddToCart')).toBeVisible();
     await expect(page.locator('#stickyTotal')).not.toHaveText('R0.00');
     await page.locator('#btnAddToCart').click();
