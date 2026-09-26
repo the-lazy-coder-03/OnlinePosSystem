@@ -42,6 +42,17 @@ test('order renderer treats every customer field as text and allows only known s
     expect(await page.evaluate(() => window.nextStatus)).toBe('Preparing');
 });
 
+test('pizza customization defaults to the available 30cm size', async ({page}) => {
+    await login(page, 'browser@example.com');
+    await page.goto('/order');
+    await page.locator('#branchKenridge').click();
+    const pizza = page.locator('#listBody .row:not(.special-unavailable)')
+        .filter({hasText: /Click to customize/}).first();
+    await expect(pizza).toContainText('Click to customize');
+    await pizza.click();
+    await expect(page.locator('#size_30')).toBeChecked();
+});
+
 test('customer order, profile and live admin queue work with RLS and CSRF', async ({page, browser}) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));

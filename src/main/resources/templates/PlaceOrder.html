@@ -2655,7 +2655,14 @@
             state.customize.detail = detail;
 
             const sizes = normalizeSizes(detail);
-            state.customize.sizeCm = sizes.length ? Number(sizes[0].sizeCm) : null;
+            const lockedSizeCm = Number(state.special.pending?.sizeCm);
+            const lockedSize = Number.isFinite(lockedSizeCm)
+                ? sizes.find(size => Number(size.sizeCm) === lockedSizeCm)
+                : null;
+            const defaultSize = lockedSize
+                || sizes.find(size => Number(size.sizeCm) === 30)
+                || sizes[0];
+            state.customize.sizeCm = defaultSize ? Number(defaultSize.sizeCm) : null;
 
             const defaults = normalizeDefaultToppings(detail);
             for (const t of defaults){
