@@ -1606,7 +1606,7 @@
 
         categories(){
             const out = [
-                { key: "all", label: "Everything" },
+                { key: "all", label: "Full Menu" },
                 ...(state.data.specials.length ? [{ key: "specials", label: "Specials" }] : []),
                 { key: "pizza-1", label: "Favourite" },
                 { key: "pizza-2", label: "Supreme" }
@@ -2662,7 +2662,18 @@
             const defaultSize = lockedSize
                 || sizes.find(size => Number(size.sizeCm) === 30)
                 || sizes[0];
-            state.customize.sizeCm = defaultSize ? Number(defaultSize.sizeCm) : null;
+            const selectedSizeCm = defaultSize ? Number(defaultSize.sizeCm) : null;
+            if (selectedSizeCm != null && Number(sizes[0]?.sizeCm) !== selectedSizeCm){
+                try{
+                    detail = await api.getPizzaDetail(state.branch.id, id, selectedSizeCm);
+                } catch (e){
+                    if (sessionId !== state.customize.sessionId) return;
+                    throw e;
+                }
+                if (sessionId !== state.customize.sessionId) return;
+                state.customize.detail = detail;
+            }
+            state.customize.sizeCm = selectedSizeCm;
 
             const defaults = normalizeDefaultToppings(detail);
             for (const t of defaults){

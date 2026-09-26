@@ -26,7 +26,9 @@ class SpecialUiContractTest {
                     .contains("const lockedSizeCm = Number(state.special.pending?.sizeCm)")
                     .contains("sizes.find(size => Number(size.sizeCm) === 30)")
                     .contains("|| sizes[0]")
-                    .contains("state.customize.sizeCm = defaultSize ? Number(defaultSize.sizeCm) : null")
+                    .contains("api.getPizzaDetail(state.branch.id, id, selectedSizeCm)")
+                    .contains("state.customize.detail = detail")
+                    .contains("state.customize.sizeCm = selectedSizeCm")
                     .doesNotContain("select.value && !component.allowCustomization")
                     .doesNotContain("quote.finalTotal");
         }
