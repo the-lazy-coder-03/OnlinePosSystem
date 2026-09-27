@@ -25,6 +25,7 @@
 
     let draft = readDraft();
     let submitting = false;
+    const idempotencyKey = crypto.randomUUID();
 
     function readDraft() {
         try {
@@ -246,7 +247,7 @@
         try {
             const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
             const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
-            const headers = { "Content-Type": "application/json" };
+            const headers = { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey };
             if (csrfToken && csrfHeader) headers[csrfHeader] = csrfToken;
             const response = await fetch("/api/orders", { method: "POST", headers, body: JSON.stringify(orderPayload()) });
             if (!response.ok) {

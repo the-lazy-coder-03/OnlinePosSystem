@@ -5,6 +5,8 @@ import org.example.onlinepossystem.security.JwtAuthenticationFilter;
 import org.example.onlinepossystem.security.AccountPrincipalRefreshFilter;
 import org.example.onlinepossystem.security.LoggingAuthenticationFailureHandler;
 import org.example.onlinepossystem.security.LoginRateLimitFilter;
+import org.example.onlinepossystem.security.SecurityHeadersFilter;
+import org.example.onlinepossystem.security.AbuseProtectionFilter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,15 +40,21 @@ public class SecurityConfig {
     private final LoginRateLimitFilter loginRateLimitFilter;
     private final LoggingAuthenticationFailureHandler authenticationFailureHandler;
     private final AuthenticationSuccessHandler authenticationSuccessHandler;
+    private final SecurityHeadersFilter securityHeadersFilter;
+    private final AbuseProtectionFilter abuseProtectionFilter;
 
     public SecurityConfig(UserDetailsService userDetailsService,
                           JwtAuthenticationFilter jwtAuthenticationFilter,
                           LoginRateLimitFilter loginRateLimitFilter,
+                          SecurityHeadersFilter securityHeadersFilter,
+                          AbuseProtectionFilter abuseProtectionFilter,
                           LoggingAuthenticationFailureHandler authenticationFailureHandler,
                           @Qualifier("roleAwareAuthenticationSuccessHandler") AuthenticationSuccessHandler authenticationSuccessHandler) {
         this.userDetailsService = userDetailsService;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.loginRateLimitFilter = loginRateLimitFilter;
+        this.securityHeadersFilter = securityHeadersFilter;
+        this.abuseProtectionFilter = abuseProtectionFilter;
         this.authenticationFailureHandler = authenticationFailureHandler;
         this.authenticationSuccessHandler = authenticationSuccessHandler;
     }
@@ -92,6 +100,20 @@ public class SecurityConfig {
     }
 
     @Bean
+    public FilterRegistrationBean<SecurityHeadersFilter> securityHeadersFilterRegistration() {
+        var registration = new FilterRegistrationBean<>(securityHeadersFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<AbuseProtectionFilter> abuseProtectionFilterRegistration() {
+        var registration = new FilterRegistrationBean<>(abuseProtectionFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
             SecurityContextRepository securityContextRepository
@@ -100,6 +122,8 @@ public class SecurityConfig {
                 .cors(org.springframework.security.config.Customizer.withDefaults())
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(abuseProtectionFilter, CsrfFilter.class)
+                .addFilterBefore(securityHeadersFilter, CsrfFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, CsrfFilter.class)
                 .addFilterAfter(new AccountPrincipalRefreshFilter(userDetailsService), JwtAuthenticationFilter.class)
                 .securityContext(context -> context
@@ -117,10 +141,12 @@ public class SecurityConfig {
                 )
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.sameOrigin())
+                        .contentTypeOptions(org.springframework.security.config.Customizer.withDefaults())
+                        .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).preload(true).maxAgeInSeconds(31536000))
                 )
                 .authorizeHttpRequests(auth -> auth
                         // Protect order and profile pages
-                        .requestMatchers("/order", "/checkout", "/profile/edit").hasAnyRole("USER", "SUPER_ADMIN")
+                        .requestMatchers("/order", "/checkout", "/profile/edit").hasRole("USER")
                         .requestMatchers("/profile/update").hasRole("USER")
                         .requestMatchers("/admin/login").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -128,7 +154,7 @@ public class SecurityConfig {
                         // Protect sensitive API endpoints
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/staff/create").hasRole("SUPER_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/orders").hasAnyRole("USER", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/orders/menu").permitAll()
                         .requestMatchers("/api/orders", "/api/orders/**").hasRole("ADMIN")
                         .requestMatchers("/input-orders", "/orders", "/InputOrders", "/InputOrders.html").hasRole("ADMIN")
@@ -150,7 +176,6 @@ public class SecurityConfig {
                                 "/register",
                                 "/forgot-password",
                                 "/reset-password",
-                                "/test",              // Test page
                                 "/css/**",
                                 "/js/**",
                                 "/images/**",

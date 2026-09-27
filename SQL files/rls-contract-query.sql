@@ -7,9 +7,7 @@ WITH protected AS (
         'customers', 'customer_order', 'order_menu_item', 'order_menu_item_extra',
         'order_burger_protein', 'order_burger_removed_component', 'order_burger_extra_component',
         'order_pizza_item', 'order_pizza_item_extra', 'order_pizza_item_base_option',
-        'customer_notes', 'staff', 'password_reset_tokens',
-        'special', 'special_day', 'special_component', 'special_component_menu_item',
-        'special_component_pizza', 'special_addon', 'order_special_item',
+        'customer_notes', 'staff', 'password_reset_tokens', 'order_special_item',
         'order_special_selection', 'order_pizza_item_removed_ingredient'
     )
 )
@@ -17,7 +15,9 @@ SELECT jsonb_build_object(
     'policies', (SELECT jsonb_object_agg(c.relname || '.' || p.polname, jsonb_build_object(
         'command', p.polcmd, 'permissive', p.polpermissive,
         'roles', (SELECT jsonb_agg(CASE WHEN role_id = 0 THEN 'PUBLIC'
-            WHEN role_id = c.relowner THEN 'TABLE_OWNER' ELSE 'ROLE:' || pg_get_userbyid(role_id) END ORDER BY role_id)
+            WHEN role_id = c.relowner THEN 'TABLE_OWNER'
+            WHEN pg_get_userbyid(role_id) = current_user THEN 'RUNTIME_ROLE'
+            ELSE 'ROLE:' || pg_get_userbyid(role_id) END ORDER BY role_id)
             FROM unnest(p.polroles) role_id),
         'using', pg_get_expr(p.polqual, p.polrelid),
         'check', pg_get_expr(p.polwithcheck, p.polrelid)))

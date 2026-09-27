@@ -49,8 +49,8 @@ class ResendEmailSenderTest {
         assertThat(request.getValue().getSubject()).isEqualTo("Reset your password");
         assertThat(request.getValue().getHtml()).isEqualTo("<p>private-reset-token</p>");
         assertThat(request.getValue().getText()).isEqualTo("private-reset-token");
-        assertThat(output).contains("Resend accepted email", "email_123")
-                .doesNotContain("private-reset-token", properties.getApiKey(), message.recipient());
+        assertThat(output).contains("Resend accepted email")
+                .doesNotContain("email_123", "private-reset-token", properties.getApiKey(), message.recipient());
     }
 
     @Test

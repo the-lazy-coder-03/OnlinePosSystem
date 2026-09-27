@@ -8,6 +8,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.Locale;
 
 @Service
 public class CustomerUserDetailsService implements UserDetailsService {
@@ -31,6 +32,7 @@ public class CustomerUserDetailsService implements UserDetailsService {
         if (normalized.equals(adminUsername)) {
             return new AccountPrincipal(adminUsername, "{noop}" + adminPassword, null, 3, true);
         }
+        if (normalized.contains("@")) normalized = normalized.toLowerCase(Locale.ROOT);
         var account = accounts.findCredentials(normalized)
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid account"));
         String password = account.password();

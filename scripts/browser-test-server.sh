@@ -15,6 +15,7 @@ export PGUSER="$RLS_TEST_ADMIN_USERNAME" PGPASSWORD="${RLS_TEST_ADMIN_PASSWORD:-
 export MIGRATION_DATASOURCE_USERNAME="$owner" MIGRATION_DATASOURCE_PASSWORD=browser-test-only
 export SPRING_DATASOURCE_USERNAME="$runtime" SPRING_DATASOURCE_PASSWORD=browser-test-only
 export MIGRATION_DATASOURCE_URL="jdbc:${test_uri}" RLS_RUNTIME_ROLE="$runtime"
+export RLS_CONTEXT_SECRET="${RLS_CONTEXT_SECRET:-browser-test-rls-context-secret-at-least-32-characters}"
 app_pid=''
 cleanup() {
     if [[ -n "$app_pid" ]]; then kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; fi

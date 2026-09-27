@@ -17,6 +17,7 @@ import org.example.onlinepossystem.special.service.SpecialService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,6 +36,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     private final OrderResponseMapper orderResponseMapper;
     private final CustomerOrderSummaryMapper customerOrderSummaryMapper;
     private final OrderEventPublisher eventPublisher;
+    private final EntityManager entityManager;
 
     public OrderService(OrderRepository orderRepository,
                         BranchLookup branchLookup,
@@ -47,7 +49,8 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
                         OrderStatusPolicy orderStatusPolicy,
                         OrderResponseMapper orderResponseMapper,
                         CustomerOrderSummaryMapper customerOrderSummaryMapper,
-                        OrderEventPublisher eventPublisher) {
+                        OrderEventPublisher eventPublisher,
+                        EntityManager entityManager) {
         this.orderRepository = orderRepository;
         this.branchLookup = branchLookup;
         this.customerAccountReader = customerAccountReader;
@@ -60,6 +63,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         this.orderResponseMapper = orderResponseMapper;
         this.customerOrderSummaryMapper = customerOrderSummaryMapper;
         this.eventPublisher = eventPublisher;
+        this.entityManager = entityManager;
     }
 
     @Override
@@ -71,26 +75,41 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     @Override
     @Transactional
     public OrderResponseDTO placeOrderForCustomer(OrderRequestDTO request, String customerEmail) {
+        return placeOrderForCustomer(request, customerEmail, null);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponseDTO placeOrderForCustomer(OrderRequestDTO request, String customerEmail,
+                                                   String idempotencyKey) {
+        orderRequestValidator.validate(request);
         CustomerAccount customer = resolveCustomer(customerEmail);
-        return saveOrder(request, customer);
+        if (customer == null || idempotencyKey == null) return saveOrder(request, customer, null);
+        entityManager.createNativeQuery("SELECT pg_advisory_xact_lock(hashtextextended(:scope, 0))")
+                .setParameter("scope", "order:" + customer.id() + ":" + idempotencyKey)
+                .getSingleResult();
+        return orderRepository.findByCustomerIdAndIdempotencyKey(customer.id(), idempotencyKey)
+                .map(orderResponseMapper::toDto)
+                .orElseGet(() -> saveOrder(request, customer, idempotencyKey));
     }
 
     @Override
     @Transactional
     public OrderResponseDTO placeOrderForCustomerId(OrderRequestDTO request, Long customerId) {
+        orderRequestValidator.validate(request);
         CustomerAccount customer = customerAccountReader.findById(customerId)
                 .orElseThrow(() -> new IllegalArgumentException("Customer account is missing."));
-        return saveOrder(request, customer);
+        return saveOrder(request, customer, null);
     }
 
-    private OrderResponseDTO saveOrder(OrderRequestDTO request, CustomerAccount customer) {
-        orderRequestValidator.validate(request);
+    private OrderResponseDTO saveOrder(OrderRequestDTO request, CustomerAccount customer, String idempotencyKey) {
         BranchView branch = branchLookup.requireByName(request.getBranchName());
         LocalDateTime createdAt = LocalDateTime.now();
 
         Order order = new Order();
         order.setBranchId(branch.id());
         order.setCustomerId(customer == null ? null : customer.id());
+        order.setIdempotencyKey(idempotencyKey);
         order.setCustomerName(request.getCustomerName());
         order.setPhone(request.getPhone());
         order.setHouseNumber(request.getHouseNumber());

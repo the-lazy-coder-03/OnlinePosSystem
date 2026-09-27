@@ -2,6 +2,7 @@ package org.example.onlinepossystem.security;
 
 import org.example.onlinepossystem.security.api.RateLimiter;
 import org.example.onlinepossystem.security.api.TokenService;
+import org.example.onlinepossystem.customer.service.CustomerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
+import java.util.regex.Pattern;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -20,12 +22,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 class ApiSecurityTest {
+    private static final String CUSTOMER_EMAIL = "api-security-user@example.com";
+    private static final String CUSTOMER_PASSWORD = "Password1!";
+
     @Autowired MockMvc mvc;
     @Autowired TokenService tokens;
     @Autowired UserDetailsService accounts;
     @Autowired RateLimiter limiter;
+    @Autowired CustomerService customers;
 
-    @BeforeEach void resetLimit() { limiter.reset("login:127.0.0.1"); }
+    @BeforeEach void setUp() {
+        limiter.reset("login:127.0.0.1");
+        if (!customers.emailExists(CUSTOMER_EMAIL)) {
+            customers.registerCustomer("API", "Security", CUSTOMER_EMAIL, CUSTOMER_PASSWORD,
+                    "0710000099", null, "1", "Test Street", "Kenridge", null,
+                    "Kenridge Branch", "7550");
+        }
+    }
 
     private MockHttpSession login() throws Exception {
         return (MockHttpSession) mvc.perform(post("/login").with(csrf())
@@ -33,8 +46,14 @@ class ApiSecurityTest {
                 .andExpect(status().is3xxRedirection()).andReturn().getRequest().getSession(false);
     }
 
+    private MockHttpSession customerLogin() throws Exception {
+        return (MockHttpSession) mvc.perform(post("/login").with(csrf())
+                        .param("username", CUSTOMER_EMAIL).param("password", CUSTOMER_PASSWORD))
+                .andExpect(status().is3xxRedirection()).andReturn().getRequest().getSession(false);
+    }
+
     @Test void sessionWritesRequireValidCsrf() throws Exception {
-        var session = login();
+        var session = customerLogin();
         mvc.perform(post("/api/orders").session(session).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/orders").session(session).with(csrf().useInvalidToken())
@@ -42,6 +61,7 @@ class ApiSecurityTest {
                 .andExpect(status().isForbidden());
         // A valid token reaches request validation rather than being rejected by security.
         mvc.perform(post("/api/orders").session(session).with(csrf())
+                        .header("Idempotency-Key", "security-test-order-0001")
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
     }
@@ -59,8 +79,9 @@ class ApiSecurityTest {
     }
 
     @Test void bearerWritesDoNotRequireCsrfOrCreateSessions() throws Exception {
-        String token = tokens.generateToken(accounts.loadUserByUsername("admin"));
+        String token = tokens.generateToken(accounts.loadUserByUsername(CUSTOMER_EMAIL));
         var result = mvc.perform(post("/api/orders").header("Authorization", "Bearer " + token)
+                        .header("Idempotency-Key", "security-test-order-0002")
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest()).andReturn();
         org.assertj.core.api.Assertions.assertThat(result.getRequest().getSession(false)).isNull();
@@ -89,5 +110,34 @@ class ApiSecurityTest {
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/auth/login").contentType(MediaType.TEXT_PLAIN).content("{}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test void htmlResponsesUseNonceBasedBrowserSecurityHeaders() throws Exception {
+        var response = mvc.perform(get("/register")).andExpect(status().isOk())
+                .andExpect(header().exists("Content-Security-Policy"))
+                .andExpect(header().string("Referrer-Policy", "strict-origin-when-cross-origin"))
+                .andExpect(header().exists("Permissions-Policy"))
+                .andReturn().getResponse();
+        String policy = response.getHeader("Content-Security-Policy");
+        var matcher = Pattern.compile("'nonce-([^']+)'" ).matcher(policy);
+        org.assertj.core.api.Assertions.assertThat(matcher.find()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(response.getContentAsString())
+                .contains("nonce=\"" + matcher.group(1) + "\"")
+                .doesNotContain("onclick=");
+    }
+
+    @Test void expensivePublicEndpointReturnsDeterministicRateLimit() throws Exception {
+        String address = "203.0.113.44";
+        limiter.reset("http:geocode:" + address);
+        for (int attempt = 0; attempt < 30; attempt++) {
+            mvc.perform(get("/api/full-address").param("lat", "91").param("lon", "0")
+                            .with(request -> { request.setRemoteAddr(address); return request; }))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(get("/api/full-address").param("lat", "91").param("lon", "0")
+                        .with(request -> { request.setRemoteAddr(address); return request; }))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "60"))
+                .andExpect(content().json("{\"status\":429,\"message\":\"Too many requests. Please try again later.\"}"));
     }
 }

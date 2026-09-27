@@ -25,6 +25,9 @@ public class Order {
     @Column(name = "customer_id")
     private Long customerId;
 
+    @Column(name = "idempotency_key", length = 128)
+    private String idempotencyKey;
+
     @Column(name = "branch_id", nullable = false)
     private Integer branchId;
 
@@ -84,6 +87,8 @@ public class Order {
     public void setBranchId(Integer branchId) { this.branchId = branchId; }
     public Long getCustomerId() { return customerId; }
     public void setCustomerId(Long customerId) { this.customerId = customerId; }
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
     public String getOrderType() { return orderType; }
     public void setOrderType(String orderType) { this.orderType = orderType; }
     public String getStatus() { return status; }

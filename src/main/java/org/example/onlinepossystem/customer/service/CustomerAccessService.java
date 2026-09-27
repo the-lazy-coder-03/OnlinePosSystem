@@ -39,9 +39,7 @@ public class CustomerAccessService implements AccountAccessReader, AccountAccess
         if (username == null || username.isBlank()) {
             return new AccountAccess(0);
         }
-        return customerRepository.findByEmail(username)
-                .or(() -> customerRepository.findByPhone1(username))
-                .or(() -> customerRepository.findByPhone2(username))
+        return customerRepository.findByEmailIgnoreCase(username)
                 .map(customer -> new AccountAccess(effectiveLevel(customer)))
                 .orElseGet(() -> new AccountAccess(0));
     }

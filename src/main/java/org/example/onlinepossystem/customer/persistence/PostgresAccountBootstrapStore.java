@@ -61,8 +61,8 @@ public class PostgresAccountBootstrapStore implements AccountBootstrapStore {
     }
 
     @Override
-    public boolean consumeReset(String tokenHash, String passwordHash) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT app_security.consume_reset(?, ?)",
-                Boolean.class, tokenHash, passwordHash));
+    public Optional<String> consumeReset(String tokenHash, String passwordHash) {
+        return Optional.ofNullable(jdbc.queryForObject("SELECT app_security.consume_reset(?, ?)",
+                String.class, tokenHash, passwordHash));
     }
 }

@@ -14,5 +14,5 @@ public interface AccountBootstrapStore {
     Customer register(Customer customer);
     Optional<String> createReset(String email, String tokenHash, LocalDateTime expiresAt);
     void cancelReset(String tokenHash);
-    boolean consumeReset(String tokenHash, String passwordHash);
+    Optional<String> consumeReset(String tokenHash, String passwordHash);
 }

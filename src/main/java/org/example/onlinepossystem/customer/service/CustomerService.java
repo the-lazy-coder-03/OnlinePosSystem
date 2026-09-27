@@ -10,9 +10,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.example.onlinepossystem.customer.persistence.AccountBootstrapStore;
+import org.example.onlinepossystem.customer.api.AccountCredentialsChanged;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Locale;
 
 @Service
 @Transactional(readOnly = true)
@@ -22,14 +25,17 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
     private final PasswordEncoder passwordEncoder;
     private final PasswordPolicy passwordPolicy;
     private final AccountBootstrapStore accounts;
+    private final ApplicationEventPublisher events;
 
     public CustomerService(CustomerRepository customerRepository,
                            PasswordEncoder passwordEncoder,
-                           PasswordPolicy passwordPolicy, AccountBootstrapStore accounts) {
+                           PasswordPolicy passwordPolicy, AccountBootstrapStore accounts,
+                           ApplicationEventPublisher events) {
         this.customerRepository = customerRepository;
         this.passwordEncoder = passwordEncoder;
         this.passwordPolicy = passwordPolicy;
         this.accounts = accounts;
+        this.events = events;
     }
 
     @Transactional
@@ -49,7 +55,8 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         if (!passwordPolicy.isValid(password)) {
             throw new CustomerRegistrationException(CustomerRegistrationException.Reason.PASSWORD, passwordPolicy.validationMessage());
         }
-        if (emailExists(email)) {
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+        if (emailExists(normalizedEmail)) {
             throw new CustomerRegistrationException(CustomerRegistrationException.Reason.EMAIL, "Email is already registered.");
         }
         if (phoneExists(phone)) {
@@ -59,7 +66,7 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         Customer customer = new Customer();
         customer.setFirstName(firstName);
         customer.setLastName(lastName);
-        customer.setEmail(email);
+        customer.setEmail(normalizedEmail);
         customer.setPassword(passwordEncoder.encode(password)); // encode password
         customer.setPhone1(phone);        // main phone
         customer.setPhone2(phone2);       // optional second phone
@@ -78,7 +85,7 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
 
     @Override
     public Optional<CustomerAccount> findByEmail(String email) {
-        return customerRepository.findByEmail(email).map(this::toAccount);
+        return customerRepository.findByEmailIgnoreCase(email).map(this::toAccount);
     }
 
     @Override
@@ -116,7 +123,7 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
                                   String preferredStore,
                                   String complexName,
                                   String newPassword) {
-        Customer customer = customerRepository.findByEmail(email)
+        Customer customer = customerRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Customer not found for email: " + email));
 
         customer.setFirstName(firstName);
@@ -130,14 +137,17 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         customer.setPreferredStore(preferredStore);
         customer.setComplexName(complexName);
 
-        if (newPassword != null && !newPassword.isEmpty()) {
+        boolean passwordChanged = newPassword != null && !newPassword.isEmpty();
+        if (passwordChanged) {
             if (!passwordPolicy.isValid(newPassword)) {
                 throw new IllegalArgumentException(passwordPolicy.validationMessage());
             }
             customer.setPassword(passwordEncoder.encode(newPassword));
         }
 
-        return customerRepository.save(customer);
+        Customer saved = customerRepository.save(customer);
+        if (passwordChanged) events.publishEvent(new AccountCredentialsChanged(saved.getEmail()));
+        return saved;
     }
 
     private CustomerAccount toAccount(Customer customer) {

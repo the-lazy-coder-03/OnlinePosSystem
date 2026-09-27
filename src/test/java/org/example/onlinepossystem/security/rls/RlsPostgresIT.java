@@ -44,6 +44,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class RlsPostgresIT {
+    private static final String TEST_CONTEXT_SECRET = "test-only-rls-context-secret-at-least-32-characters";
     private final String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
     private final String database = "rls_test_" + suffix;
     private final String owner = "rls_owner_" + suffix;
@@ -84,6 +85,10 @@ class RlsPostgresIT {
             statement.execute("CREATE DATABASE " + database + " OWNER " + owner);
             databaseCreated = true;
         }
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, adminUser, adminPassword);
+             var statement = connection.createStatement()) {
+            statement.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public");
+        }
         migrate();
         // Reapplying uses recorded checksums and does not duplicate policies or data.
         migrate();
@@ -107,6 +112,7 @@ class RlsPostgresIT {
                 "--spring.profiles.active=migrate", "--spring.config.import=",
                 "--MIGRATION_DATASOURCE_URL=" + jdbcUrl, "--MIGRATION_DATASOURCE_USERNAME=" + owner,
                 "--MIGRATION_DATASOURCE_PASSWORD=" + password, "--app.rls.runtime-role=" + runtime,
+                "--app.rls.context-secret=" + TEST_CONTEXT_SECRET,
                 "--app.database.migration.enabled=true", "--spring.jpa.show-sql=false",
                 "--spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect")) {
             assertThat(context.getBean(MigrationSqlRunner.class)).isNotNull();
@@ -122,6 +128,7 @@ class RlsPostgresIT {
                 "--spring.jpa.open-in-view=false", "--spring.jpa.show-sql=false",
                 "--spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect",
                 "--app.rls.enabled=true", "--app.database.migration.enabled=false", "--server.port=0",
+                "--app.rls.context-secret=" + TEST_CONTEXT_SECRET,
                 "--server.address=127.0.0.1", "--ADMIN_USERNAME=environment-admin", "--ADMIN_PASSWORD=test-admin-password",
                 "--jwt.secret=integration-test-only-secret-at-least-32-bytes", "--resend.api-key=",
                 "--SESSION_COOKIE_SECURE=false", "--logging.level.org.springframework.security=WARN"};
@@ -279,7 +286,9 @@ class RlsPostgresIT {
         assertThat(jdbc.queryForObject("SELECT price FROM special_addon a JOIN special s ON s.special_id=a.special_id WHERE s.code='UIT-THU-RIBS'", BigDecimal.class))
                 .isEqualByComparingTo("95.00");
         assertThat(jdbc.update("UPDATE special SET active=false WHERE code='UIT-MON-STEAK-BURGERS'"))
-                .isZero();
+                .isEqualTo(1);
+        assertThat(jdbc.update("UPDATE special SET active=true WHERE code='UIT-MON-STEAK-BURGERS'"))
+                .isEqualTo(1);
     }
 
     @Test @Order(2)
@@ -327,12 +336,14 @@ class RlsPostgresIT {
 
     @Test @Order(4)
     void missingEmptyMalformedAndUnknownContextsExposeNothing() {
-        Set<String> publicSpecialTables = Set.of("special", "special_day", "special_component",
-                "special_component_menu_item", "special_component_pizza", "special_addon");
         for (String table : RlsRuntimeVerifier.REQUIRED_POLICIES.keySet()) {
-            Integer count = jdbc.queryForObject("SELECT count(*) FROM " + table, Integer.class);
-            if (publicSpecialTables.contains(table)) assertThat(count).as(table).isPositive();
-            else assertThat(count).as(table).isZero();
+            if (table.equals("password_reset_tokens")) {
+                assertThatThrownBy(() -> jdbc.queryForObject("SELECT count(*) FROM password_reset_tokens", Integer.class))
+                        .hasRootCauseInstanceOf(SQLException.class);
+            } else {
+                Integer count = jdbc.queryForObject("SELECT count(*) FROM " + table, Integer.class);
+                assertThat(count).as(table).isZero();
+            }
         }
         assertThat(jdbc.queryForObject("SELECT count(*) FROM orders", Integer.class)).isZero();
         transaction.executeWithoutResult(s -> {
@@ -345,6 +356,43 @@ class RlsPostgresIT {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM menu_item", Integer.class)).isPositive();
     }
 
+    @Test @Order(4)
+    void signedContextRejectsChangedIdsInvalidKeysAndCrossTransactionReplay() {
+        as("a@example.com");
+        String capturedSignature = transaction.execute(s -> {
+            String signature = jdbc.queryForObject(
+                    "SELECT current_setting('app.context_signature', true)", String.class);
+            jdbc.queryForList("SELECT set_config('app.customer_id', ?, true), set_config('app.role', 'SUPER_ADMIN', true)",
+                    Long.toString(customerB));
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+            return signature;
+        });
+        assertThat(capturedSignature).isNotBlank();
+
+        SecurityContextHolder.clearContext();
+        transaction.executeWithoutResult(s -> {
+            jdbc.queryForList("SELECT set_config('app.customer_id', ?, true), set_config('app.context_signature', ?, true), "
+                            + "set_config('app.role', 'SUPER_ADMIN', true)",
+                    Long.toString(customerA), capturedSignature);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+        });
+        transaction.executeWithoutResult(s -> {
+            jdbc.queryForList("SELECT set_config('app.customer_id', ?, true), set_config('app.context_signature', ?, true)",
+                    Long.toString(customerA), "0".repeat(64));
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_order", Integer.class)).isZero();
+        });
+    }
+
+    @Test @Order(4)
+    void wrongSigningKeyFailsRuntimeVerification() throws Exception {
+        try (Connection c = pool.getConnection()) {
+            assertThatThrownBy(() -> RlsRuntimeVerifier.verify(c,
+                    "different-test-signing-key-with-at-least-32-characters"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("does not match");
+        }
+    }
+
     @Test @Order(5)
     void singleConnectionNeverLeaksContextAfterCommitRollbackOrFailedInitialization() {
         assertThat(pool.getMaximumPoolSize()).isEqualTo(1);
@@ -353,7 +401,9 @@ class RlsPostgresIT {
             as(name);
             transaction.executeWithoutResult(s -> {
                 assertThat(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)).isEqualTo(backend);
-                assertThat(jdbc.queryForObject("SELECT current_setting('app.role', true)", String.class)).isNotBlank();
+                assertThat(jdbc.queryForObject("SELECT current_setting('app.role', true)", String.class)).isBlank();
+                assertThat(jdbc.queryForObject("SELECT current_setting('app.context_signature', true)", String.class)).isNotBlank();
+                assertThat(jdbc.queryForObject("SELECT app_security.actor_role()", String.class)).isNotBlank();
             });
             transaction.executeWithoutResult(s -> s.setRollbackOnly());
             SecurityContextHolder.clearContext();
@@ -410,15 +460,15 @@ class RlsPostgresIT {
         assertThat(store.findCredentials("new@example.com").orElseThrow().accessLevel()).isZero();
         String hash = "a".repeat(64);
         assertThat(store.createReset("new@example.com", hash, LocalDateTime.now().plusMinutes(30))).contains("new@example.com");
-        assertThat(store.consumeReset(hash, "{noop}changed")).isTrue();
-        assertThat(store.consumeReset(hash, "{noop}reuse")).isFalse();
+        assertThat(store.consumeReset(hash, "{noop}changed")).contains("new@example.com");
+        assertThat(store.consumeReset(hash, "{noop}reuse")).isEmpty();
         assertThat(store.findCredentials("new@example.com").orElseThrow().password()).isEqualTo("{noop}changed");
         String expiredHash = "c".repeat(64);
         assertThat(store.createReset("new@example.com", expiredHash, LocalDateTime.now().plusMinutes(30))).contains("new@example.com");
         try (Connection ownerDb = ownerConnection(); var statement = ownerDb.createStatement()) {
             statement.executeUpdate("UPDATE password_reset_tokens SET expires_at=LOCALTIMESTAMP - interval '1 minute' WHERE token_hash='" + expiredHash + "'");
         }
-        assertThat(store.consumeReset(expiredHash, "{noop}expired")).isFalse();
+        assertThat(store.consumeReset(expiredHash, "{noop}expired")).isEmpty();
         assertThat(store.findCredentials("new@example.com").orElseThrow().password()).isEqualTo("{noop}changed");
         assertThat(created.getId()).isPositive();
     }
@@ -523,7 +573,8 @@ class RlsPostgresIT {
             // Separate physical connections exercise the database lock and token recheck.
             pool.setMaximumPoolSize(2);
             List<Callable<Boolean>> resets = List.of(
-                    () -> store.consumeReset(hash,"{noop}winner-one"), () -> store.consumeReset(hash,"{noop}winner-two"));
+                    () -> store.consumeReset(hash,"{noop}winner-one").isPresent(),
+                    () -> store.consumeReset(hash,"{noop}winner-two").isPresent());
             var resetResults = workers.invokeAll(resets);
             assertThat(List.of(resetResults.get(0).get(), resetResults.get(1).get())).containsExactlyInAnyOrder(true,false);
         } finally { pool.setMaximumPoolSize(1); workers.shutdownNow(); }
@@ -549,14 +600,41 @@ class RlsPostgresIT {
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/order")));
         mvc.perform(get("/api/orders/menu").param("branch", "Kenridge"))
                 .andExpect(status().isOk());
-        mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(customer)).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"customerName\":\"A\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber());
+        String customerOrderKey = "rls-customer-order-0001";
+        String customerOrderBody = "{\"customerName\":\"A\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}";
+        var firstCustomerOrder = mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(customer))
+                        .header("Idempotency-Key", customerOrderKey).contentType(MediaType.APPLICATION_JSON)
+                        .content(customerOrderBody))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber()).andReturn();
+        var replayedCustomerOrder = mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(customer))
+                        .header("Idempotency-Key", customerOrderKey).contentType(MediaType.APPLICATION_JSON)
+                        .content(customerOrderBody))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber()).andReturn();
+        assertThat(application.getBean(ObjectMapper.class).readTree(replayedCustomerOrder.getResponse().getContentAsString()).path("id").asLong())
+                .isEqualTo(application.getBean(ObjectMapper.class).readTree(firstCustomerOrder.getResponse().getContentAsString()).path("id").asLong());
+        String concurrentKey = "rls-concurrent-order-0001";
+        ExecutorService replayWorkers = Executors.newFixedThreadPool(2);
+        try {
+            pool.setMaximumPoolSize(2);
+            Callable<Long> submit = () -> {
+                var response = mvc.perform(post("/api/orders").with(csrf()).with(user(customer))
+                                .header("Idempotency-Key", concurrentKey).contentType(MediaType.APPLICATION_JSON)
+                                .content(customerOrderBody))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+                return application.getBean(ObjectMapper.class).readTree(response).path("id").asLong();
+            };
+            var submissions = replayWorkers.invokeAll(List.of(submit, submit));
+            assertThat(submissions.get(0).get()).isEqualTo(submissions.get(1).get());
+        } finally {
+            pool.setMaximumPoolSize(1);
+            replayWorkers.shutdownNow();
+        }
         mvc.perform(get("/profile/edit").with(user(customer)))
                 .andExpect(status().isOk());
         mvc.perform(get("/order").session(namedSuperSession))
                 .andExpect(status().isOk()).andExpect(view().name("PlaceOrder"));
         var superOrder = mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).session(namedSuperSession)
+                        .header("Idempotency-Key", "rls-super-order-0001")
                         .contentType(MediaType.APPLICATION_JSON).content(orderRequest))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber())
                 .andReturn();
@@ -571,34 +649,17 @@ class RlsPostgresIT {
                 assertThat(result.getLong("branch_id")).isEqualTo(2);
             }
         }
-        mvc.perform(get("/order").with(user(environmentAdmin)))
-                .andExpect(status().isOk()).andExpect(view().name("PlaceOrder"));
-        var environmentOrder = mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(environmentAdmin))
+        mvc.perform(get("/order").with(user(environmentAdmin))).andExpect(status().isForbidden());
+        mvc.perform(post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(environmentAdmin))
                         .contentType(MediaType.APPLICATION_JSON).content(orderRequest))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.id").isNumber())
-                .andReturn();
-        long environmentOrderId = application.getBean(ObjectMapper.class)
-                .readTree(environmentOrder.getResponse().getContentAsString()).path("id").asLong();
-        try (Connection c = ownerConnection(); var statement = c.prepareStatement("""
-                SELECT o.customer_id, c.environment_admin, c.email, c.password
-                FROM customer_order o JOIN customers c ON c.id = o.customer_id
-                WHERE o.order_id = ?
-                """)) {
-            statement.setLong(1, environmentOrderId);
-            try (var result = statement.executeQuery()) {
-                assertThat(result.next()).isTrue();
-                assertThat(result.getBoolean("environment_admin")).isTrue();
-                assertThat(result.getString("email")).isNull();
-                assertThat(result.getString("password")).isNull();
-            }
-        }
-        mvc.perform(get("/profile/edit").with(user(environmentAdmin)))
-                .andExpect(status().isOk()).andExpect(view().name("customerInfoEdit"))
-                .andExpect(model().attribute("readOnlyHistory", true));
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/profile/edit").with(user(environmentAdmin))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/admin/orders").with(user(environmentAdmin)))
+                .andExpect(status().isOk());
         try (Connection c = ownerConnection(); var statement = c.createStatement();
              var result = statement.executeQuery("SELECT count(*) FROM customers WHERE environment_admin")) {
             assertThat(result.next()).isTrue();
-            assertThat(result.getInt(1)).isEqualTo(1);
+            assertThat(result.getLong(1)).isZero();
         }
         for (var blocked : List.of(branchAdmin, driverAccount)) {
             mvc.perform(get("/order").with(user(blocked))).andExpect(status().isForbidden());
@@ -685,6 +746,8 @@ class RlsPostgresIT {
     }
 
     private static class RlsContextInitializerForTest extends RlsContextInitializer {
+        private RlsContextInitializerForTest() { super(TEST_CONTEXT_SECRET); }
+
         @Override public void initialize(Connection connection) throws SQLException {
             try (var statement = connection.createStatement()) {
                 statement.execute("SELECT set_config('app.role','SUPER_ADMIN',true)");

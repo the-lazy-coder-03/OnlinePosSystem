@@ -2,7 +2,7 @@ name: onlinepossystem
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine3.24
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-online_pos_system}
       POSTGRES_USER: ${POSTGRES_USER:-pos_app}
@@ -18,6 +18,13 @@ services:
 
   app:
     restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -38,6 +45,7 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      RLS_CONTEXT_SECRET: ${RLS_CONTEXT_SECRET:?Set RLS_CONTEXT_SECRET}
       JWT_EXPIRATION_SECONDS: ${JWT_EXPIRATION_SECONDS:-7200}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       APP_BASE_URL: ${APP_BASE_URL:-https://crowdcam.co.za}
@@ -54,7 +62,7 @@ services:
       start_period: 30s
 
   provision:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine3.24
     profiles: ["tools"]
     depends_on:
       db:
@@ -86,10 +94,11 @@ services:
       MIGRATION_DATASOURCE_USERNAME: ${MIGRATION_DATASOURCE_USERNAME:?Set the migration owner username}
       MIGRATION_DATASOURCE_PASSWORD: ${MIGRATION_DATASOURCE_PASSWORD:?Set the migration owner password}
       RLS_RUNTIME_ROLE: ${SPRING_DATASOURCE_USERNAME:-pos_runtime}
+      RLS_CONTEXT_SECRET: ${RLS_CONTEXT_SECRET:?Set RLS_CONTEXT_SECRET}
       RUN_MIGRATION_SQL: ${RUN_MIGRATION_SQL:-true}
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:stable-alpine3.24-slim
     profiles: ["legacy-proxy"]
     depends_on:
       - app
@@ -105,15 +114,35 @@ services:
       exec nginx -g "daemon off;"'
 
   certbot:
-    image: certbot/certbot:latest
+    build:
+      context: ..
+      dockerfile: docker/certbot.Dockerfile
     profiles: ["tools"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /var/lib/letsencrypt:rw,noexec,nosuid,size=16m
+      - /var/log/letsencrypt:rw,noexec,nosuid,size=16m
     volumes:
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
 
   certbot-renew:
-    image: certbot/certbot:latest
+    build:
+      context: ..
+      dockerfile: docker/certbot.Dockerfile
     profiles: ["legacy-proxy"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /var/lib/letsencrypt:rw,noexec,nosuid,size=16m
+      - /var/log/letsencrypt:rw,noexec,nosuid,size=16m
     depends_on:
       - nginx
     volumes:

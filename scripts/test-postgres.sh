@@ -20,8 +20,16 @@ export TEST_DATASOURCE_PASSWORD="${RLS_TEST_ADMIN_PASSWORD:-}"
 # the RLS integration test's isolated migration context.
 unset SPRING_DATASOURCE_URL SPRING_DATASOURCE_USERNAME SPRING_DATASOURCE_PASSWORD
 export SPRING_PROFILES_ACTIVE=postgres-test
+export RLS_CONTEXT_SECRET="${RLS_CONTEXT_SECRET:-test-only-rls-context-secret-at-least-32-characters}"
 # Local .env files must never override the disposable test database settings.
 export SPRING_CONFIG_IMPORT=
+export ADMIN_USERNAME=admin
+export ADMIN_PASSWORD=admin
+export JWT_SECRET=test-secret-key-with-enough-length-for-hmac-signing
+export APP_BASE_URL=http://localhost:8080
+export SESSION_COOKIE_SECURE=false
+export RESEND_API_KEY=
+export MAIL_API=
 
 cleanup() {
   psql -X -q -d "$admin_uri" -c "DROP DATABASE IF EXISTS $test_db WITH (FORCE)" >/dev/null 2>&1 || true

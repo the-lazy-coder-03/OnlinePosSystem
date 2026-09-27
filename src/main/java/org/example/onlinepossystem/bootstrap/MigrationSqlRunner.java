@@ -31,22 +31,29 @@ public class MigrationSqlRunner implements CommandLineRunner {
     private static final String CATALOG_MIGRATION_ID = "migration.sql";
     private static final String RLS_MIGRATION_ID = "db/rls-v1.sql";
     private static final String RLS_SPECIALS_MIGRATION_ID = "db/rls-v2-specials.sql";
+    private static final String RLS_HARDENING_MIGRATION_ID = "db/rls-v3-hardening.sql";
+    private static final String RLS_AUDIT_MIGRATION_ID = "db/rls-v4-audit.sql";
     private static final String CATALOG_MIGRATION_RESOURCE = "sql/migration.sql";
     private static final String RLS_MIGRATION_RESOURCE = "sql/rls-v1.sql";
     private static final String RLS_SPECIALS_MIGRATION_RESOURCE = "sql/rls-v2-specials.sql";
+    private static final String RLS_HARDENING_MIGRATION_RESOURCE = "sql/rls-v3-hardening.sql";
+    private static final String RLS_AUDIT_MIGRATION_RESOURCE = "sql/rls-v4-audit.sql";
 
     private final DataSource dataSource;
     private final boolean catalogEnabled;
     private final String runtimeRole;
+    private final String contextSecret;
 
     public MigrationSqlRunner(
             DataSource dataSource,
             @Value("${app.database.migration.enabled:true}") boolean catalogEnabled,
-            @Value("${app.rls.runtime-role:pos_runtime}") String runtimeRole
+            @Value("${app.rls.runtime-role:pos_runtime}") String runtimeRole,
+            @Value("${app.rls.context-secret:${RLS_CONTEXT_SECRET:}}") String contextSecret
     ) {
         this.dataSource = dataSource;
         this.catalogEnabled = catalogEnabled;
         this.runtimeRole = requireText(runtimeRole, "Runtime database username is required.");
+        this.contextSecret = requireSecret(contextSecret);
     }
 
     @Override
@@ -77,6 +84,11 @@ public class MigrationSqlRunner implements CommandLineRunner {
         applyMigration(connection, RLS_MIGRATION_ID, RLS_MIGRATION_RESOURCE, true, () -> setRuntimeRole(connection));
         applyMigration(connection, RLS_SPECIALS_MIGRATION_ID, RLS_SPECIALS_MIGRATION_RESOURCE, true,
                 () -> setRuntimeRole(connection));
+        applyMigration(connection, RLS_HARDENING_MIGRATION_ID, RLS_HARDENING_MIGRATION_RESOURCE, true,
+                () -> setRuntimeRole(connection));
+        applyMigration(connection, RLS_AUDIT_MIGRATION_ID, RLS_AUDIT_MIGRATION_RESOURCE, true,
+                () -> setRuntimeRole(connection));
+        synchronizeContextSecret(connection);
     }
 
     private void applyMigration(
@@ -119,6 +131,18 @@ public class MigrationSqlRunner implements CommandLineRunner {
         try (PreparedStatement statement = connection.prepareStatement("SELECT set_config('app.runtime_role', ?, true)")) {
             statement.setString(1, runtimeRole);
             statement.execute();
+        }
+    }
+
+    private void synchronizeContextSecret(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO app_security.rls_context_secret (singleton, secret, updated_at)
+                VALUES (true, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (singleton) DO UPDATE
+                    SET secret = EXCLUDED.secret, updated_at = EXCLUDED.updated_at
+                """)) {
+            statement.setString(1, contextSecret);
+            statement.executeUpdate();
         }
     }
 
@@ -211,6 +235,13 @@ public class MigrationSqlRunner implements CommandLineRunner {
             throw new IllegalStateException(message);
         }
         return value.trim();
+    }
+
+    private static String requireSecret(String value) {
+        if (value == null || value.isBlank() || value.length() < 32) {
+            throw new IllegalStateException("RLS_CONTEXT_SECRET must contain at least 32 characters.");
+        }
+        return value;
     }
 
     @FunctionalInterface

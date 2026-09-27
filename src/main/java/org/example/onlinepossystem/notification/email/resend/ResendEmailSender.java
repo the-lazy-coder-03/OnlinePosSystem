@@ -52,7 +52,7 @@ public class ResendEmailSender implements EmailSender {
                 logger.warn("Resend returned no email ID for the email request.");
                 throw new NotificationDeliveryException(Reason.PROVIDER_ERROR);
             }
-            logger.info("Resend accepted email; email ID {}", response.getId());
+            logger.info("Resend accepted email");
         } catch (ResendException ex) {
             Reason reason = classify(ex);
             logger.warn("Resend rejected email: status={}, reason={}", ex.getStatusCode(), reason);

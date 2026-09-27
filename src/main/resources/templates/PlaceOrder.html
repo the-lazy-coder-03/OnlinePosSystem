@@ -1301,7 +1301,7 @@
 </div>
 
 <script src="/js/stomp-client.js"></script>
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const MENU_ONLY = /*[[${menuOnly == true}]]*/ false;
     const INITIAL_BRANCH_ID = /*[[${branchId}]]*/ null;
     const INITIAL_BRANCH_NAME = /*[[${branchName ?: ''}]]*/ "";

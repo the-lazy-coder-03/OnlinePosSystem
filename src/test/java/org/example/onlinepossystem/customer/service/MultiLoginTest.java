@@ -5,11 +5,13 @@ import org.example.onlinepossystem.customer.api.AccountAccessAdministration;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
 import org.example.onlinepossystem.ordering.repository.OrderRepository;
 import org.example.onlinepossystem.security.api.RateLimiter;
+import org.example.onlinepossystem.security.api.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +56,10 @@ public class MultiLoginTest {
 
     @Autowired
     private RateLimiter rateLimiter;
+    @Autowired
+    private TokenService tokenService;
+    @Autowired
+    private AuthenticationManager authenticationManager;
 
     @BeforeEach
     void resetLoginLimit() {
@@ -74,6 +80,7 @@ public class MultiLoginTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("PlaceOrder"));
         mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(principal))
+                        .header("Idempotency-Key", "named-super-order-0001")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"customerName\":\"Named Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
                 .andExpect(status().isOk())
@@ -177,23 +184,15 @@ public class MultiLoginTest {
     }
 
     @Test
-    public void environmentSuperAdminCanPlaceLinkedCustomerOrder() throws Exception {
+    public void environmentSuperAdminCannotUseCustomerOrderingIdentity() throws Exception {
         UserDetails principal = userDetailsService.loadUserByUsername("admin");
 
         mockMvc.perform(MockMvcRequestBuilders.get("/order").with(user(principal)))
-                .andExpect(status().isOk());
+                .andExpect(status().isForbidden());
         mockMvc.perform(MockMvcRequestBuilders.post("/api/orders").with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf()).with(user(principal))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"customerName\":\"Admin\",\"branchName\":\"Kenridge\",\"items\":[{\"menuItemId\":101,\"quantity\":1}]}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").isNumber());
-
-        Customer internalAccount = customerRepository.findByEnvironmentAdminTrue().orElseThrow();
-        assertNull(internalAccount.getEmail());
-        assertNull(internalAccount.getPassword());
-        assertEquals(3, internalAccount.getAccessLevel());
-        assertTrue(orderRepository.findAll().stream()
-                .anyMatch(order -> internalAccount.getId().equals(order.getCustomerId())));
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -220,10 +219,41 @@ public class MultiLoginTest {
         assertNotNull(userByPhone1);
         assertEquals(email, userByPhone1.getUsername());
 
-        // 3. Login with Phone2
-        UserDetails userByPhone2 = userDetailsService.loadUserByUsername(phone2);
-        assertNotNull(userByPhone2);
-        assertEquals(email, userByPhone2.getUsername());
+        // Secondary phone numbers are profile data, not login identifiers.
+        assertThrows(org.springframework.security.core.userdetails.UsernameNotFoundException.class,
+                () -> userDetailsService.loadUserByUsername(phone2));
+    }
+
+    @Test
+    public void changingPasswordRequiresCurrentPasswordAndRevokesExistingCredentials() throws Exception {
+        String email = "password-change@example.com";
+        String oldPassword = "Password1!";
+        String newPassword = "Changed2@";
+        customerService.registerCustomer("Password", "Change", email, oldPassword, "0712345677", null,
+                "12", "Main Street", "Kenridge", null, "Kenridge Branch", "7550");
+        UserDetails principal = userDetailsService.loadUserByUsername(email);
+        String oldJwt = tokenService.generateToken(principal);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/profile/update").with(csrf()).with(user(principal))
+                        .param("firstName", "Password").param("lastName", "Change")
+                        .param("phone1", "0712345677").param("preferredStore", "Kenridge Branch")
+                        .param("currentPassword", "wrong").param("password", newPassword))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/profile/edit?error=current-password"));
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/profile/update").with(csrf()).with(user(principal))
+                        .param("firstName", "Password").param("lastName", "Change")
+                        .param("phone1", "0712345677").param("preferredStore", "Kenridge Branch")
+                        .param("currentPassword", oldPassword).param("password", newPassword))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?passwordChanged"));
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/orders/menu").param("branch", "Kenridge")
+                        .header("Authorization", "Bearer " + oldJwt))
+                .andExpect(status().isUnauthorized());
+        assertThrows(org.springframework.security.authentication.BadCredentialsException.class,
+                () -> authenticationManager.authenticate(
+                        org.springframework.security.authentication.UsernamePasswordAuthenticationToken.unauthenticated(email, oldPassword)));
     }
     @Test
     public void testLoginPage() throws Exception {

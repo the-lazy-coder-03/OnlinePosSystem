@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.shared.config;
 
 import org.example.onlinepossystem.customer.api.AccountAccessChanged;
+import org.example.onlinepossystem.customer.api.AccountCredentialsChanged;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -37,8 +38,17 @@ public class AccountWebSocketSessions {
 
     @TransactionalEventListener
     public void accessChanged(AccountAccessChanged event) {
+        closeForUsername(event.username());
+    }
+
+    @TransactionalEventListener
+    public void credentialsChanged(AccountCredentialsChanged event) {
+        closeForUsername(event.username());
+    }
+
+    private void closeForUsername(String username) {
         sessions.values().stream().filter(s -> s.getPrincipal() != null
-                && Objects.equals(s.getPrincipal().getName(), event.username())).forEach(session -> {
+                && Objects.equals(s.getPrincipal().getName(), username)).forEach(session -> {
             try { session.close(CloseStatus.POLICY_VIOLATION); }
             catch (IOException exception) { logger.warn("Could not close an expired account WebSocket session"); }
         });

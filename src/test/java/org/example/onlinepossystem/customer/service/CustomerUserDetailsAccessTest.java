@@ -19,16 +19,17 @@ class CustomerUserDetailsAccessTest {
             "0,ROLE_USER",
             "1,ROLE_ADMIN",
             "2,ROLE_ADMIN",
-            "3,ROLE_ADMIN|ROLE_SUPER_ADMIN",
+            "3,ROLE_ADMIN|ROLE_SUPER_ADMIN|ROLE_USER",
             "4,ROLE_DRIVER"
     })
     void derivesAuthoritiesFromAccessLevel(int accessLevel, String expectedAuthorities) {
         CustomerRepository repository = mock(CustomerRepository.class);
         Customer customer = new Customer();
+        customer.setId(42L);
         customer.setEmail("person@example.com");
         customer.setPassword("password-hash");
         customer.setAccessLevel(accessLevel);
-        when(repository.findByEmail("person@example.com")).thenReturn(Optional.of(customer));
+        when(repository.findByEmailIgnoreCase("person@example.com")).thenReturn(Optional.of(customer));
         CustomerUserDetailsService service = new CustomerUserDetailsService(new org.example.onlinepossystem.customer.persistence.JpaAccountBootstrapStore(repository, null), "admin", "admin-password");
 
         UserDetails details = service.loadUserByUsername("person@example.com");

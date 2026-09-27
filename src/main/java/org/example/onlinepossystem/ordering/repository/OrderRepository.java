@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.Optional;
 
 @Repository
 @org.springframework.transaction.annotation.Transactional(readOnly = true)
@@ -26,4 +27,5 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             Integer branchId, LocalDateTime start, LocalDateTime end);
     List<Order> findByStatusInOrderByCreatedAtDesc(Collection<String> statuses);
     List<Order> findByBranchIdAndStatusInOrderByCreatedAtDesc(Integer branchId, Collection<String> statuses);
+    Optional<Order> findByCustomerIdAndIdempotencyKey(Long customerId, String idempotencyKey);
 }

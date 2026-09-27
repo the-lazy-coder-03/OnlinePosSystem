@@ -6,28 +6,39 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Max;
 
 import java.util.List;
 
 public class OrderRequestDTO {
-    @NotBlank
+    @NotBlank @Size(max = 200)
     private String customerName;
+    @Size(max = 20)
     private String phone;
+    @Size(max = 100)
     private String houseNumber;
+    @Size(max = 255)
     private String street;
+    @Size(max = 120)
     private String area;
+    @Size(max = 120)
     private String city;
+    @Size(max = 20)
     private String postalCode;
+    @Size(max = 120)
     private String complexName;
     @Size(max = 64, message = "Gate access code must be 64 characters or fewer.")
     @Pattern(regexp = "[A-Za-z0-9 #*]*", message = "Gate access code may contain only letters, numbers, spaces, # and *.")
     private String gateAccessCode;
-    @NotBlank
+    @NotBlank @Size(max = 100)
     private String branchName;
+    @Pattern(regexp = "pickup|delivery", flags = Pattern.Flag.CASE_INSENSITIVE)
     private String orderType; // "pickup" or "delivery"
     @Valid
+    @Size(max = 100)
     private List<OrderItemRequestDTO> items;
     @Valid
+    @Size(max = 50)
     private List<SpecialItemRequestDTO> specialItems;
 
     // Getters and Setters
@@ -66,9 +77,12 @@ public class OrderRequestDTO {
         private Integer pizzaBaseOptionId;
         @NotNull
         @Positive
+        @Max(50)
         private Integer quantity;
         @Valid
+        @Size(max = 100)
         private List<CustomizationRequestDTO> customizations;
+        @Size(max = 1000)
         private String notes;
 
         // Getters and Setters
@@ -92,9 +106,9 @@ public class OrderRequestDTO {
 
     public static class SpecialItemRequestDTO {
         @NotNull private Long specialId;
-        @NotNull @Positive private Integer quantity;
-        @Valid private List<SpecialSelectionRequestDTO> selections;
-        @Valid private List<SpecialAddonRequestDTO> addons;
+        @NotNull @Positive @Max(50) private Integer quantity;
+        @Valid @Size(max = 100) private List<SpecialSelectionRequestDTO> selections;
+        @Valid @Size(max = 100) private List<SpecialAddonRequestDTO> addons;
         public Long getSpecialId() { return specialId; }
         public void setSpecialId(Long specialId) { this.specialId = specialId; }
         public Integer getQuantity() { return quantity; }
@@ -107,7 +121,7 @@ public class OrderRequestDTO {
 
     public static class SpecialSelectionRequestDTO {
         @NotNull private Long componentId;
-        @NotNull @Positive private Integer selectionIndex;
+        @NotNull @Positive @Max(100) private Integer selectionIndex;
         @NotNull @Valid private OrderItemRequestDTO item;
         public Long getComponentId() { return componentId; }
         public void setComponentId(Long componentId) { this.componentId = componentId; }
@@ -119,7 +133,7 @@ public class OrderRequestDTO {
 
     public static class SpecialAddonRequestDTO {
         @NotNull private Long addonId;
-        @NotNull @Positive private Integer quantity;
+        @NotNull @Positive @Max(50) private Integer quantity;
         @NotNull @Valid private OrderItemRequestDTO item;
         public Long getAddonId() { return addonId; }
         public void setAddonId(Long addonId) { this.addonId = addonId; }
@@ -134,7 +148,9 @@ public class OrderRequestDTO {
         private Integer id;
         @NotNull
         @Positive
+        @Max(50)
         private Integer quantity;
+        @Size(max = 40)
         private String type;
 
         // Getters and Setters

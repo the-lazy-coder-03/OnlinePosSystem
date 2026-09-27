@@ -11,11 +11,16 @@ packaged under `sql/` inside the application jar.
 
 1. Use a dedicated application database and configure the variables documented in
    `SupportConfigFiles/.env.example`.
-2. Run `scripts/provision-rls.sh` as the database administrator. It transfers only
-   recognized application objects and provisions separate owner/runtime logins.
-3. Build the application, then run `scripts/migrate-database.sh target/OnlinePosSystem-0.0.1-SNAPSHOT.jar`
-   with the owner credentials and `RLS_RUNTIME_ROLE` naming the runtime login.
-4. Start the application using restricted `SPRING_DATASOURCE_*` credentials.
+2. Generate `RLS_CONTEXT_SECRET` with at least 32 random characters. Supply the
+   same value to the migration process and every application instance.
+3. Run `scripts/provision-rls.sh` as the database administrator. It installs
+   `pgcrypto`, transfers only recognized application objects, and provisions
+   separate owner/runtime logins.
+4. Build the application, then run `scripts/migrate-database.sh target/OnlinePosSystem-0.0.1-SNAPSHOT.jar`
+   with the owner credentials, `RLS_RUNTIME_ROLE` naming the runtime login, and
+   `RLS_CONTEXT_SECRET` set.
+5. Start the application using restricted `SPRING_DATASOURCE_*` credentials and
+   the same `RLS_CONTEXT_SECRET`.
 
 See [ROW_LEVEL_SECURITY.md](ROW_LEVEL_SECURITY.md) for the exact permission model,
 provisioning variables and Docker Compose sequence. The active order table is

@@ -3,6 +3,7 @@ package org.example.onlinepossystem.customer.web;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.example.onlinepossystem.customer.service.PasswordResetService;
 import org.example.onlinepossystem.security.api.RequestClientIp;
 import org.springframework.stereotype.Controller;
@@ -30,7 +31,7 @@ public class PasswordResetController {
 
     @PostMapping("/forgot-password")
     public String requestReset(
-            @RequestParam @NotBlank @Email String email,
+            @RequestParam @NotBlank @Email @Size(max = 254) String email,
             HttpServletRequest request,
             Model model
     ) {
@@ -39,7 +40,7 @@ public class PasswordResetController {
     }
 
     @GetMapping("/reset-password")
-    public String resetPasswordPage(@RequestParam(required = false) String token, Model model) {
+    public String resetPasswordPage(@RequestParam(required = false) @Size(max = 256) String token, Model model) {
         model.addAttribute("token", token);
         if (!StringUtils.hasText(token)) {
             model.addAttribute("error", "Reset link is invalid or has expired.");
@@ -49,9 +50,9 @@ public class PasswordResetController {
 
     @PostMapping("/reset-password")
     public String resetPassword(
-            @RequestParam(required = false) String token,
-            @RequestParam @NotBlank String password,
-            @RequestParam @NotBlank String confirmPassword,
+            @RequestParam(required = false) @Size(max = 256) String token,
+            @RequestParam @NotBlank @Size(max = 512) String password,
+            @RequestParam @NotBlank @Size(max = 512) String confirmPassword,
             Model model
     ) {
         try {

@@ -5,6 +5,7 @@
 \getenv owner_password MIGRATION_DATASOURCE_PASSWORD
 \getenv runtime_name SPRING_DATASOURCE_USERNAME
 \getenv runtime_password SPRING_DATASOURCE_PASSWORD
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 BEGIN;
 SELECT format('CREATE ROLE %I LOGIN', :'owner_name') WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=:'owner_name') \gexec
 SELECT format('CREATE ROLE %I LOGIN', :'runtime_name') WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=:'runtime_name') \gexec

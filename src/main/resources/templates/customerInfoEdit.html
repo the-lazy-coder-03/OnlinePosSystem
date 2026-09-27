@@ -288,7 +288,7 @@
          2.1 SIDEBAR
     ========================= -->
     <div class="sidebar">
-        <button class="back-btn" onclick="goBack()">← Back to Home</button>
+        <button class="back-btn" id="profileBackButton" type="button">← Back to Home</button>
         <h3>Account Menu</h3>
         <button class="tab-btn active" data-tab="profile" th:unless="${readOnlyHistory}">1. Edit Profile</button>
         <button class="tab-btn" th:classappend="${readOnlyHistory} ? ' active' : ''" data-tab="orders" th:text="${readOnlyHistory} ? 'Order History' : '2. Past Orders'">2. Past Orders</button>
@@ -306,6 +306,7 @@
             <h2>1. Edit Profile</h2>
             <div th:if="${param.success}" class="message">Profile updated successfully!</div>
             <div th:if="${param.error != null and param.error[0] == 'password'}" class="message">Password must be at least 8 characters and include uppercase, lowercase, number, and special character.</div>
+            <div th:if="${param.error != null and param.error[0] == 'current-password'}" class="message">Enter your current password before choosing a new one.</div>
             <form id="profileForm" th:action="@{/profile/update}" method="post" th:object="${customer}">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                 <div style="display: flex; gap: 10px;">
@@ -313,7 +314,8 @@
                     <input type="text" id="lastName" th:field="*{lastName}" placeholder="Surname" required style="flex: 1;">
                 </div>
                 <input type="email" id="email" th:field="*{email}" placeholder="Email Address" required readonly>
-                <input type="password" id="password" name="password" minlength="8" placeholder="New Password (leave blank to keep current)">
+                <input type="password" id="currentPassword" name="currentPassword" maxlength="512" autocomplete="current-password" placeholder="Current Password (required to change password)">
+                <input type="password" id="password" name="password" minlength="8" maxlength="512" autocomplete="new-password" placeholder="New Password (leave blank to keep current)">
 
                 <input type="text" id="houseNumber" th:field="*{houseNumber}" placeholder="House / Apartment Number">
                 <input type="text" id="complexName" th:field="*{complexName}" placeholder="Complex Name">
@@ -383,7 +385,7 @@
 <!-- =========================
      5. SCRIPT
 ========================= -->
-<script>
+<script th:attr="nonce=${cspNonce}">
     let isProfileDirty = false;
 
     // =========================
@@ -395,6 +397,7 @@
         }
         window.location.href = "/";
     }
+    document.getElementById("profileBackButton")?.addEventListener("click", goBack);
 
     // =========================
     // TAB SWITCHING

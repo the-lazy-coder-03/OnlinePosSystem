@@ -257,11 +257,9 @@
 
         <!-- 9.3 LOGOUT -->
         <th:block sec:authorize="isAuthenticated()">
-            <a href="#" class="nav-btn--logout" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                Logout
-            </a>
-            <form id="logout-form" th:action="@{/logout}" method="post" style="display:none;">
+            <form id="logout-form" th:action="@{/logout}" method="post" style="display:inline;">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <button type="submit" class="nav-btn--logout">Logout</button>
             </form>
         </th:block>
 

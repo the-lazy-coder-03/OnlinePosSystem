@@ -7,6 +7,7 @@ import org.example.onlinepossystem.security.DefaultPasswordPolicy;
 import org.example.onlinepossystem.security.SimpleRateLimiter;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.nio.charset.StandardCharsets;
@@ -24,8 +25,9 @@ class PasswordResetServiceTest {
     private final AccountBootstrapStore accounts = mock(AccountBootstrapStore.class);
     private final PasswordEncoder encoder = mock(PasswordEncoder.class);
     private final PasswordResetNotifier notifier = mock(PasswordResetNotifier.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final PasswordResetService service = new PasswordResetService(accounts, encoder, notifier,
-            new SimpleRateLimiter(), new SecureRandom(), new DefaultPasswordPolicy());
+            new SimpleRateLimiter(), new SecureRandom(), new DefaultPasswordPolicy(), events);
 
     @Test
     void storesOnlyTokenHashAndSendsRawTokenThroughNotifier() throws Exception {
@@ -64,14 +66,17 @@ class PasswordResetServiceTest {
     @Test
     void consumesTokenWithEncodedPassword() {
         when(encoder.encode("ValidPass1!")).thenReturn("{bcrypt}new");
-        when(accounts.consumeReset(anyString(), eq("{bcrypt}new"))).thenReturn(true);
+        when(accounts.consumeReset(anyString(), eq("{bcrypt}new")))
+                .thenReturn(Optional.of("customer@example.com"));
         service.resetPassword("raw-token", "ValidPass1!", "ValidPass1!");
         verify(accounts).consumeReset(matches("[a-f0-9]{64}"), eq("{bcrypt}new"));
+        verify(events).publishEvent(new org.example.onlinepossystem.customer.api.AccountCredentialsChanged(
+                "customer@example.com"));
     }
 
     @Test
     void invalidExpiredOrUsedTokenFails() {
-        when(accounts.consumeReset(anyString(), any())).thenReturn(false);
+        when(accounts.consumeReset(anyString(), any())).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.resetPassword("expired-token", "ValidPass1!"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("invalid or has expired");
     }

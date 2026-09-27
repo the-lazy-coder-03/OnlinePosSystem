@@ -40,15 +40,16 @@ jobs:
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
       JWT_SECRET: ci-only-secret-must-be-at-least-32-characters-long
+      RLS_CONTEXT_SECRET: ci-only-rls-context-secret-must-be-at-least-32-characters-long
       GOOGLE_MAPS_API_KEY: ci-placeholder
       SESSION_COOKIE_SECURE: "false"
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "17"
@@ -57,6 +58,22 @@ jobs:
 
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Verify obsolete tests remain removed
+        run: |
+          obsolete_tests=(
+            src/test/java/org/example/onlinepossystem/OnlinePosSystemApplicationTests.java
+            src/test/java/org/example/onlinepossystem/RouteTest.java
+            src/test/java/org/example/onlinepossystem/admin/AdminLiveOrderRenderingTest.java
+            src/test/java/org/example/onlinepossystem/staff/service/StaffLoginTest.java
+            src/test/java/org/example/onlinepossystem/staff/service/StaffServiceDependencyTest.java
+          )
+          for test_file in "${obsolete_tests[@]}"; do
+            if [[ -e "$test_file" ]]; then
+              echo "Obsolete test must not run in CI: $test_file" >&2
+              exit 1
+            fi
+          done
 
       - name: Run PostgreSQL tests and verify package
         run: ./scripts/test-postgres.sh -B verify -Prls-it
@@ -84,15 +101,16 @@ jobs:
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
       JWT_SECRET: ci-only-secret-must-be-at-least-32-characters-long
+      RLS_CONTEXT_SECRET: ci-only-rls-context-secret-must-be-at-least-32-characters-long
       GOOGLE_MAPS_API_KEY: ci-placeholder
       SESSION_COOKIE_SECURE: "false"
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "17"
@@ -100,7 +118,7 @@ jobs:
           cache-dependency-path: Misc/pom.xml
 
       - name: Set up browser test runtime
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
           cache: npm
@@ -117,7 +135,7 @@ jobs:
 
       - name: Cache Playwright Chromium
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('SupportConfigFiles/package-lock.json') }}
@@ -138,10 +156,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
 
@@ -169,17 +187,19 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Validate required secrets
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
           AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
+          AZURE_VM_KNOWN_HOSTS: ${{ secrets.AZURE_VM_KNOWN_HOSTS }}
         run: |
           test -n "$AZURE_VM_HOST" || (echo "Missing AZURE_VM_HOST secret" && exit 1)
           test -n "$AZURE_VM_USER" || (echo "Missing AZURE_VM_USER secret" && exit 1)
           test -n "$AZURE_VM_SSH_KEY" || (echo "Missing AZURE_VM_SSH_KEY secret" && exit 1)
+          test -n "$AZURE_VM_KNOWN_HOSTS" || (echo "Missing AZURE_VM_KNOWN_HOSTS secret" && exit 1)
 
       - name: Build runtime environment file
         id: runtime-env
@@ -192,6 +212,7 @@ jobs:
           MIGRATION_DATASOURCE_USERNAME: ${{ secrets.MIGRATION_DATASOURCE_USERNAME }}
           MIGRATION_DATASOURCE_PASSWORD: ${{ secrets.MIGRATION_DATASOURCE_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          RLS_CONTEXT_SECRET: ${{ secrets.RLS_CONTEXT_SECRET }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
@@ -203,6 +224,7 @@ jobs:
           RUN_MIGRATION_SQL: ${{ secrets.RUN_MIGRATION_SQL }}
           CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
         run: |
+          umask 077
           mkdir -p runtime
 
           db_name="${POSTGRES_DB:-online_pos_system}"
@@ -214,7 +236,7 @@ jobs:
           migration_user="${MIGRATION_DATASOURCE_USERNAME:-}"
           migration_password="${MIGRATION_DATASOURCE_PASSWORD:-}"
 
-          if [[ -z "$runtime_password" || -z "$migration_user" || -z "$migration_password" || -z "$db_password" || -z "$JWT_SECRET" || -z "$ADMIN_PASSWORD" || -z "${RESEND_API_KEY:-${MAIL_API:-}}" ]]; then
+          if [[ -z "$runtime_password" || -z "$migration_user" || -z "$migration_password" || -z "$db_password" || -z "$JWT_SECRET" || -z "$RLS_CONTEXT_SECRET" || -z "$ADMIN_PASSWORD" || -z "${RESEND_API_KEY:-${MAIL_API:-}}" ]]; then
             echo "A complete runtime secret set was not provided; deployment will keep the existing server .env file."
             echo "created=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -244,6 +266,7 @@ jobs:
             echo "ADMIN_USERNAME=${ADMIN_USERNAME:-admin}"
             echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
             echo "JWT_SECRET=${JWT_SECRET}"
+            echo "RLS_CONTEXT_SECRET=${RLS_CONTEXT_SECRET}"
             echo "JWT_EXPIRATION_SECONDS=7200"
             echo "SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}"
             echo "APP_BASE_URL=${APP_BASE_URL:-https://crowdcam.co.za}"
@@ -261,11 +284,14 @@ jobs:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
           AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
+          AZURE_VM_KNOWN_HOSTS: ${{ secrets.AZURE_VM_KNOWN_HOSTS }}
         run: |
+          umask 077
           mkdir -p ~/.ssh
           printf '%s\n' "$AZURE_VM_SSH_KEY" > ~/.ssh/online-pos-azure
           chmod 600 ~/.ssh/online-pos-azure
-          ssh-keyscan -p "${AZURE_VM_PORT:-22}" "$AZURE_VM_HOST" >> ~/.ssh/known_hosts
+          printf '%s\n' "$AZURE_VM_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
 
       - name: Upload runtime environment
         if: steps.runtime-env.outputs.created == 'true'
@@ -310,3 +336,7 @@ jobs:
 
           ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
             "REMOTE_ENV=${quoted_remote_env} REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} RUNTIME_ENV_CREATED=${quoted_runtime_env_created} bash ${quoted_remote_script}"
+
+      - name: Remove local deployment credentials
+        if: always()
+        run: rm -rf runtime ~/.ssh/online-pos-azure

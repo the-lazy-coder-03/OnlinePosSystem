@@ -1,53 +1,36 @@
 # PostgreSQL row security
 
-The normal application uses a restricted PostgreSQL login. Its request identity comes from Spring Security, then `RlsJpaDialect` initializes `app.user_id`, `app.customer_id`, `app.branch_id`, and `app.role` on the **same connection and inside each JPA transaction**. The IDs refer to the existing customer account; there is no separate user or staff account ID in the current login model. The database reads the account's current access level before setting branch and role. All four settings use `set_config(name, value, true)`: `true` makes them transaction-local, so Hikari can reuse a connection without carrying one person's identity into another person's request. Missing or invalid settings expose no protected rows.
+The normal application uses the restricted `pos_runtime` PostgreSQL login. Spring Security supplies a trusted `AccountPrincipal`, and `RlsJpaDialect` initializes `app.customer_id` and `app.context_signature` on the same connection and inside each JPA transaction. The HMAC signature uses `RLS_CONTEXT_SECRET` and is bound to the customer ID, PostgreSQL backend PID, transaction ID, and context version. Transaction-local settings prevent Hikari connection reuse from carrying identity into another request.
 
-`SQL files/rls-v1.sql` forces RLS on `customers`, `customer_order`, all eight order-line/selection tables (`order_menu_item`, `order_menu_item_extra`, `order_burger_protein`, `order_burger_removed_component`, `order_burger_extra_component`, `order_pizza_item`, `order_pizza_item_extra`, `order_pizza_item_base_option`), `staff`, `password_reset_tokens`, and `customer_notes`. The unused legacy `orders` table, if present, is preserved with default-deny RLS. Public branch, menu, pizza, and price tables remain readable without account context.
+The database derives the actor role and branch from the protected customer row and its current `access_level`. Values supplied through `app.role`, `app.user_id`, and `app.branch_id` are never authorization inputs. Missing, malformed, incorrectly signed, or replayed contexts expose no protected rows. The environment administrator resolves through its protected `environment_admin` customer row and receives the same signed context as named accounts.
 
-Customers can read/update their own profile and read/create their own orders and order lines. Branch admins (access levels 1 and 2) can read and update orders for their assigned branch and read full saved profiles for customers who ordered there. They can read/add notes only for those customers. Super admins (level 3 and the configured environment admin) have global administrative access. Drivers gain no order-management access. Order children derive authorization from their protected parent; ownership/branch changes are rejected by triggers. The former staff PIN/code endpoint returns HTTP 410. Named admin accounts use the existing account login, and the POS queue remains available after login.
+The immutable migrations force RLS on `customers`, `customer_order`, `customer_notes`, `staff`, `password_reset_tokens`, and every order-line or customization table. The optional legacy `orders` table remains default-deny. Shared branch, menu, burger, pizza, ingredient, price, modifier, and specials catalog tables have RLS disabled and remain readable without customer context. Runtime catalog writes retain only the SQL privileges used by the existing Spring-authorized super-admin services.
 
-Registration, credential lookup, and recovery cannot start with a customer RLS context. Narrow `SECURITY DEFINER` functions provide only those operations. They qualify table names, use a fixed search path, force new accounts to `USER`/level 0, and atomically consume reset tokens. Never grant runtime ownership, `BYPASSRLS`, superuser, owner-role membership, schema creation, or `TRUNCATE`; those privileges bypass or undermine RLS. The migration owner has its own forced-RLS maintenance policy and is never used by the web process. A database credential compromise or arbitrary SQL that can forge `app.*` settings remains a separate threat that requires SQL-injection defenses and credential protection.
+Customers can read and update their profile and read or create their own orders and order lines. Branch admins can read their branch orders and children, update branch order headers, and read or add notes for customers who ordered at that branch. Super admins have global administrative access. Every nested order predicate joins through its complete parent chain to `customer_order`. Triggers reject customer, branch, order, line-item, and special-selection re-parenting.
+
+Registration, credential lookup, and password recovery use narrow `SECURITY DEFINER` functions because they begin without a customer RLS context. These functions use qualified names and a fixed `pg_catalog, pg_temp` search path. Runtime has no direct access to `password_reset_tokens` or the owner-only `app_security.rls_context_secret` table. Function execution is an explicit allowlist, and `PUBLIC` receives no access to `app_security` functions.
+
+Never grant the runtime role object ownership, `BYPASSRLS`, superuser, owner-role membership, database/schema creation, `TRUNCATE`, or grant options. The migration owner is separate from the web runtime and has owner-only maintenance policies on forced-RLS tables.
 
 ## Local migration and rollout
 
-1. Back up the application database. Provision or confirm a named super admin and named branch-admin accounts before switching off the legacy staff login. Keep the existing `ADMIN_USERNAME`/`ADMIN_PASSWORD` available for access assignments.
-2. In a **dedicated application database**, set `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD` for a trusted database administrator. Set `MIGRATION_DATASOURCE_USERNAME`, `MIGRATION_DATASOURCE_PASSWORD`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` for two different accounts. Run `scripts/provision-rls.sh`. It transfers ownership of known application objects and creates/restricts the two logins; it does not erase data.
-3. Set `MIGRATION_DATASOURCE_URL` (same database, owner credentials) and run `scripts/migrate-database.sh target/OnlinePosSystem-0.0.1-SNAPSHOT.jar`. The owner-only migration profile applies the existing catalog migration and the immutable RLS migration. The normal runtime uses `SPRING_DATASOURCE_*` and Hibernate schema validation; it refuses to start if role privileges or policies are unsafe.
-4. With Docker Compose, run `docker compose --env-file SupportConfigFiles/.env -f docker/docker-compose.yml up -d db`, then `... run --rm provision`, then `... run --rm migrate`, and finally `... up -d app nginx certbot-renew`. The deployment workflow follows that order and preserves the existing TLS health check.
+1. Back up the application database.
+2. Generate one random `RLS_CONTEXT_SECRET` containing at least 32 characters. Configure the same value for the migration process and every runtime instance. Never commit or log it.
+3. In a dedicated application database, set `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD` for a trusted database administrator. Set `MIGRATION_DATASOURCE_USERNAME`, `MIGRATION_DATASOURCE_PASSWORD`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` for separate owner and runtime accounts.
+4. Run `scripts/provision-rls.sh`. It installs `pgcrypto`, transfers ownership of recognized application objects, and creates or restricts the owner/runtime logins without erasing data.
+5. Build the application, set `MIGRATION_DATASOURCE_URL`, and run `scripts/migrate-database.sh target/OnlinePosSystem-0.0.1-SNAPSHOT.jar`. The migration profile applies the catalog and ordered RLS migrations, then synchronizes the signing key through a prepared statement.
+6. Start every application instance with restricted `SPRING_DATASOURCE_*` credentials and the same `RLS_CONTEXT_SECRET`. Startup fails if the key differs from the database fingerprint or if roles, grants, policies, triggers, or function definitions drift.
 
-For isolated local PostgreSQL 16 tests, set `RLS_TEST_ADMIN_URL`, `RLS_TEST_ADMIN_USERNAME`, and `RLS_TEST_ADMIN_PASSWORD` for an administrator of a disposable PostgreSQL server, then run `./scripts/test-postgres.sh`. All Spring tests use a disposable PostgreSQL database; the RLS integration tests additionally create separate owner/runtime roles and another unique database, run migrations twice, exercise RLS through the restricted login and a one-connection Hikari pool, verify a legacy timestamp schema upgrade, and remove their database and roles afterward. Development also uses PostgreSQL: run the owner migration, then start with `SPRING_PROFILES_ACTIVE=dev` and restricted `SPRING_DATASOURCE_*` credentials. Never run the provisioning script against an unrelated shared database.
+With Docker Compose, start `db`, run the one-shot `provision` service, run `migrate`, and then start `app`, `nginx`, and `certbot-renew`. The deploy workflow follows the same order.
+
+For isolated PostgreSQL 16 tests, set `RLS_TEST_ADMIN_URL`, `RLS_TEST_ADMIN_USERNAME`, and `RLS_TEST_ADMIN_PASSWORD`, then run `./scripts/test-postgres.sh -B verify -Prls-it`. The suite creates separate owner/runtime roles and a disposable database, applies the immutable migrations twice, exercises a one-connection Hikari pool, and removes its database and roles afterward.
 
 ## Reviewed security contract
 
-Startup also compares the actual definitions against `SupportConfigFiles/rls-contract.json`, packaged as
-`config/rls-contract.json` inside the jar. Maven includes only this reviewed JSON
-from the configuration directory; environment files and staff configuration are
-not bundled. This includes all 56 policies on the 13 private tables (including
-owner-maintenance policies), all 13 non-internal triggers on those tables, and the
-11 `app_security` functions. Policy commands, roles, `USING`/`WITH CHECK` expressions,
-function bodies, and trigger enabled states must match. Additional policies are
-rejected; a policy retaining its original name cannot silently become `USING (true)`.
-The optional legacy `orders` table permits only its owner-maintenance policy or no
-policies. Runtime has read-only SQL grants there and sees no rows.
+Startup compares the database definitions with `SupportConfigFiles/rls-contract.json`, packaged as `config/rls-contract.json`. The current contract includes 71 policies, 17 non-internal triggers, and 17 `app_security` functions. It records policy commands, target roles, `USING` and `WITH CHECK` expressions, trigger definitions and enabled states, and complete function definitions.
 
-The verifier checks effective table/function grants as well as ownership and role
-membership, and rejects PUBLIC access to private tables/functions, grant options,
-database/schema creation and permission to disable triggers through
-`session_replication_role`. It restores the connection's original search path after
-reading the contract. The runtime test-only RLS escape hatch requires a classpath
-marker that is absent from the packaged application.
+The verifier also rejects catalog RLS, missing forced RLS, unsafe effective table/function grants, `PUBLIC` access, grant options, secret-table access, owner membership, `BYPASSRLS`, database/schema creation, and permission to disable triggers. It checks a domain-separated HMAC fingerprint so an application configured with the wrong signing secret cannot start.
 
-The contract was generated from the reviewed migrations on a fresh PostgreSQL 16
-database using `SQL files/rls-contract-query.sql` with `search_path=pg_catalog`; JSON object
-ordering is irrelevant. Never regenerate it from a deployed database to silence a
-startup failure. Investigate drift, restore reviewed definitions or add a new
-ordered/checksummed migration, and regenerate from a fresh disposable database only
-after reviewing the intended SQL changes. `SQL files/rls-v1.sql` remains immutable. This audit
-changes verification without changing the installed SQL schema or policies, so no
-new SQL migration is needed.
+The contract is generated from reviewed migrations on a fresh PostgreSQL 16 database using `SQL files/rls-contract-query.sql` with `search_path=pg_catalog`. Never regenerate it from a deployed database merely to silence a startup failure. Investigate drift, restore reviewed definitions or add a new ordered migration, then regenerate from a fresh disposable database. `SQL files/rls-v1.sql` and `SQL files/rls-v2-specials.sql` remain immutable; hardening lives in ordered v3 and v4 migrations.
 
-The test suite introduces weakened predicates, unexpected policies, disabled or
-missing triggers, replaced functions, unsafe grants and owner memberships in isolated
-transactions. It also verifies that a disabled account-protection trigger prevents
-the application from starting. See [DATABASE_SETUP.md](DATABASE_SETUP.md) for Maven
-and real-browser commands.
+The integration tests also introduce policy, trigger, function, grant, role, and signing-key failures and verify that startup rejects them. See [DATABASE_SETUP.md](DATABASE_SETUP.md) for the full test commands.

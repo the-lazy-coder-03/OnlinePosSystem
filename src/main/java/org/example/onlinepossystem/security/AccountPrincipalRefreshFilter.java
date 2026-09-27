@@ -29,7 +29,8 @@ public final class AccountPrincipalRefreshFilter extends OncePerRequestFilter {
             try {
                 var refreshed = accounts.loadUserByUsername(principal.getUsername());
                 if (!(refreshed instanceof AccountPrincipal account)
-                        || !Objects.equals(account.customerId(), principal.customerId())) {
+                        || !Objects.equals(account.customerId(), principal.customerId())
+                        || !Objects.equals(account.credentialFingerprint(), principal.credentialFingerprint())) {
                     throw new UsernameNotFoundException("Account no longer exists");
                 }
                 var authentication = UsernamePasswordAuthenticationToken.authenticated(account, null, account.getAuthorities());

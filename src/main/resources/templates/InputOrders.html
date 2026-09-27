@@ -209,7 +209,7 @@
         <h2>Online Orders Queue</h2>
         <div id="liveStatus" class="liveStatus"></div>
         <ul id="orderListQueue" class="orderList"></ul>
-        <button onclick="processNextOrder()" style="padding:15px 30px;font-size:1.2rem;background:#0073e6;color:white;border:none;border-radius:12px;margin-top:20px;">Process Next Order</button>
+        <button id="processNextOrderButton" type="button" style="padding:15px 30px;font-size:1.2rem;background:#0073e6;color:white;border:none;border-radius:12px;margin-top:20px;">Process Next Order</button>
     </div>
 
     <!-- SINGLE ORDER SCREEN -->
@@ -217,8 +217,8 @@
         <div class="branchLabel" id="branchLabelSingle"></div>
         <h2>Processing Order</h2>
         <div class="topButtons">
-            <button class="homeBtn" onclick="goHome()">Home</button>
-            <button class="backBtn" onclick="goBack()">Previous Order</button>
+            <button class="homeBtn" id="ordersHomeButton" type="button">Home</button>
+            <button class="backBtn" id="previousOrderButton" type="button">Previous Order</button>
         </div>
         <div id="currentOrderSingle"></div>
     </div>
@@ -226,7 +226,7 @@
 
 <script src="/js/stomp-client.js"></script>
 <script src="/js/pos-order-renderer.js"></script>
-<script th:inline="javascript">
+<script th:inline="javascript" th:attr="nonce=${cspNonce}">
     const ADMIN_MODE = /*[[${adminMode ?: false}]]*/ false;
     const ADMIN_BRANCH_ID = /*[[${adminBranchId}]]*/ null;
     const ADMIN_BRANCH_NAME = /*[[${adminBranchName}]]*/ null;
@@ -243,6 +243,9 @@
     const API_BASE_URL = '/api';
     const ADMIN_ORDERS_URL = `${API_BASE_URL}/admin/orders`;
     const ADMIN_ORDER_TOPIC = '/topic/admin/orders';
+    document.getElementById('processNextOrderButton')?.addEventListener('click', processNextOrder);
+    document.getElementById('ordersHomeButton')?.addEventListener('click', goHome);
+    document.getElementById('previousOrderButton')?.addEventListener('click', goBack);
 
     function setLiveStatus(message) {
         const el = document.getElementById('liveStatus');

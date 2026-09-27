@@ -16,6 +16,10 @@ public class LocationController {
 
     @GetMapping("/api/full-address")
     public String getFullAddress(@RequestParam double lat, @RequestParam double lon) {
+        if (!Double.isFinite(lat) || !Double.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Coordinates are outside the valid range");
+        }
         return locationService.getFullAddress(lat, lon);
     }
 }

@@ -249,11 +249,8 @@
         <button type="submit">Register</button>
 
         <!-- Error Messages -->
-        <div th:if="${param.error != null and param.error[0] == 'email'}" class="error">
-            This email is already registered. Please use a different email or <a href="/login">login here</a>.
-        </div>
-        <div th:if="${param.error != null and param.error[0] == 'phone'}" class="error">
-            This phone number is already registered. Please use a different phone number or <a href="/login">login here</a>.
+        <div th:if="${param.error != null and param.error[0] == 'account'}" class="error">
+            We could not create that account. Check the details or <a href="/login">sign in</a>.
         </div>
         <div th:if="${param.error != null and param.error[0] == 'password'}" class="error">
             Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
@@ -269,7 +266,7 @@
 <!-- =========================
      LOCATION SCRIPT
 ========================= -->
-<script>
+<script th:attr="nonce=${cspNonce}">
     const locationBtn = document.getElementById("locationBtn");
 
     locationBtn.addEventListener("click", () => {
@@ -309,7 +306,7 @@
 <!-- =========================
      FORM VALIDATION SCRIPT
 ========================= -->
-<script>
+<script th:attr="nonce=${cspNonce}">
     const form = document.getElementById("registerForm");
     const phoneInput = document.getElementById("phone");
 

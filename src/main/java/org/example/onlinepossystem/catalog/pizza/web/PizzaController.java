@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -47,7 +48,7 @@ public class PizzaController {
     public PriceQuoteResponse quotePrice(
             @PathVariable Integer branchId,
             @PathVariable Integer pizzaId,
-            @RequestBody PriceQuoteRequest request
+            @Valid @RequestBody PriceQuoteRequest request
     ) {
         if (request.sizeCm() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sizeCm is required");

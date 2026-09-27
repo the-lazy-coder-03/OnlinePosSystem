@@ -3,7 +3,6 @@ package org.example.onlinepossystem.ordering.web;
 import jakarta.validation.Valid;
 import org.example.onlinepossystem.catalog.api.OrderCatalogResolver;
 import org.example.onlinepossystem.catalog.dto.MenuDTO;
-import org.example.onlinepossystem.customer.api.EnvironmentAdminAccount;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
 import org.example.onlinepossystem.ordering.api.InvalidOrderStatusException;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
@@ -21,17 +20,15 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/orders")
+@org.springframework.validation.annotation.Validated
 public class OrderController {
 
     private final OrderOperations orderOperations;
     private final OrderCatalogResolver catalogResolver;
-    private final EnvironmentAdminAccount environmentAdminAccount;
 
-    public OrderController(OrderOperations orderOperations, OrderCatalogResolver catalogResolver,
-                           EnvironmentAdminAccount environmentAdminAccount) {
+    public OrderController(OrderOperations orderOperations, OrderCatalogResolver catalogResolver) {
         this.orderOperations = orderOperations;
         this.catalogResolver = catalogResolver;
-        this.environmentAdminAccount = environmentAdminAccount;
     }
 
     /**
@@ -51,14 +48,16 @@ public class OrderController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<OrderResponseDTO> placeOrder(
             @Valid @RequestBody OrderRequestDTO request,
+            @RequestHeader("Idempotency-Key")
+            @jakarta.validation.constraints.Pattern(regexp = "[A-Za-z0-9._:-]{16,128}") String idempotencyKey,
             Authentication authentication
     ) {
-        if (authentication != null && environmentAdminAccount.matches(authentication.getPrincipal())) {
-            Long customerId = environmentAdminAccount.ensureCustomerId(authentication.getPrincipal());
-            return ResponseEntity.ok(orderOperations.placeOrderForCustomerId(request, customerId));
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "A customer-backed account is required to place an order.");
         }
-        String customerEmail = authentication == null ? null : authentication.getName();
-        return ResponseEntity.ok(orderOperations.placeOrderForCustomer(request, customerEmail));
+        return ResponseEntity.ok(orderOperations.placeOrderForCustomer(
+                request, authentication.getName(), idempotencyKey));
     }
 
     /**

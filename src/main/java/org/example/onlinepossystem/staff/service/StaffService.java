@@ -26,6 +26,7 @@ public class StaffService implements StaffDirectory, StaffOperations {
         this.passwordEncoder = passwordEncoder;
     }
 
+        /* Unused legacy PIN/code authentication; /api/staff/login is retired.
     @Override
     public Optional<String> authenticate(String pin, String code) {
         if (code != null && !code.isEmpty()) {
@@ -37,33 +38,16 @@ public class StaffService implements StaffDirectory, StaffOperations {
         return Optional.empty();
     }
 
-    /**
-     * Authenticate staff by checking PIN against all staff records.
-     * Returns the branch name if a matching PIN is found, otherwise null.
-     *
-     * SECURITY: Uses BCrypt to compare entered PIN against stored hashed PINs.
-     * Never stores or compares plain text PINs.
-     */
     public String authenticateStaff(String enteredPin) {
-        // Fetch all staff records
         List<Staff> allStaff = staffRepository.findAll();
-
-        // Check entered PIN against each staff member's hashed PIN
         for (Staff staff : allStaff) {
             if (staff.getPinHash() != null && passwordEncoder.matches(enteredPin, staff.getPinHash())) {
-                // PIN matches - return the branch
                 return staff.getBranch();
             }
         }
-
-        // No match found
         return null;
     }
 
-    /**
-     * Authenticate staff by 16-character branch code.
-     * Returns the branch name if the code matches, otherwise null.
-     */
     public String authenticateByCode(String code) {
         if (code == null || code.length() != 16) {
             return null;
@@ -73,6 +57,7 @@ public class StaffService implements StaffDirectory, StaffOperations {
                 .map(Staff::getBranch)
                 .orElse(null);
     }
+    */
 
     /**
      * Create a new staff member with a hashed PIN and optional branch code.
@@ -84,9 +69,11 @@ public class StaffService implements StaffDirectory, StaffOperations {
         return toAccount(staffRepository.save(staff));
     }
 
+    /* Unused convenience overload; active callers use the branch-code form.
     public StaffAccount createStaff(String name, String branch, String plainPin) {
         return createStaff(name, branch, plainPin, null);
     }
+    */
 
     /**
      * Update or create a staff member.

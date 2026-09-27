@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.mvn
+target
+SupportConfigFiles/.env
+SupportConfigFiles/*.env
+MD files
+docker/certbot
+node_modules
+playwright-report
+test-results
+*.log

@@ -26,8 +26,7 @@ public class JpaAccountBootstrapStore implements AccountBootstrapStore {
 
     @Override
     public Optional<Credentials> findCredentials(String identifier) {
-        return customers.findByEmail(identifier).or(() -> customers.findByPhone1(identifier))
-                .or(() -> customers.findByPhone2(identifier))
+        return customers.findByEmailIgnoreCase(identifier).or(() -> customers.findByPhone1(identifier))
                 .map(c -> new Credentials(c.getId(), c.getEmail(), c.getPassword(), effectiveLevel(c)));
     }
 
@@ -40,13 +39,13 @@ public class JpaAccountBootstrapStore implements AccountBootstrapStore {
         };
     }
 
-    @Override public boolean emailExists(String email) { return customers.findByEmail(email).isPresent(); }
+    @Override public boolean emailExists(String email) { return customers.findByEmailIgnoreCase(email).isPresent(); }
     @Override public boolean phoneExists(String phone) { return customers.findByPhone1(phone).isPresent(); }
     @Override public Customer register(Customer customer) { return customers.save(customer); }
 
     @Override
     public Optional<String> createReset(String email, String hash, LocalDateTime expiresAt) {
-        return customers.findByEmail(email).map(customer -> {
+        return customers.findByEmailIgnoreCase(email).map(customer -> {
             tokens.deleteByCustomerAndUsedFalse(customer);
             PasswordResetToken token = new PasswordResetToken();
             token.setCustomer(customer);
@@ -63,7 +62,7 @@ public class JpaAccountBootstrapStore implements AccountBootstrapStore {
     }
 
     @Override
-    public boolean consumeReset(String hash, String password) {
+    public Optional<String> consumeReset(String hash, String password) {
         return tokens.findByTokenHashAndUsedFalse(hash).filter(t -> t.getExpiresAt().isAfter(LocalDateTime.now()))
                 .map(token -> {
                     token.getCustomer().setPassword(password);
@@ -71,7 +70,7 @@ public class JpaAccountBootstrapStore implements AccountBootstrapStore {
                     token.setUsed(true);
                     tokens.save(token);
                     tokens.deleteByCustomerAndUsedFalse(token.getCustomer());
-                    return true;
-                }).orElse(false);
+                    return token.getCustomer().getEmail();
+                });
     }
 }

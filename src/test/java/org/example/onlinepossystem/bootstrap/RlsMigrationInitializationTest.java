@@ -19,9 +19,13 @@ class RlsMigrationInitializationTest {
         assertThat(source)
                 .contains("private static final String CATALOG_MIGRATION_ID = \"migration.sql\"")
                 .contains("private static final String RLS_MIGRATION_ID = \"db/rls-v1.sql\"")
+                .contains("private static final String RLS_HARDENING_MIGRATION_ID = \"db/rls-v3-hardening.sql\"")
+                .contains("private static final String RLS_AUDIT_MIGRATION_ID = \"db/rls-v4-audit.sql\"")
                 .contains("private static final String CATALOG_MIGRATION_RESOURCE = \"sql/migration.sql\"")
                 .contains("private static final String RLS_MIGRATION_RESOURCE = \"sql/rls-v1.sql\"")
                 .contains("setRuntimeRole(connection)")
+                .contains("synchronizeContextSecret(connection)")
+                .contains("RLS_CONTEXT_SECRET must contain at least 32 characters")
                 .contains("An applied immutable migration was changed")
                 .contains("recordAppliedChecksum(connection, migrationId, checksum)");
 
@@ -29,6 +33,8 @@ class RlsMigrationInitializationTest {
                 .contains("SQL files/provision-rls.sql")
                 .contains("MIGRATION_DATASOURCE_USERNAME")
                 .contains("SPRING_DATASOURCE_USERNAME");
+        assertThat(sourceFile("SQL files/provision-rls.sql"))
+                .contains("CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public");
 
         assertThat(source.indexOf("applyCatalogMigration(connection)"))
                 .isLessThan(source.indexOf("applyRlsMigration(connection)"));
@@ -60,6 +66,9 @@ class RlsMigrationInitializationTest {
     void consolidatedSqlDirectoryIsPackagedUnderOneClasspathPrefix() {
         assertThat(new ClassPathResource("sql/migration.sql").exists()).isTrue();
         assertThat(new ClassPathResource("sql/rls-v1.sql").exists()).isTrue();
+        assertThat(new ClassPathResource("sql/rls-v2-specials.sql").exists()).isTrue();
+        assertThat(new ClassPathResource("sql/rls-v3-hardening.sql").exists()).isTrue();
+        assertThat(new ClassPathResource("sql/rls-v4-audit.sql").exists()).isTrue();
         assertThat(new ClassPathResource("sql/rls-contract-query.sql").exists()).isTrue();
         assertThat(new ClassPathResource("sql/provision-rls.sql").exists()).isTrue();
         assertThat(new ClassPathResource("sql/tessql.sql").exists()).isTrue();

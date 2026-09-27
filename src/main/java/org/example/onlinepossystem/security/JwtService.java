@@ -3,6 +3,7 @@ package org.example.onlinepossystem.security;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.onlinepossystem.security.api.TokenService;
+import org.example.onlinepossystem.security.api.AccountPrincipal;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -56,6 +57,7 @@ public class JwtService implements TokenService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("sub", userDetails.getUsername());
         payload.put("roles", roles);
+        payload.put("auth", credentialFingerprint(userDetails));
         payload.put("iat", now.getEpochSecond());
         payload.put("exp", now.plusSeconds(expirationSeconds).getEpochSecond());
 
@@ -79,12 +81,25 @@ public class JwtService implements TokenService {
     @Override
     public boolean isTokenValid(String token, UserDetails userDetails) {
         String username = extractUsername(token);
-        return username.equals(userDetails.getUsername()) && !isExpired(parseClaims(token));
+        Map<String, Object> claims = parseClaims(token);
+        Object auth = claims.get("auth");
+        return username.equals(userDetails.getUsername())
+                && auth instanceof String fingerprint
+                && MessageDigest.isEqual(fingerprint.getBytes(StandardCharsets.UTF_8),
+                        credentialFingerprint(userDetails).getBytes(StandardCharsets.UTF_8))
+                && !isExpired(claims);
     }
 
     @Override
     public long getExpirationSeconds() {
         return expirationSeconds;
+    }
+
+    private String credentialFingerprint(UserDetails userDetails) {
+        if (userDetails instanceof AccountPrincipal principal) {
+            return principal.credentialFingerprint();
+        }
+        return AccountPrincipal.fingerprint(userDetails.getPassword());
     }
 
     private Map<String, Object> parseClaims(String token) {
