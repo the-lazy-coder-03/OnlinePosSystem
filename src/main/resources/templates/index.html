@@ -104,14 +104,16 @@
             gap: 20px;
         }
 
-        .nav-links a {
+        .nav-links a,
+        .nav-links button {
             width: 150px;
             height: 50px;
-            flex: 0 0 150px;
             box-sizing: border-box;
             border: 2px solid #0052cc;
             border-radius: 15px;
+            background-color: transparent;
             color: #0052cc;
+            font-family: inherit;
             font-weight: bold;
             font-size: 1em;
             text-decoration: none;
@@ -121,7 +123,23 @@
             transition: all 0.3s;
         }
 
-        .nav-links a:hover {
+        .nav-links a {
+            flex: 0 0 150px;
+        }
+
+        .nav-links form {
+            width: 150px;
+            height: 50px;
+            flex: 0 0 150px;
+            margin: 0;
+        }
+
+        .nav-links button {
+            cursor: pointer;
+        }
+
+        .nav-links a:hover,
+        .nav-links button:hover {
             background-color: #0052cc;
             color: white;
         }
@@ -204,7 +222,9 @@
             }
             nav { margin: 12px; }
             .nav-links { width: 100%; gap: 8px; flex-wrap: wrap; }
-            .nav-links a { flex: 1 1 135px; width: auto; min-width: 0; }
+            .nav-links a,
+            .nav-links form { flex: 1 1 135px; width: auto; min-width: 0; }
+            .nav-links button { width: 100%; }
             #locations { padding: 0 12px 24px; gap: 12px; }
             .map-container { min-width: 0; flex-basis: 100%; padding: 16px; border-radius: 8px; }
             .map-container iframe { height: 300px; }
@@ -257,7 +277,7 @@
 
         <!-- 9.3 LOGOUT -->
         <th:block sec:authorize="isAuthenticated()">
-            <form id="logout-form" th:action="@{/logout}" method="post" style="display:inline;">
+            <form id="logout-form" th:action="@{/logout}" method="post">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                 <button type="submit" class="nav-btn--logout">Logout</button>
             </form>
