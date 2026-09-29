@@ -62,6 +62,7 @@ Required environment values:
 APP_BASE_URL=https://email.crowdcam.co.za
 RESEND_API_KEY=<Resend sending_access API key>
 RESEND_FROM_EMAIL=noreply@email.crowdcam.co.za
+GOOGLE_MAPS_API_KEY=<restricted browser key for Maps JavaScript and Places API (New)>
 RUN_MIGRATION_SQL=true
 ```
 
@@ -80,6 +81,16 @@ or validate credentials through account-management endpoints. Actuator's
 verify key validity, domain status, delivery, or send test emails.
 Ensure `email.crowdcam.co.za` is verified in Resend and the sending key is
 allowed to send from that domain.
+
+`GOOGLE_MAPS_API_KEY` is rendered into registration, profile and checkout pages
+so the browser can load the current Google Maps JavaScript Places autocomplete
+widget. Enable Maps JavaScript API and Places API (New) for that key. Restrict
+it in Google Cloud by HTTP referrer for the deployed hostnames, and restrict API
+usage to those APIs. Do not commit a real key. Browser-provided place IDs,
+coordinates and formatted addresses are stored as address metadata only; any
+future delivery fee or serviceability decision must be recalculated by the
+server using trusted provider data.
+
 After changing the live `.env`, recreate the app container to apply it:
 
 ```bash

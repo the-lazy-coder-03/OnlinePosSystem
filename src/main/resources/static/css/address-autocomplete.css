@@ -1,0 +1,34 @@
+.address-autocomplete {
+    display: grid;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.address-autocomplete label {
+    color: #003366;
+    font-weight: 700;
+}
+
+.address-widget {
+    min-height: 48px;
+}
+
+.address-status {
+    color: #5f3700;
+    font-size: 0.9rem;
+    line-height: 1.35;
+}
+
+.address-autocomplete[data-address-state="verified"] .address-status {
+    color: #126b2f;
+}
+
+.address-autocomplete[data-address-state="invalid"] .address-status,
+.address-autocomplete[data-address-state="error"] .address-status {
+    color: #b00020;
+}
+
+gmp-place-autocomplete {
+    display: block;
+    width: 100%;
+}

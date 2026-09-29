@@ -67,6 +67,12 @@ CREATE TABLE IF NOT EXISTS public.customers (
     city            varchar(255),
     password        varchar(255),
     postal_code     varchar(255),
+    google_place_id varchar(255),
+    formatted_address text,
+    latitude        numeric(9,6),
+    longitude       numeric(10,6),
+    province        varchar(120),
+    country         varchar(120),
     first_name      varchar(255),
     last_name       varchar(255),
     role            varchar(255) NOT NULL DEFAULT 'USER',
@@ -399,6 +405,19 @@ CREATE TABLE IF NOT EXISTS customer_order (
     -- optional contact snapshot
     customer_name TEXT,
     phone        TEXT,
+    house_number VARCHAR(255),
+    street       VARCHAR(255),
+    area         VARCHAR(255),
+    city         VARCHAR(255),
+    postal_code  VARCHAR(255),
+    complex_name VARCHAR(255),
+    google_place_id VARCHAR(255),
+    formatted_address TEXT,
+    latitude NUMERIC(9,6),
+    longitude NUMERIC(10,6),
+    province VARCHAR(120),
+    country VARCHAR(120),
+    gate_access_code VARCHAR(64),
     notes        TEXT
     );
 

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import org.example.onlinepossystem.customer.api.AddressSelection;
 import org.example.onlinepossystem.customer.service.CustomerRegistrationException;
 import org.example.onlinepossystem.customer.service.CustomerService;
 import org.slf4j.Logger;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import java.math.BigDecimal;
 
 @Controller
 @Validated
@@ -51,7 +53,14 @@ public class CustomerController {
             @RequestParam(required = false) @Size(max = 100) String houseNumber,
             @RequestParam(required = false) @Size(max = 255) String street,
             @RequestParam(required = false) @Size(max = 120) String area,
+            @RequestParam(required = false) @Size(max = 120) String city,
             @RequestParam(required = false) @Size(max = 20) String postalCode,
+            @RequestParam(required = false) @Size(max = 255) String googlePlaceId,
+            @RequestParam(required = false) @Size(max = 512) String formattedAddress,
+            @RequestParam(required = false) BigDecimal latitude,
+            @RequestParam(required = false) BigDecimal longitude,
+            @RequestParam(required = false) @Size(max = 120) String province,
+            @RequestParam(required = false) @Size(max = 120) String country,
             @RequestParam(required = false) @Pattern(regexp = "^[0-9+()\\-\\s]{7,20}$") String phone1,
             @RequestParam(required = false) @Pattern(regexp = "^$|^[0-9+()\\-\\s]{7,20}$") String phone2,
             @RequestParam(required = false) @Size(max = 100) String preferredStore,
@@ -74,6 +83,8 @@ public class CustomerController {
             }
         }
 
+        AddressSelection address = new AddressSelection(googlePlaceId, formattedAddress, latitude, longitude,
+                houseNumber, street, area, city, postalCode, complexName, province, country);
         try {
             customerService.updateProfile(
                     authentication.getName(),
@@ -87,9 +98,13 @@ public class CustomerController {
                     phone2,
                     preferredStore,
                     complexName,
-                    newPassword
+                    newPassword,
+                    address
             );
         } catch (IllegalArgumentException ex) {
+            if (requiresVerifiedAddress(ex)) {
+                return "redirect:/profile/edit?error=address";
+            }
             return "redirect:/profile/edit?error=password";
         }
 
@@ -110,7 +125,14 @@ public class CustomerController {
             @RequestParam(required = false, name = "house_number") @Size(max = 100) String houseNumber,
             @RequestParam @NotBlank @Size(max = 255) String street,
             @RequestParam @NotBlank @Size(max = 120) String area,
+            @RequestParam(required = false) @Size(max = 120) String city,
             @RequestParam @NotBlank @Size(max = 20) String postalCode,
+            @RequestParam(required = false) @Size(max = 255) String googlePlaceId,
+            @RequestParam(required = false) @Size(max = 512) String formattedAddress,
+            @RequestParam(required = false) BigDecimal latitude,
+            @RequestParam(required = false) BigDecimal longitude,
+            @RequestParam(required = false) @Size(max = 120) String province,
+            @RequestParam(required = false) @Size(max = 120) String country,
             @RequestParam @NotBlank @Pattern(regexp = "^[0-9+()\\-\\s]{7,20}$") String phone,
             @RequestParam(required = false) @Pattern(regexp = "^$|^[0-9+()\\-\\s]{7,20}$") String phone2,
             @RequestParam(required = false, name = "preferred_store") @Size(max = 100) String preferredStore,
@@ -118,6 +140,11 @@ public class CustomerController {
             HttpServletResponse response
     ) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+        AddressSelection address = new AddressSelection(googlePlaceId, formattedAddress, latitude, longitude,
+                houseNumber, street, area, city, postalCode, null, province, country);
+        if (!address.isVerifiedGoogleAddress()) {
+            return "redirect:/register?error=address";
+        }
         try {
             customerService.registerCustomer(
                     firstName,
@@ -131,7 +158,8 @@ public class CustomerController {
                     area,
                     null,
                     preferredStore,
-                    postalCode
+                    postalCode,
+                    address
             );
         } catch (CustomerRegistrationException ex) {
             return switch (ex.getReason()) {
@@ -156,6 +184,10 @@ public class CustomerController {
 
         logger.info("New customer signed in after registration");
         return "redirect:/";
+    }
+
+    private boolean requiresVerifiedAddress(IllegalArgumentException ex) {
+        return ex.getMessage() != null && ex.getMessage().contains("verified Google address");
     }
 
 }

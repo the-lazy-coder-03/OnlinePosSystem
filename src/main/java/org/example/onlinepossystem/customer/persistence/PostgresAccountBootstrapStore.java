@@ -39,10 +39,11 @@ public class PostgresAccountBootstrapStore implements AccountBootstrapStore {
 
     @Override
     public Customer register(Customer c) {
-        Long id = jdbc.queryForObject("SELECT app_security.register_customer(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", Long.class,
+        Long id = jdbc.queryForObject("SELECT app_security.register_customer(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", Long.class,
                 c.getFirstName(), c.getLastName(), c.getEmail(), c.getPassword(), c.getPhone1(), c.getPhone2(),
                 c.getHouseNumber(), c.getStreet(), c.getArea(), c.getComplexName(), c.getPreferredStore(),
-                c.getPostalCode(), c.getCity(), c.getLastOrderedAt());
+                c.getPostalCode(), c.getCity(), c.getLastOrderedAt(), c.getGooglePlaceId(), c.getFormattedAddress(),
+                c.getLatitude(), c.getLongitude(), c.getProvince(), c.getCountry());
         c.setId(id);
         c.setAccessLevel(0);
         c.setRole("USER");

@@ -26,10 +26,14 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -90,6 +94,28 @@ class CustomerProfileControllerTest {
                 .andExpect(content().string(not(containsString(hiddenFixture.menuItem().getName()))))
                 .andExpect(content().string(not(containsString("Margherita Pizza"))))
                 .andExpect(content().string(not(containsString("Pepperoni Pizza"))));
+    }
+
+    @Test
+    void profileRejectsTypedAddressChangeWithoutGoogleSelection() throws Exception {
+        Customer customer = createCustomer("profile-address-guard");
+
+        mockMvc.perform(post("/profile/update")
+                        .with(csrf())
+                        .with(user(customer.getEmail()).roles("USER"))
+                        .param("firstName", "Profile")
+                        .param("lastName", "profile-address-guard")
+                        .param("houseNumber", "99")
+                        .param("street", "Typed Street")
+                        .param("area", "Typed Area")
+                        .param("city", "Cape Town")
+                        .param("postalCode", "7551")
+                        .param("phone1", customer.getPhone1())
+                        .param("preferredStore", "Kenridge Branch"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/profile/edit?error=address"));
+
+        assertThat(customerService.findByEmail(customer.getEmail()).orElseThrow().street()).isEqualTo("Main Street");
     }
 
     private Customer createCustomer(String label) {

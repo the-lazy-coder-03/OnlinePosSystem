@@ -2,6 +2,7 @@ package org.example.onlinepossystem.ordering.service;
 
 import org.example.onlinepossystem.branch.api.BranchLookup;
 import org.example.onlinepossystem.branch.api.BranchView;
+import org.example.onlinepossystem.customer.api.AddressSelection;
 import org.example.onlinepossystem.customer.api.CustomerAccount;
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
 import org.example.onlinepossystem.customer.api.CustomerOrderRecorder;
@@ -112,14 +113,9 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
         order.setIdempotencyKey(idempotencyKey);
         order.setCustomerName(request.getCustomerName());
         order.setPhone(request.getPhone());
-        order.setHouseNumber(request.getHouseNumber());
-        order.setStreet(request.getStreet());
-        order.setArea(request.getArea());
-        order.setCity(request.getCity());
-        order.setPostalCode(request.getPostalCode());
-        order.setComplexName(request.getComplexName());
         String orderType = request.getOrderType() != null ? request.getOrderType() : "pickup";
         order.setOrderType(orderType);
+        applyDeliveryAddress(order, request, orderType);
         order.setGateAccessCode("delivery".equalsIgnoreCase(orderType)
                 ? trimToNull(request.getGateAccessCode()) : null);
         order.setCreatedAt(createdAt);
@@ -147,6 +143,31 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
 
     private <T> List<T> safe(List<T> values) {
         return values == null ? List.of() : values;
+    }
+
+    private void applyDeliveryAddress(Order order, OrderRequestDTO request, String orderType) {
+        if (!"delivery".equalsIgnoreCase(orderType)) {
+            order.setHouseNumber(null);
+            order.setStreet(null);
+            order.setArea(null);
+            order.setCity(null);
+            order.setPostalCode(null);
+            order.setComplexName(null);
+            return;
+        }
+        AddressSelection address = request.getDeliveryAddress();
+        order.setHouseNumber(address.houseNumber());
+        order.setStreet(address.street());
+        order.setArea(address.area());
+        order.setCity(address.city());
+        order.setPostalCode(address.postalCode());
+        order.setComplexName(trimToNull(address.complexName()) != null ? address.complexName() : request.getComplexName());
+        order.setGooglePlaceId(address.googlePlaceId());
+        order.setFormattedAddress(address.formattedAddress());
+        order.setLatitude(address.latitude());
+        order.setLongitude(address.longitude());
+        order.setProvince(address.province());
+        order.setCountry(address.country());
     }
 
     private String trimToNull(String value) {

@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,6 +65,24 @@ public class Order {
     @Column(name = "complex_name")
     private String complexName;
 
+    @Column(name = "google_place_id")
+    private String googlePlaceId;
+
+    @Column(name = "formatted_address", columnDefinition = "TEXT")
+    private String formattedAddress;
+
+    @Column(name = "latitude", precision = 9, scale = 6)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 10, scale = 6)
+    private BigDecimal longitude;
+
+    @Column(name = "province")
+    private String province;
+
+    @Column(name = "country")
+    private String country;
+
     @Column(name = "gate_access_code", length = 64)
     private String gateAccessCode;
 
@@ -111,6 +130,18 @@ public class Order {
     public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
     public String getComplexName() { return complexName; }
     public void setComplexName(String complexName) { this.complexName = complexName; }
+    public String getGooglePlaceId() { return googlePlaceId; }
+    public void setGooglePlaceId(String googlePlaceId) { this.googlePlaceId = googlePlaceId; }
+    public String getFormattedAddress() { return formattedAddress; }
+    public void setFormattedAddress(String formattedAddress) { this.formattedAddress = formattedAddress; }
+    public BigDecimal getLatitude() { return latitude; }
+    public void setLatitude(BigDecimal latitude) { this.latitude = latitude; }
+    public BigDecimal getLongitude() { return longitude; }
+    public void setLongitude(BigDecimal longitude) { this.longitude = longitude; }
+    public String getProvince() { return province; }
+    public void setProvince(String province) { this.province = province; }
+    public String getCountry() { return country; }
+    public void setCountry(String country) { this.country = country; }
     public String getGateAccessCode() { return gateAccessCode; }
     public void setGateAccessCode(String gateAccessCode) { this.gateAccessCode = gateAccessCode; }
     public String getNotes() { return notes; }

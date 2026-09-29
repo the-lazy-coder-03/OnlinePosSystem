@@ -9,7 +9,10 @@
     const pickupButton = document.getElementById("pickupButton");
     const placeOrderButton = document.getElementById("placeOrderButton");
     const notice = document.getElementById("checkoutNotice");
-    const fieldIds = ["fullName", "phone", "houseNumber", "street", "area", "city", "postalCode", "complexName", "gateAccessCode"];
+    const fieldIds = [
+        "fullName", "phone", "houseNumber", "street", "area", "city", "postalCode", "complexName", "gateAccessCode",
+        "googlePlaceId", "formattedAddress", "latitude", "longitude", "province", "country"
+    ];
 
     const serverCustomer = {
         fullName: defaultsElement?.dataset.fullName || "",
@@ -20,7 +23,13 @@
         area: defaultsElement?.dataset.area || "",
         city: defaultsElement?.dataset.city || "",
         postalCode: defaultsElement?.dataset.postalCode || "",
-        complexName: defaultsElement?.dataset.complexName || ""
+        complexName: defaultsElement?.dataset.complexName || "",
+        googlePlaceId: defaultsElement?.dataset.googlePlaceId || "",
+        formattedAddress: defaultsElement?.dataset.formattedAddress || "",
+        latitude: defaultsElement?.dataset.latitude || "",
+        longitude: defaultsElement?.dataset.longitude || "",
+        province: defaultsElement?.dataset.province || "",
+        country: defaultsElement?.dataset.country || ""
     };
 
     let draft = readDraft();
@@ -117,6 +126,8 @@
 
     function customerValue(key) {
         const draftKey = key === "fullName" ? "name" : key;
+        const fromDraftAddress = draft?.customer?.deliveryAddress?.[key];
+        if (typeof fromDraftAddress === "string" && fromDraftAddress.trim()) return fromDraftAddress.trim();
         const fromDraft = draft?.customer?.[draftKey]?.trim();
         if (fromDraft) return fromDraft;
         const fromServer = serverCustomer[key]?.trim();
@@ -133,8 +144,10 @@
 
     function updatePlaceOrderAvailability() {
         const hasItems = Boolean(draft?.items?.length);
-        const hasOrderType = Boolean(document.getElementById("orderType").value);
-        placeOrderButton.disabled = submitting || !hasItems || !hasOrderType;
+        const orderType = document.getElementById("orderType").value;
+        const hasOrderType = Boolean(orderType);
+        const deliveryAddressReady = orderType !== "delivery" || Boolean(addressInstance()?.isVerified());
+        placeOrderButton.disabled = submitting || !hasItems || !hasOrderType || !deliveryAddressReady;
     }
 
     function setOrderType(type) {
@@ -169,9 +182,31 @@
             city: document.getElementById("city").value.trim(),
             postalCode: document.getElementById("postalCode").value.trim(),
             complexName: document.getElementById("complexName").value.trim(),
-            gateAccessCode: document.getElementById("gateAccessCode").value.trim()
+            gateAccessCode: document.getElementById("gateAccessCode").value.trim(),
+            deliveryAddress: addressFromFields()
         };
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    }
+
+    function addressInstance() {
+        return window.PetesAddressAutocomplete?.get("checkoutAddressAutocomplete");
+    }
+
+    function addressFromFields() {
+        return {
+            googlePlaceId: document.getElementById("googlePlaceId").value.trim(),
+            formattedAddress: document.getElementById("formattedAddress").value.trim(),
+            latitude: document.getElementById("latitude").value.trim(),
+            longitude: document.getElementById("longitude").value.trim(),
+            houseNumber: document.getElementById("houseNumber").value.trim(),
+            street: document.getElementById("street").value.trim(),
+            area: document.getElementById("area").value.trim(),
+            city: document.getElementById("city").value.trim(),
+            postalCode: document.getElementById("postalCode").value.trim(),
+            complexName: document.getElementById("complexName").value.trim(),
+            province: document.getElementById("province").value.trim(),
+            country: document.getElementById("country").value.trim()
+        };
     }
 
     function orderItems() {
@@ -203,6 +238,7 @@
 
     function orderPayload() {
         const delivery = document.getElementById("orderType").value === "delivery";
+        const deliveryAddress = delivery ? (addressInstance()?.getAddress() || addressFromFields()) : null;
         return {
             customerName: document.getElementById("fullName").value.trim(),
             phone: document.getElementById("phone").value.trim(),
@@ -213,6 +249,7 @@
             postalCode: delivery ? document.getElementById("postalCode").value.trim() : "",
             complexName: delivery ? document.getElementById("complexName").value.trim() : "",
             gateAccessCode: delivery ? document.getElementById("gateAccessCode").value.trim() : "",
+            deliveryAddress,
             branchName: draft.branch.name,
             orderType: document.getElementById("orderType").value,
             items: orderItems(),
@@ -236,6 +273,11 @@
         if (!form.checkValidity()) {
             form.reportValidity();
             showNotice("Please complete the required customer details and delivery address.", "error");
+            return;
+        }
+        if (document.getElementById("orderType").value === "delivery" && !addressInstance()?.requireValid()) {
+            showNotice("Select a verified Google delivery address before placing your order.", "error");
+            updatePlaceOrderAvailability();
             return;
         }
 
@@ -287,4 +329,8 @@
     pickupButton.addEventListener("click", () => setOrderType("pickup"));
     form.addEventListener("input", saveDraftFromForm);
     placeOrderButton.addEventListener("click", placeOrder);
+    document.getElementById("checkoutAddressAutocomplete")?.addEventListener("address:state", () => {
+        saveDraftFromForm();
+        updatePlaceOrderAvailability();
+    });
 })();

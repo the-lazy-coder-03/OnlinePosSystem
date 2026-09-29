@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.customer.service;
 
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
+import org.example.onlinepossystem.customer.api.AddressSelection;
 import org.example.onlinepossystem.customer.api.CustomerAccount;
 import org.example.onlinepossystem.customer.api.CustomerOrderRecorder;
 import org.example.onlinepossystem.customer.entity.Customer;
@@ -51,6 +52,24 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
                                      String complex,
                                      String preferredStore,
                                      String postalCode) {
+        return registerCustomer(firstName, lastName, email, password, phone, phone2, houseNumber, street, area,
+                complex, preferredStore, postalCode, AddressSelection.empty());
+    }
+
+    @Transactional
+    public Customer registerCustomer(String firstName,
+                                     String lastName,
+                                     String email,
+                                     String password,
+                                     String phone,
+                                     String phone2,
+                                     String houseNumber,
+                                     String street,
+                                     String area,
+                                     String complex,
+                                     String preferredStore,
+                                     String postalCode,
+                                     AddressSelection address) {
 
         if (!passwordPolicy.isValid(password)) {
             throw new CustomerRegistrationException(CustomerRegistrationException.Reason.PASSWORD, passwordPolicy.validationMessage());
@@ -61,6 +80,9 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         }
         if (phoneExists(phone)) {
             throw new CustomerRegistrationException(CustomerRegistrationException.Reason.PHONE, "Phone number is already registered.");
+        }
+        if (address != null && address.hasGoogleSelection() && !address.isVerifiedGoogleAddress()) {
+            throw new IllegalArgumentException("A verified Google address selection is required.");
         }
 
         Customer customer = new Customer();
@@ -76,6 +98,10 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         customer.setComplexName(complex);
         customer.setPreferredStore(preferredStore);
         customer.setPostalCode(postalCode);
+        if (address != null && address.hasGoogleSelection()) {
+            customer.setCity(address.city());
+        }
+        applyAddressMetadata(customer, address);
         customer.setLastOrderedAt(LocalDateTime.now());
         customer.setRole("USER");
         customer.setAccessLevel(0);
@@ -123,8 +149,38 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
                                   String preferredStore,
                                   String complexName,
                                   String newPassword) {
+        return updateProfile(email, firstName, lastName, houseNumber, street, area, postalCode, phone1, phone2,
+                preferredStore, complexName, newPassword, AddressSelection.empty());
+    }
+
+    @Transactional
+    public Customer updateProfile(String email,
+                                  String firstName,
+                                  String lastName,
+                                  String houseNumber,
+                                  String street,
+                                  String area,
+                                  String postalCode,
+                                  String phone1,
+                                  String phone2,
+                                  String preferredStore,
+                                  String complexName,
+                                  String newPassword,
+                                  AddressSelection address) {
         Customer customer = customerRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Customer not found for email: " + email));
+
+        boolean addressChanged = !same(customer.getHouseNumber(), houseNumber)
+                || !same(customer.getStreet(), street)
+                || !same(customer.getArea(), area)
+                || (address != null && address.city() != null && !same(customer.getCity(), address.city()))
+                || !same(customer.getPostalCode(), postalCode);
+        if ((address == null || !address.hasGoogleSelection()) && addressChanged) {
+            throw new IllegalArgumentException("A verified Google address selection is required.");
+        }
+        if (address != null && address.hasGoogleSelection() && !address.isVerifiedGoogleAddress()) {
+            throw new IllegalArgumentException("A verified Google address selection is required.");
+        }
 
         customer.setFirstName(firstName);
         customer.setLastName(lastName);
@@ -136,6 +192,10 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         customer.setPhone2(phone2);
         customer.setPreferredStore(preferredStore);
         customer.setComplexName(complexName);
+        if (address != null && address.hasGoogleSelection()) {
+            customer.setCity(address.city());
+        }
+        applyAddressMetadata(customer, address);
 
         boolean passwordChanged = newPassword != null && !newPassword.isEmpty();
         if (passwordChanged) {
@@ -164,10 +224,36 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
                 customer.getPreferredStore(),
                 customer.getCity(),
                 customer.getPostalCode(),
+                customer.getGooglePlaceId(),
+                customer.getFormattedAddress(),
+                customer.getLatitude(),
+                customer.getLongitude(),
+                customer.getProvince(),
+                customer.getCountry(),
                 customer.getFirstName(),
                 customer.getLastName(),
                 customer.getRole(),
                 customer.getAccessLevel() == null ? 0 : customer.getAccessLevel()
         );
+    }
+
+    private void applyAddressMetadata(Customer customer, AddressSelection address) {
+        if (address == null || !address.hasGoogleSelection()) {
+            return;
+        }
+        customer.setGooglePlaceId(address.googlePlaceId());
+        customer.setFormattedAddress(address.formattedAddress());
+        customer.setLatitude(address.latitude());
+        customer.setLongitude(address.longitude());
+        customer.setProvince(address.province());
+        customer.setCountry(address.country());
+    }
+
+    private boolean same(String stored, String submitted) {
+        return normalize(stored).equals(normalize(submitted));
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim();
     }
 }

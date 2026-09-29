@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -51,6 +52,24 @@ public class Customer {
 
     @Column(name = "postal_code")
     private String postalCode;
+
+    @Column(name = "google_place_id")
+    private String googlePlaceId;
+
+    @Column(name = "formatted_address", columnDefinition = "TEXT")
+    private String formattedAddress;
+
+    @Column(name = "latitude", precision = 9, scale = 6)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 10, scale = 6)
+    private BigDecimal longitude;
+
+    @Column(name = "province")
+    private String province;
+
+    @Column(name = "country")
+    private String country;
 
     @Column(name = "first_name")
     private String firstName;
@@ -106,6 +125,24 @@ public class Customer {
 
     public String getPostalCode() { return postalCode; }
     public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
+
+    public String getGooglePlaceId() { return googlePlaceId; }
+    public void setGooglePlaceId(String googlePlaceId) { this.googlePlaceId = googlePlaceId; }
+
+    public String getFormattedAddress() { return formattedAddress; }
+    public void setFormattedAddress(String formattedAddress) { this.formattedAddress = formattedAddress; }
+
+    public BigDecimal getLatitude() { return latitude; }
+    public void setLatitude(BigDecimal latitude) { this.latitude = latitude; }
+
+    public BigDecimal getLongitude() { return longitude; }
+    public void setLongitude(BigDecimal longitude) { this.longitude = longitude; }
+
+    public String getProvince() { return province; }
+    public void setProvince(String province) { this.province = province; }
+
+    public String getCountry() { return country; }
+    public void setCountry(String country) { this.country = country; }
 
     public String getPreferredStore() { return preferredStore; }
     public void setPreferredStore(String preferredStore) { this.preferredStore = preferredStore; }

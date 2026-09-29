@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Register — Pete’s Pizza</title>
+    <link rel="stylesheet" th:href="@{/css/address-autocomplete.css}">
 
     <style>
         /* =========================
@@ -139,18 +140,6 @@
             transition: all 0.3s;
         }
 
-        #locationBtn {
-            background-color: #ff9900;
-            color: white;
-        }
-
-        #locationBtn:hover {
-            background-color: white;
-            color: #ff9900;
-            border: 2px solid #e6a433;
-            transform: scale(1.03);
-        }
-
         button[type="submit"] {
             background-color: #0052cc;
             color: white;
@@ -230,9 +219,36 @@
         <input type="email" name="email" placeholder="Email Address" required>
         <input type="password" name="password" placeholder="Password" minlength="8" required
                title="Use at least 8 characters with uppercase, lowercase, number, and special character.">
+        <div id="registerAddressAutocomplete"
+             class="address-autocomplete"
+             data-address-autocomplete
+             data-require="true"
+             th:data-google-maps-key="${googleMapsApiKey ?: ''}"
+             data-field-google-place-id="#registerGooglePlaceId"
+             data-field-formatted-address="#registerFormattedAddress"
+             data-field-latitude="#registerLatitude"
+             data-field-longitude="#registerLongitude"
+             data-field-house-number="#house_number"
+             data-field-street="#street"
+             data-field-area="#area"
+             data-field-city="#city"
+             data-field-postal-code="#postalCode"
+             data-field-province="#registerProvince"
+             data-field-country="#registerCountry">
+            <label>Delivery address</label>
+            <div class="address-widget" data-address-widget></div>
+            <small class="address-status" data-address-status hidden></small>
+        </div>
+        <input type="hidden" name="googlePlaceId" id="registerGooglePlaceId">
+        <input type="hidden" name="formattedAddress" id="registerFormattedAddress">
+        <input type="hidden" name="latitude" id="registerLatitude">
+        <input type="hidden" name="longitude" id="registerLongitude">
+        <input type="hidden" name="province" id="registerProvince">
+        <input type="hidden" name="country" id="registerCountry">
         <input type="text" name="house_number" id="house_number" placeholder="House / Apartment Number / Complex Name">
         <input type="text" name="street" id="street" placeholder="Street Address" required>
         <input type="text" name="area" id="area" placeholder="Area / Suburb" required>
+        <input type="text" name="city" id="city" placeholder="City">
         <input type="text" name="postalCode" id="postalCode" placeholder="Postal Code" required>
         <input type="text" name="phone" id="phone" placeholder="Phone Number" maxlength="10" required>
 
@@ -244,8 +260,6 @@
             <option value="Uitzicht Branch">Uitzicht Branch</option>
         </select>
 
-        <!-- Buttons -->
-        <button type="button" id="locationBtn">Use My Current Location</button>
         <button type="submit">Register</button>
 
         <!-- Error Messages -->
@@ -255,6 +269,9 @@
         <div th:if="${param.error != null and param.error[0] == 'password'}" class="error">
             Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
         </div>
+        <div th:if="${param.error != null and param.error[0] == 'address'}" class="error">
+            Select a delivery address from Google before creating your account.
+        </div>
     </form>
 
     <!-- Login Link -->
@@ -262,46 +279,6 @@
         Already have an account? <a href="/login">Login here</a>
     </div>
 </div>
-
-<!-- =========================
-     LOCATION SCRIPT
-========================= -->
-<script th:attr="nonce=${cspNonce}">
-    const locationBtn = document.getElementById("locationBtn");
-
-    locationBtn.addEventListener("click", () => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(success, error);
-        } else {
-            alert("Geolocation is not supported by your browser.");
-        }
-    });
-
-    function success(position) {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`)
-            .then(response => response.json())
-            .then(data => {
-                if(data.address) {
-                    document.getElementById("street").value = data.address.road || "";
-                    document.getElementById("house_number").value = data.address.house_number || "";
-                    document.getElementById("area").value = data.address.suburb || data.address.city || "";
-                    document.getElementById("postalCode").value = data.address.postcode || "";
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("Unable to fetch full address from your location.");
-            });
-    }
-
-    function error(err) {
-        console.warn(`ERROR(${err.code}): ${err.message}`);
-        alert("Location access denied or unavailable.");
-    }
-</script>
 
 <!-- =========================
      FORM VALIDATION SCRIPT
@@ -319,6 +296,7 @@
     // Form submit validation
     form.addEventListener("submit", function(e) {
         let valid = true;
+        const address = window.PetesAddressAutocomplete?.get("registerAddressAutocomplete");
 
         const inputs = form.querySelectorAll("input[required]");
 
@@ -334,6 +312,9 @@
         // Phone must be exactly 10 digits
         if(phoneInput.value.trim().length !== 10) {
             phoneInput.classList.add("error-field");
+            valid = false;
+        }
+        if(address && !address.requireValid()) {
             valid = false;
         }
 
@@ -353,6 +334,7 @@
         });
     });
 </script>
+<script th:src="@{/js/address-autocomplete.js}" defer></script>
 
 </body>
 </html>

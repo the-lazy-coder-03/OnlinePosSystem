@@ -68,6 +68,12 @@ CREATE TABLE IF NOT EXISTS public.customers (
                                                 city            varchar(255),
                                                 password        varchar(255),
                                                 postal_code     varchar(255),
+                                                google_place_id varchar(255),
+                                                formatted_address text,
+                                                latitude        numeric(9,6),
+                                                longitude       numeric(10,6),
+                                                province        varchar(120),
+                                                country         varchar(120),
                                                 first_name      varchar(255),
                                                 last_name       varchar(255),
                                                 role            varchar(255) NOT NULL DEFAULT 'USER',
@@ -80,6 +86,14 @@ CREATE TABLE IF NOT EXISTS public.customers (
 );
 
 ALTER SEQUENCE public.customers_id_seq OWNED BY public.customers.id;
+
+ALTER TABLE public.customers
+    ADD COLUMN IF NOT EXISTS google_place_id varchar(255),
+    ADD COLUMN IF NOT EXISTS formatted_address text,
+    ADD COLUMN IF NOT EXISTS latitude numeric(9,6),
+    ADD COLUMN IF NOT EXISTS longitude numeric(10,6),
+    ADD COLUMN IF NOT EXISTS province varchar(120),
+    ADD COLUMN IF NOT EXISTS country varchar(120);
 
 -- Ensure the role column also works correctly when this migration runs
 -- against an existing customers table created before the USER default.
@@ -480,6 +494,12 @@ CREATE TABLE IF NOT EXISTS customer_order (
                                               city           VARCHAR(255),
                                               postal_code    VARCHAR(255),
                                               complex_name   VARCHAR(255),
+                                              google_place_id VARCHAR(255),
+                                              formatted_address TEXT,
+                                              latitude NUMERIC(9,6),
+                                              longitude NUMERIC(10,6),
+                                              province VARCHAR(120),
+                                              country VARCHAR(120),
                                               gate_access_code VARCHAR(64),
                                               notes          TEXT
 );
@@ -491,6 +511,12 @@ ALTER TABLE customer_order
     ADD COLUMN IF NOT EXISTS city VARCHAR(255),
     ADD COLUMN IF NOT EXISTS postal_code VARCHAR(255),
     ADD COLUMN IF NOT EXISTS complex_name VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS google_place_id VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS formatted_address TEXT,
+    ADD COLUMN IF NOT EXISTS latitude NUMERIC(9,6),
+    ADD COLUMN IF NOT EXISTS longitude NUMERIC(10,6),
+    ADD COLUMN IF NOT EXISTS province VARCHAR(120),
+    ADD COLUMN IF NOT EXISTS country VARCHAR(120),
     ADD COLUMN IF NOT EXISTS gate_access_code VARCHAR(64);
 
 -- Menu order lines

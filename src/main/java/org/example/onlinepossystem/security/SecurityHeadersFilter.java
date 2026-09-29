@@ -34,8 +34,12 @@ public final class SecurityHeadersFilter extends OncePerRequestFilter {
         request.setAttribute("cspNonce", nonce);
         response.setHeader("Content-Security-Policy", "default-src 'self'; base-uri 'self'; object-src 'none'; "
                 + "frame-ancestors 'self'; form-action 'self'; script-src 'self' 'nonce-" + nonce + "'; "
-                + "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
-                + "connect-src 'self' " + websocketOrigin + " https://nominatim.openstreetmap.org; "
+                + "script-src-elem 'self' 'nonce-" + nonce + "' https://maps.googleapis.com https://maps.gstatic.com; "
+                + "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                + "img-src 'self' data: https://maps.gstatic.com https://maps.googleapis.com; "
+                + "font-src 'self' https://fonts.gstatic.com; "
+                + "connect-src 'self' " + websocketOrigin
+                + " https://maps.googleapis.com https://places.googleapis.com; "
                 + "frame-src https://www.google.com");
         response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         response.setHeader("Permissions-Policy", "geolocation=(self), camera=(), microphone=(), payment=(), usb=()");

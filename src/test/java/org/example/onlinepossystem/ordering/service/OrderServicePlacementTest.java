@@ -35,6 +35,7 @@ import org.example.onlinepossystem.catalog.repository.PizzaCategoryRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaRepository;
 import org.example.onlinepossystem.catalog.repository.PizzaSizeRepository;
 import org.example.onlinepossystem.catalog.repository.PriceCategoryRepository;
+import org.example.onlinepossystem.customer.api.AddressSelection;
 import org.example.onlinepossystem.customer.entity.Customer;
 import org.example.onlinepossystem.customer.service.CustomerService;
 import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
@@ -137,6 +138,7 @@ class OrderServicePlacementTest {
         MenuFixture fixture = createMenuFixture();
         OrderRequestDTO request = request(fixture.branch().getName(), menuItem(fixture.menuItem().getId(), 1));
         request.setOrderType("delivery");
+        request.setDeliveryAddress(verifiedAddress());
         request.setGateAccessCode("  Gate 4*  ");
 
         OrderResponseDTO response = orderOperations.placeOrder(request);
@@ -144,7 +146,13 @@ class OrderServicePlacementTest {
         entityManager.clear();
 
         assertThat(response.getGateAccessCode()).isEqualTo("Gate 4*");
-        assertThat(orderRepository.findById(response.getId()).orElseThrow().getGateAccessCode()).isEqualTo("Gate 4*");
+        Order saved = orderRepository.findById(response.getId()).orElseThrow();
+        assertThat(saved.getGateAccessCode()).isEqualTo("Gate 4*");
+        assertThat(saved.getGooglePlaceId()).isEqualTo("places/test-delivery");
+        assertThat(saved.getFormattedAddress()).contains("Main Street");
+        assertThat(response.getGooglePlaceId()).isEqualTo("places/test-delivery");
+        assertThat(response.getLatitude()).isEqualByComparingTo("-33.861000");
+        assertThat(response.getLongitude()).isEqualByComparingTo("18.650000");
     }
 
     @Test
@@ -165,6 +173,7 @@ class OrderServicePlacementTest {
         MenuFixture fixture = createMenuFixture();
         OrderRequestDTO request = request(fixture.branch().getName(), menuItem(fixture.menuItem().getId(), 1));
         request.setOrderType("delivery");
+        request.setDeliveryAddress(verifiedAddress());
         request.setGateAccessCode("   ");
 
         OrderResponseDTO response = orderOperations.placeOrder(request);
@@ -857,6 +866,23 @@ class OrderServicePlacementTest {
         request.setOrderType("pickup");
         request.setItems(List.of(items));
         return request;
+    }
+
+    private AddressSelection verifiedAddress() {
+        return new AddressSelection(
+                "places/test-delivery",
+                "12 Main Street, Kenridge, Cape Town, 7550, South Africa",
+                new BigDecimal("-33.861000"),
+                new BigDecimal("18.650000"),
+                "12",
+                "Main Street",
+                "Kenridge",
+                "Cape Town",
+                "7550",
+                null,
+                "Western Cape",
+                "South Africa"
+        );
     }
 
     private OrderRequestDTO.OrderItemRequestDTO menuItem(

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="data:,">
+    <link rel="stylesheet" th:href="@{/css/address-autocomplete.css}">
     <title>Account Details — Pete’s Pizza</title>
     <style>
         /* =========================
@@ -307,6 +308,7 @@
             <div th:if="${param.success}" class="message">Profile updated successfully!</div>
             <div th:if="${param.error != null and param.error[0] == 'password'}" class="message">Password must be at least 8 characters and include uppercase, lowercase, number, and special character.</div>
             <div th:if="${param.error != null and param.error[0] == 'current-password'}" class="message">Enter your current password before choosing a new one.</div>
+            <div th:if="${param.error != null and param.error[0] == 'address'}" class="message">Select an address from Google before saving address changes.</div>
             <form id="profileForm" th:action="@{/profile/update}" method="post" th:object="${customer}">
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                 <div style="display: flex; gap: 10px;">
@@ -317,10 +319,38 @@
                 <input type="password" id="currentPassword" name="currentPassword" maxlength="512" autocomplete="current-password" placeholder="Current Password (required to change password)">
                 <input type="password" id="password" name="password" minlength="8" maxlength="512" autocomplete="new-password" placeholder="New Password (leave blank to keep current)">
 
+                <div id="profileAddressAutocomplete"
+                     class="address-autocomplete"
+                     data-address-autocomplete
+                     data-require-on-change="true"
+                     th:data-google-maps-key="${googleMapsApiKey ?: ''}"
+                     data-field-google-place-id="#profileGooglePlaceId"
+                     data-field-formatted-address="#profileFormattedAddress"
+                     data-field-latitude="#profileLatitude"
+                     data-field-longitude="#profileLongitude"
+                     data-field-house-number="#houseNumber"
+                     data-field-street="#street"
+                     data-field-area="#area"
+                     data-field-city="#city"
+                     data-field-postal-code="#postalCode"
+                     data-field-complex-name="#complexName"
+                     data-field-province="#profileProvince"
+                     data-field-country="#profileCountry">
+                    <label>Residential address</label>
+                    <div class="address-widget" data-address-widget></div>
+                    <small class="address-status" data-address-status hidden></small>
+                </div>
+                <input type="hidden" name="googlePlaceId" id="profileGooglePlaceId" th:value="*{googlePlaceId}">
+                <input type="hidden" name="formattedAddress" id="profileFormattedAddress" th:value="*{formattedAddress}">
+                <input type="hidden" name="latitude" id="profileLatitude" th:value="*{latitude}">
+                <input type="hidden" name="longitude" id="profileLongitude" th:value="*{longitude}">
+                <input type="hidden" name="province" id="profileProvince" th:value="*{province}">
+                <input type="hidden" name="country" id="profileCountry" th:value="*{country}">
                 <input type="text" id="houseNumber" th:field="*{houseNumber}" placeholder="House / Apartment Number">
                 <input type="text" id="complexName" th:field="*{complexName}" placeholder="Complex Name">
                 <input type="text" id="street" th:field="*{street}" placeholder="Street Address">
                 <input type="text" id="area" th:field="*{area}" placeholder="Area / Suburb">
+                <input type="text" id="city" th:field="*{city}" placeholder="City">
                 <input type="text" id="postalCode" th:field="*{postalCode}" placeholder="Postal Code">
                 <input type="text" id="phone1" th:field="*{phone1}" placeholder="Phone Number" required>
                 <input type="text" id="phone2" th:field="*{phone2}" placeholder="Secondary Phone Number">
@@ -426,7 +456,14 @@
     const profileForm = document.getElementById("profileForm");
     if (profileForm) {
         profileForm.addEventListener("input", () => { isProfileDirty = true; });
-        profileForm.addEventListener('submit', () => { isProfileDirty = false; });
+        profileForm.addEventListener('submit', event => {
+            const address = window.PetesAddressAutocomplete?.get("profileAddressAutocomplete");
+            if (address && !address.requireValid()) {
+                event.preventDefault();
+                return;
+            }
+            isProfileDirty = false;
+        });
     }
 
     window.addEventListener("beforeunload", (e) => {
@@ -436,6 +473,7 @@
         }
     });
 </script>
+<script th:src="@{/js/address-autocomplete.js}" defer></script>
 
 </body>
 </html>

@@ -7,6 +7,7 @@
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <link rel="icon" href="data:,">
     <title>Checkout — Pete’s Pizza</title>
+    <link rel="stylesheet" th:href="@{/css/address-autocomplete.css}">
     <link rel="stylesheet" th:href="@{/css/checkout.css}">
 </head>
 <body>
@@ -20,6 +21,13 @@
      th:data-city="${user != null ? user.city : ''}"
      th:data-postal-code="${user != null ? user.postalCode : ''}"
      th:data-complex-name="${user != null ? user.complexName : ''}"
+     th:data-google-place-id="${user != null ? user.googlePlaceId : ''}"
+     th:data-formatted-address="${user != null ? user.formattedAddress : ''}"
+     th:data-latitude="${user != null ? user.latitude : ''}"
+     th:data-longitude="${user != null ? user.longitude : ''}"
+     th:data-province="${user != null ? user.province : ''}"
+     th:data-country="${user != null ? user.country : ''}"
+     th:data-google-maps-key="${googleMapsApiKey ?: ''}"
      hidden></div>
 
 <header class="topbar">
@@ -91,6 +99,33 @@
                     <small class="field-hint">Orders are linked to this signed-in account.</small>
                 </div>
                 <div id="deliveryFields" hidden>
+                    <div id="checkoutAddressAutocomplete"
+                         class="address-autocomplete"
+                         data-address-autocomplete
+                         data-require="true"
+                         th:data-google-maps-key="${googleMapsApiKey ?: ''}"
+                         data-field-google-place-id="#googlePlaceId"
+                         data-field-formatted-address="#formattedAddress"
+                         data-field-latitude="#latitude"
+                         data-field-longitude="#longitude"
+                         data-field-house-number="#houseNumber"
+                         data-field-street="#street"
+                         data-field-area="#area"
+                         data-field-city="#city"
+                         data-field-postal-code="#postalCode"
+                         data-field-complex-name="#complexName"
+                         data-field-province="#province"
+                         data-field-country="#country">
+                        <label>Delivery address</label>
+                        <div class="address-widget" data-address-widget></div>
+                        <small class="address-status" data-address-status hidden></small>
+                    </div>
+                    <input type="hidden" id="googlePlaceId" name="googlePlaceId">
+                    <input type="hidden" id="formattedAddress" name="formattedAddress">
+                    <input type="hidden" id="latitude" name="latitude">
+                    <input type="hidden" id="longitude" name="longitude">
+                    <input type="hidden" id="province" name="province">
+                    <input type="hidden" id="country" name="country">
                     <div class="form-row form-row-address">
                         <div class="form-group">
                             <label for="houseNumber">House / unit</label>
@@ -174,6 +209,7 @@
     </aside>
 </main>
 
+<script th:src="@{/js/address-autocomplete.js}" defer></script>
 <script th:src="@{/js/checkout.js}" defer></script>
 </body>
 </html>

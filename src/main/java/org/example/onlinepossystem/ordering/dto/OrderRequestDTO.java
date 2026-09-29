@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Max;
+import org.example.onlinepossystem.customer.api.AddressSelection;
 
 import java.util.List;
 
@@ -34,6 +35,8 @@ public class OrderRequestDTO {
     private String branchName;
     @Pattern(regexp = "pickup|delivery", flags = Pattern.Flag.CASE_INSENSITIVE)
     private String orderType; // "pickup" or "delivery"
+    @Valid
+    private AddressSelection deliveryAddress;
     @Valid
     @Size(max = 100)
     private List<OrderItemRequestDTO> items;
@@ -64,6 +67,8 @@ public class OrderRequestDTO {
     public void setBranchName(String branchName) { this.branchName = branchName; }
     public String getOrderType() { return orderType; }
     public void setOrderType(String orderType) { this.orderType = orderType; }
+    public AddressSelection getDeliveryAddress() { return deliveryAddress; }
+    public void setDeliveryAddress(AddressSelection deliveryAddress) { this.deliveryAddress = deliveryAddress; }
     public List<OrderItemRequestDTO> getItems() { return items; }
     public void setItems(List<OrderItemRequestDTO> items) { this.items = items; }
     public List<SpecialItemRequestDTO> getSpecialItems() { return specialItems; }

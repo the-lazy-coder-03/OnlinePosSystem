@@ -13,6 +13,29 @@ async function login(page, username) {
     await expect(page).not.toHaveURL(/\/login/);
 }
 
+async function seedVerifiedAddress(page, ids = {}) {
+    await page.evaluate(ids => {
+        const values = {
+            googlePlaceId: 'places/browser-test',
+            formattedAddress: '12 Main Street, Kenridge, Cape Town, 7550, South Africa',
+            latitude: '-33.861000',
+            longitude: '18.650000',
+            province: 'Western Cape',
+            country: 'South Africa',
+            ...ids
+        };
+        for (const [id, value] of Object.entries(values)) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.value = value;
+                element.dispatchEvent(new Event('input', {bubbles: true}));
+            }
+        }
+        document.getElementById('checkoutAddressAutocomplete')
+            ?.dispatchEvent(new CustomEvent('address:state', {bubbles: true}));
+    }, ids);
+}
+
 test('order renderer treats every customer field as text and allows only known status classes', async ({page}) => {
     await page.setContent('<main></main>');
     await page.addScriptTag({path: path.join(projectRoot, 'src/main/resources/static/js/pos-order-renderer.js')});
@@ -108,6 +131,7 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await page.locator('#area').fill('Kenridge');
     await page.locator('#city').fill('Cape Town');
     await page.locator('#postalCode').fill('7550');
+    await seedVerifiedAddress(page);
     await page.locator('#fullName').fill(maliciousName);
     await page.locator('#phone').fill('0712345678');
 
@@ -137,9 +161,17 @@ test('registration rotates the anonymous session and profile changes remain auth
     const before = (await context.cookies()).find(cookie => cookie.name === 'JSESSIONID').value;
     const fields = {
         firstName: 'Registered', lastName: 'Customer', email: 'registered@example.com', password: 'Browser-test-123',
-        house_number: '12', street: 'Main Street', area: 'Kenridge', postalCode: '7550', phone: '0712345678'
+        house_number: '12', street: 'Main Street', area: 'Kenridge', city: 'Cape Town', postalCode: '7550', phone: '0712345678'
     };
     for (const [name, value] of Object.entries(fields)) await page.locator(`[name="${name}"]`).fill(value);
+    await seedVerifiedAddress(page, {
+        registerGooglePlaceId: 'places/browser-registration',
+        registerFormattedAddress: '12 Main Street, Kenridge, Cape Town, 7550, South Africa',
+        registerLatitude: '-33.861000',
+        registerLongitude: '18.650000',
+        registerProvince: 'Western Cape',
+        registerCountry: 'South Africa'
+    });
     await page.locator('[name="preferred_store"]').selectOption('Kenridge Branch');
     await page.getByRole('button', {name: 'Register', exact: true}).click();
     await expect(page).toHaveURL('http://127.0.0.1:18081/');

@@ -49,6 +49,12 @@ public class OrderResponseMapper {
         dto.setCity(order.getCity());
         dto.setPostalCode(order.getPostalCode());
         dto.setComplexName(order.getComplexName());
+        dto.setGooglePlaceId(order.getGooglePlaceId());
+        dto.setFormattedAddress(order.getFormattedAddress());
+        dto.setLatitude(order.getLatitude());
+        dto.setLongitude(order.getLongitude());
+        dto.setProvince(order.getProvince());
+        dto.setCountry(order.getCountry());
         dto.setGateAccessCode(order.getGateAccessCode());
         dto.setNotes(order.getNotes());
         Set<OrderMenuItem> bundledMenuItems = new HashSet<>();

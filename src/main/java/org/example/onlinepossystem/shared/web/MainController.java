@@ -3,6 +3,7 @@ package org.example.onlinepossystem.shared.web;
 import org.example.onlinepossystem.customer.api.CustomerAccount;
 import org.example.onlinepossystem.customer.api.AccountAccessReader;
 import org.example.onlinepossystem.customer.api.CustomerAccountReader;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -17,10 +18,14 @@ public class MainController {
 
     private final CustomerAccountReader customerAccountReader;
     private final AccountAccessReader accountAccessReader;
+    private final String googleMapsApiKey;
 
-    public MainController(CustomerAccountReader customerAccountReader, AccountAccessReader accountAccessReader) {
+    public MainController(CustomerAccountReader customerAccountReader,
+                          AccountAccessReader accountAccessReader,
+                          @Value("${GOOGLE_MAPS_API_KEY:}") String googleMapsApiKey) {
         this.customerAccountReader = customerAccountReader;
         this.accountAccessReader = accountAccessReader;
+        this.googleMapsApiKey = googleMapsApiKey;
     }
 
     // ====== Public Pages ======
@@ -81,6 +86,7 @@ public class MainController {
         }
 
         addCustomerDetails(model, authentication.getName());
+        model.addAttribute("googleMapsApiKey", googleMapsApiKey);
         return "checkout";
     }
 
@@ -134,7 +140,8 @@ public class MainController {
     }
 
     @GetMapping("/register")
-    public String registerPage() {
+    public String registerPage(Model model) {
+        model.addAttribute("googleMapsApiKey", googleMapsApiKey);
         return "register";
     }
 

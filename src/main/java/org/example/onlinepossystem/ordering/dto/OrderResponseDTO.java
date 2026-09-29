@@ -1,6 +1,7 @@
 package org.example.onlinepossystem.ordering.dto;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +20,12 @@ public class OrderResponseDTO {
     private String city;
     private String postalCode;
     private String complexName;
+    private String googlePlaceId;
+    private String formattedAddress;
+    private BigDecimal latitude;
+    private BigDecimal longitude;
+    private String province;
+    private String country;
     private String gateAccessCode;
     private String notes;
     private List<MenuItemDTO> menuItems = new ArrayList<>();
@@ -53,6 +60,18 @@ public class OrderResponseDTO {
     public void setPostalCode(String postalCode) { this.postalCode = postalCode; }
     public String getComplexName() { return complexName; }
     public void setComplexName(String complexName) { this.complexName = complexName; }
+    public String getGooglePlaceId() { return googlePlaceId; }
+    public void setGooglePlaceId(String googlePlaceId) { this.googlePlaceId = googlePlaceId; }
+    public String getFormattedAddress() { return formattedAddress; }
+    public void setFormattedAddress(String formattedAddress) { this.formattedAddress = formattedAddress; }
+    public BigDecimal getLatitude() { return latitude; }
+    public void setLatitude(BigDecimal latitude) { this.latitude = latitude; }
+    public BigDecimal getLongitude() { return longitude; }
+    public void setLongitude(BigDecimal longitude) { this.longitude = longitude; }
+    public String getProvince() { return province; }
+    public void setProvince(String province) { this.province = province; }
+    public String getCountry() { return country; }
+    public void setCountry(String country) { this.country = country; }
     public String getGateAccessCode() { return gateAccessCode; }
     public void setGateAccessCode(String gateAccessCode) { this.gateAccessCode = gateAccessCode; }
     public String getNotes() { return notes; }

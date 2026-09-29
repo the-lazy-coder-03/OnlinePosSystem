@@ -18,3 +18,8 @@ npm --prefix SupportConfigFiles run test:browser
 Browser tests require the packaged application and disposable PostgreSQL credentials described in [DATABASE_SETUP.md](DATABASE_SETUP.md).
 
 Keep local secrets in the ignored `SupportConfigFiles/.env` file. Maven and the Docker build explicitly select the RLS contract rather than copying the entire configuration directory into the application.
+
+Address autocomplete uses `GOOGLE_MAPS_API_KEY` from configuration. Use a browser
+key restricted by HTTP referrer and limited to Maps JavaScript API plus Places
+API (New). Leave it blank in automated tests unless browser coverage explicitly
+needs to exercise Google loading with a test key.
