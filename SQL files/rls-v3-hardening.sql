@@ -297,7 +297,7 @@ BEGIN
         'app_security.account_context(bigint)'::regprocedure,
         'app_security.login_credentials(text)'::regprocedure,
         'app_security.account_exists(text,text)'::regprocedure,
-        'app_security.register_customer(text,text,text,text,text,text,text,text,text,text,text,text,text,timestamp without time zone,text,text,numeric,numeric,text,text)'::regprocedure,
+        'app_security.register_customer(text,text,text,text,text,text,text,text,text,text,text,text,text,timestamp without time zone)'::regprocedure,
         'app_security.create_reset(text,text,timestamp without time zone)'::regprocedure,
         'app_security.cancel_reset(text)'::regprocedure,
         'app_security.consume_reset(text,text)'::regprocedure,

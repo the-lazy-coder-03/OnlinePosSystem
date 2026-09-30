@@ -7,6 +7,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,6 +24,7 @@ class RlsMigrationInitializationTest {
                 .contains("private static final String RLS_MIGRATION_ID = \"db/rls-v1.sql\"")
                 .contains("private static final String RLS_HARDENING_MIGRATION_ID = \"db/rls-v3-hardening.sql\"")
                 .contains("private static final String RLS_AUDIT_MIGRATION_ID = \"db/rls-v4-audit.sql\"")
+                .contains("private static final String RLS_ADDRESS_MIGRATION_ID = \"db/rls-v5-address.sql\"")
                 .contains("private static final String CATALOG_MIGRATION_RESOURCE = \"sql/migration.sql\"")
                 .contains("private static final String RLS_MIGRATION_RESOURCE = \"sql/rls-v1.sql\"")
                 .contains("setRuntimeRole(connection)")
@@ -69,9 +73,27 @@ class RlsMigrationInitializationTest {
         assertThat(new ClassPathResource("sql/rls-v2-specials.sql").exists()).isTrue();
         assertThat(new ClassPathResource("sql/rls-v3-hardening.sql").exists()).isTrue();
         assertThat(new ClassPathResource("sql/rls-v4-audit.sql").exists()).isTrue();
+        assertThat(new ClassPathResource("sql/rls-v5-address.sql").exists()).isTrue();
         assertThat(new ClassPathResource("sql/rls-contract-query.sql").exists()).isTrue();
         assertThat(new ClassPathResource("sql/provision-rls.sql").exists()).isTrue();
         assertThat(new ClassPathResource("sql/tessql.sql").exists()).isTrue();
+    }
+
+    @Test
+    void releasedRlsMigrationsRetainTheirProductionChecksums() throws Exception {
+        Map<String, String> expected = Map.of(
+                "sql/rls-v1.sql", "88ad125eff51d1da04d5249e7c7f76e6700caca11cf23496203a1937fb135bc0",
+                "sql/rls-v2-specials.sql", "61778ad7a0ef20027ac74920111919486fdcc418397fb085c2399e3ec6871edf",
+                "sql/rls-v3-hardening.sql", "fa794d59c6a4d37452fd194e9e35175e9bc4e9edcc55392ced7f498d30419801",
+                "sql/rls-v4-audit.sql", "7f9ada211a9904e40f4382fa144be4f53223a7240c57e34af0c3d62c169c0079",
+                "sql/rls-v5-address.sql", "7eaefaf2b62d0af0b42d40d646302e86ecedafc638bb6bd5f31e885c7a474395"
+        );
+
+        for (Map.Entry<String, String> migration : expected.entrySet()) {
+            byte[] bytes = new ClassPathResource(migration.getKey()).getContentAsByteArray();
+            String actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+            assertThat(actual).as(migration.getKey()).isEqualTo(migration.getValue());
+        }
     }
 
     @Test

@@ -207,16 +207,12 @@ $$;
 CREATE OR REPLACE FUNCTION app_security.register_customer(
     first_name_value text, last_name_value text, email_value text, password_value text,
     phone1_value text, phone2_value text, house_value text, street_value text, area_value text,
-    complex_value text, store_value text, postal_value text, city_value text, ordered_at timestamp,
-    google_place_id_value text, formatted_address_value text, latitude_value numeric, longitude_value numeric,
-    province_value text, country_value text
+    complex_value text, store_value text, postal_value text, city_value text, ordered_at timestamp
 ) RETURNS bigint LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
     INSERT INTO public.customers (first_name, last_name, email, password, phone1, phone2,
-        house_number, street, area, complex_name, preferred_store, postal_code, city, last_ordered_at,
-        google_place_id, formatted_address, latitude, longitude, province, country, role, access_level)
+        house_number, street, area, complex_name, preferred_store, postal_code, city, last_ordered_at, role, access_level)
     VALUES (first_name_value, last_name_value, email_value, password_value, phone1_value, phone2_value,
-        house_value, street_value, area_value, complex_value, store_value, postal_value, city_value, ordered_at,
-        google_place_id_value, formatted_address_value, latitude_value, longitude_value, province_value, country_value, 'USER', 0)
+        house_value, street_value, area_value, complex_value, store_value, postal_value, city_value, ordered_at, 'USER', 0)
     RETURNING id
 $$;
 CREATE OR REPLACE FUNCTION app_security.create_reset(email_value text, hash_value text, expiry timestamp) RETURNS text

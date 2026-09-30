@@ -33,11 +33,13 @@ public class MigrationSqlRunner implements CommandLineRunner {
     private static final String RLS_SPECIALS_MIGRATION_ID = "db/rls-v2-specials.sql";
     private static final String RLS_HARDENING_MIGRATION_ID = "db/rls-v3-hardening.sql";
     private static final String RLS_AUDIT_MIGRATION_ID = "db/rls-v4-audit.sql";
+    private static final String RLS_ADDRESS_MIGRATION_ID = "db/rls-v5-address.sql";
     private static final String CATALOG_MIGRATION_RESOURCE = "sql/migration.sql";
     private static final String RLS_MIGRATION_RESOURCE = "sql/rls-v1.sql";
     private static final String RLS_SPECIALS_MIGRATION_RESOURCE = "sql/rls-v2-specials.sql";
     private static final String RLS_HARDENING_MIGRATION_RESOURCE = "sql/rls-v3-hardening.sql";
     private static final String RLS_AUDIT_MIGRATION_RESOURCE = "sql/rls-v4-audit.sql";
+    private static final String RLS_ADDRESS_MIGRATION_RESOURCE = "sql/rls-v5-address.sql";
 
     private final DataSource dataSource;
     private final boolean catalogEnabled;
@@ -87,6 +89,8 @@ public class MigrationSqlRunner implements CommandLineRunner {
         applyMigration(connection, RLS_HARDENING_MIGRATION_ID, RLS_HARDENING_MIGRATION_RESOURCE, true,
                 () -> setRuntimeRole(connection));
         applyMigration(connection, RLS_AUDIT_MIGRATION_ID, RLS_AUDIT_MIGRATION_RESOURCE, true,
+                () -> setRuntimeRole(connection));
+        applyMigration(connection, RLS_ADDRESS_MIGRATION_ID, RLS_ADDRESS_MIGRATION_RESOURCE, true,
                 () -> setRuntimeRole(connection));
         synchronizeContextSecret(connection);
     }
