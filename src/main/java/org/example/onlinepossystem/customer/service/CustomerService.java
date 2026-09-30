@@ -170,11 +170,17 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
         Customer customer = customerRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Customer not found for email: " + email));
 
-        boolean addressChanged = !same(customer.getHouseNumber(), houseNumber)
+        boolean addressSubmitted = houseNumber != null
+                || street != null
+                || area != null
+                || postalCode != null
+                || complexName != null
+                || (address != null && (address.city() != null || address.hasGoogleSelection()));
+        boolean addressChanged = addressSubmitted && (!same(customer.getHouseNumber(), houseNumber)
                 || !same(customer.getStreet(), street)
                 || !same(customer.getArea(), area)
                 || (address != null && address.city() != null && !same(customer.getCity(), address.city()))
-                || !same(customer.getPostalCode(), postalCode);
+                || !same(customer.getPostalCode(), postalCode));
         if ((address == null || !address.hasGoogleSelection()) && addressChanged) {
             throw new IllegalArgumentException("A verified Google address selection is required.");
         }
@@ -184,14 +190,16 @@ public class CustomerService implements CustomerAccountReader, CustomerOrderReco
 
         customer.setFirstName(firstName);
         customer.setLastName(lastName);
-        customer.setHouseNumber(houseNumber);
-        customer.setStreet(street);
-        customer.setArea(area);
-        customer.setPostalCode(postalCode);
+        if (addressSubmitted) {
+            customer.setHouseNumber(houseNumber);
+            customer.setStreet(street);
+            customer.setArea(area);
+            customer.setPostalCode(postalCode);
+            customer.setComplexName(complexName);
+        }
         customer.setPhone1(phone1);
         customer.setPhone2(phone2);
         customer.setPreferredStore(preferredStore);
-        customer.setComplexName(complexName);
         if (address != null && address.hasGoogleSelection()) {
             customer.setCity(address.city());
         }
