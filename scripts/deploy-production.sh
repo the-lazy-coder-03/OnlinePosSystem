@@ -9,6 +9,7 @@ PUBLIC_HOST="${PUBLIC_HOST:-crowdcam.co.za}"
 DOPPLER_ENABLED="${DOPPLER_ENABLED:-true}"
 DOPPLER_PROJECT="${DOPPLER_PROJECT:-onlinepos}"
 DOPPLER_CONFIG="${DOPPLER_CONFIG:-prd}"
+KEEP_ROLLBACK_IMAGE="${KEEP_ROLLBACK_IMAGE:-false}"
 RUNTIME_ENV_CREATED="${RUNTIME_ENV_CREATED:-false}"
 REMOTE_ENV="${REMOTE_ENV:-}"
 ROLLBACK_TAG="onlinepossystem-app:rollback"
@@ -81,6 +82,7 @@ command -v git >/dev/null 2>&1 || { echo "git is not installed on the server" >&
 command -v docker >/dev/null 2>&1 || { echo "docker is not installed on the server" >&2; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "curl is not installed on the server" >&2; exit 1; }
 command -v flock >/dev/null 2>&1 || { echo "flock is not installed on the server" >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "python3 is not installed on the server" >&2; exit 1; }
 if [[ "$DOPPLER_ENABLED" == "true" ]]; then
   command -v doppler >/dev/null 2>&1 || { echo "doppler is not installed on the server" >&2; exit 1; }
 fi
@@ -114,6 +116,15 @@ fi
 test -f SupportConfigFiles/.env || { echo "SupportConfigFiles/.env is missing on the server" >&2; exit 1; }
 chmod 600 SupportConfigFiles/.env
 export GIT_SHA="$DEPLOY_SHA"
+
+GOOGLE_MAPS_API_KEY="$(
+  compose config --format json \
+    | python3 -c 'import json, sys; print(json.load(sys.stdin)["services"]["app"]["environment"].get("GOOGLE_MAPS_API_KEY", ""), end="")'
+)"
+test -n "$GOOGLE_MAPS_API_KEY" || { echo "GOOGLE_MAPS_API_KEY is missing from the rendered production environment" >&2; exit 1; }
+printf '%s' "$GOOGLE_MAPS_API_KEY" \
+  | python3 scripts/google-places-preflight.py "https://${PUBLIC_HOST}"
+unset GOOGLE_MAPS_API_KEY
 
 compose up -d db
 OLD_CONTAINER_ID="$(compose ps -aq app 2>/dev/null || true)"
@@ -168,8 +179,11 @@ curl --fail --silent --show-error --max-time 10 \
   --resolve "${PUBLIC_HOST}:443:127.0.0.1" "https://${PUBLIC_HOST}/" >/dev/null
 
 trap - ERR
-if [[ "$ROLLBACK_AVAILABLE" == "true" ]]; then
+if [[ "$ROLLBACK_AVAILABLE" == "true" && "$KEEP_ROLLBACK_IMAGE" != "true" ]]; then
   docker image rm "$ROLLBACK_TAG" >/dev/null 2>&1 || true
 fi
 compose ps
 echo "Deployed and verified revision $DEPLOY_SHA"
+if [[ "$ROLLBACK_AVAILABLE" == "true" && "$KEEP_ROLLBACK_IMAGE" == "true" ]]; then
+  echo "Retained the previous application image until production smoke verification completes"
+fi

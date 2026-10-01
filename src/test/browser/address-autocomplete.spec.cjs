@@ -87,7 +87,13 @@ async function mountAddressSearch(page) {
                     region: request.region,
                     token: request.sessionToken?.id
                 });
-                if (request.input === 'error') throw new Error('mock provider failure');
+                if (request.input === 'network') throw new TypeError('Failed to fetch');
+                if (request.input === 'error') {
+                    const error = new Error('API Key not found. Please pass a valid API key.');
+                    error.name = 'RpcError';
+                    error.code = 3;
+                    throw error;
+                }
                 if (request.input === 'zz') return {suggestions: []};
                 if (request.input === 'old') {
                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -180,8 +186,12 @@ test('address search ignores stale results and reports empty and failed searches
     await expect(page.locator('.address-results-empty')).toBeVisible();
     await expect(page.locator('[data-address-status]')).toHaveText('No address suggestions found.');
 
-    await search.fill('error');
+    await search.fill('network');
     await expect(page.locator('[data-address-status]')).toHaveText('Google address search is unavailable. Check your connection and try again.');
+    await expect(search).toHaveAttribute('aria-expanded', 'false');
+
+    await search.fill('error');
+    await expect(page.locator('[data-address-status]')).toHaveText('Google address search is temporarily unavailable. Please try again later.');
     await expect(search).toHaveAttribute('aria-expanded', 'false');
 
     await search.fill('ma');

@@ -5,7 +5,22 @@
     const MIN_QUERY_LENGTH = 2;
     const SEARCH_DEBOUNCE_MS = 220;
     const MAX_RESULTS = 5;
+    const NETWORK_ERROR_MESSAGE = "Google address search is unavailable. Check your connection and try again.";
+    const SERVICE_ERROR_MESSAGE = "Google address search is temporarily unavailable. Please try again later.";
     let mapsLoader;
+
+    function searchErrorMessage(error) {
+        const code = Number(error?.code);
+        const message = String(error?.message || "");
+        const isNetworkFailure = error instanceof TypeError
+            && /failed to fetch|network|load failed|could not be loaded/i.test(message);
+        if (isNetworkFailure) return NETWORK_ERROR_MESSAGE;
+        if ([3, 7, 8].includes(code)
+            || /api key|referer|permission|denied|billing|quota|not configured/i.test(message)) {
+            return SERVICE_ERROR_MESSAGE;
+        }
+        return SERVICE_ERROR_MESSAGE;
+    }
 
     function validPlacesLibrary(places) {
         return Boolean(places?.AutocompleteSuggestion?.fetchAutocompleteSuggestions
@@ -34,7 +49,7 @@
                 const script = document.createElement("script");
                 const fail = () => {
                     delete window[callback];
-                    reject(new Error("Google address search could not be loaded."));
+                    reject(new TypeError("Google address search could not be loaded."));
                 };
 
                 window[callback] = () => {
@@ -358,10 +373,10 @@
                 });
                 if (version !== requestVersion || value(ui.input) !== query) return;
                 renderSuggestions(Array.isArray(response?.suggestions) ? response.suggestions : []);
-            } catch (_error) {
+            } catch (error) {
                 if (version !== requestVersion) return;
                 closeResults();
-                updateStatus("Google address search is unavailable. Check your connection and try again.", "error");
+                updateStatus(searchErrorMessage(error), "error");
             } finally {
                 if (version === requestVersion) ui.input.removeAttribute("aria-busy");
             }
@@ -433,9 +448,9 @@
                 ui.input.disabled = false;
                 updateStatus(isVerified ? "Address verified." : "Start typing to search for an address.", isVerified ? "verified" : "ready");
             })
-            .catch(() => {
+            .catch(error => {
                 ui.input.disabled = true;
-                updateStatus("Google address search is unavailable. Please try again later.", "error");
+                updateStatus(searchErrorMessage(error), "error");
             });
 
         return instance;

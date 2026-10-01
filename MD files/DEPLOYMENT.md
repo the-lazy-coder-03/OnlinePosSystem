@@ -203,6 +203,13 @@ docker compose --env-file SupportConfigFiles/.env \
   -f docker/docker-compose.yml up -d --no-deps --force-recreate app
 ```
 
+The CI deployment validates the rendered browser key against Places API (New)
+with the production referrer before changing containers. After deployment it
+uses Chromium to search for and select an address on `/register`. The previous
+application image is retained until this live check passes and is restored
+automatically if the check fails. Neither check submits the registration form
+or logs the browser key or provider response body.
+
 ## Docker Compose and HTTPS
 
 Set `CERTBOT_EMAIL` in `SupportConfigFiles/.env`, point `crowdcam.co.za`,
