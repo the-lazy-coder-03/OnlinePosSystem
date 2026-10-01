@@ -4,10 +4,13 @@ set -Eeuo pipefail
 : "${REMOTE_APP_DIR:?REMOTE_APP_DIR is required}"
 : "${DEPLOY_BRANCH:?DEPLOY_BRANCH is required}"
 : "${DEPLOY_SHA:?DEPLOY_SHA is required}"
-: "${RUNTIME_ENV_CREATED:?RUNTIME_ENV_CREATED is required}"
-: "${REMOTE_ENV:?REMOTE_ENV is required}"
 
 PUBLIC_HOST="${PUBLIC_HOST:-crowdcam.co.za}"
+DOPPLER_ENABLED="${DOPPLER_ENABLED:-true}"
+DOPPLER_PROJECT="${DOPPLER_PROJECT:-onlinepos}"
+DOPPLER_CONFIG="${DOPPLER_CONFIG:-prd}"
+RUNTIME_ENV_CREATED="${RUNTIME_ENV_CREATED:-false}"
+REMOTE_ENV="${REMOTE_ENV:-}"
 ROLLBACK_TAG="onlinepossystem-app:rollback"
 OLD_CONTAINER_ID=""
 OLD_IMAGE_ID=""
@@ -16,7 +19,7 @@ APP_RECREATED=false
 
 cleanup() {
   case "$0" in
-    /tmp/online-pos-system-deploy-*.sh) rm -f -- "$0" ;;
+    /tmp/onlinepos-deploy-*.sh) rm -f -- "$0" ;;
   esac
 }
 trap cleanup EXIT
@@ -24,6 +27,35 @@ trap cleanup EXIT
 compose() {
   docker compose --env-file SupportConfigFiles/.env \
     -f docker/docker-compose.yml -p onlinepossystem "$@"
+}
+
+refresh_doppler_env() {
+  command -v doppler >/dev/null 2>&1 || {
+    echo "doppler is not installed on the server; install it and configure a read-only production service token" >&2
+    exit 1
+  }
+
+  mkdir -p SupportConfigFiles
+  local tmp_env
+  tmp_env="$(mktemp SupportConfigFiles/.env.doppler.XXXXXX)"
+  chmod 600 "$tmp_env"
+
+  local doppler_args=(secrets download --no-file --format docker)
+  if [[ -n "$DOPPLER_PROJECT" ]]; then
+    doppler_args+=(--project "$DOPPLER_PROJECT")
+  fi
+  if [[ -n "$DOPPLER_CONFIG" ]]; then
+    doppler_args+=(--config "$DOPPLER_CONFIG")
+  fi
+
+  if ! doppler "${doppler_args[@]}" > "$tmp_env"; then
+    rm -f "$tmp_env"
+    echo "Failed to render SupportConfigFiles/.env from Doppler" >&2
+    exit 1
+  fi
+
+  mv "$tmp_env" SupportConfigFiles/.env
+  chmod 600 SupportConfigFiles/.env
 }
 
 rollback() {
@@ -49,6 +81,9 @@ command -v git >/dev/null 2>&1 || { echo "git is not installed on the server" >&
 command -v docker >/dev/null 2>&1 || { echo "docker is not installed on the server" >&2; exit 1; }
 command -v curl >/dev/null 2>&1 || { echo "curl is not installed on the server" >&2; exit 1; }
 command -v flock >/dev/null 2>&1 || { echo "flock is not installed on the server" >&2; exit 1; }
+if [[ "$DOPPLER_ENABLED" == "true" ]]; then
+  command -v doppler >/dev/null 2>&1 || { echo "doppler is not installed on the server" >&2; exit 1; }
+fi
 
 cd "$REMOTE_APP_DIR"
 exec 9>.git/online-pos-deploy.lock
@@ -68,7 +103,10 @@ if [[ "$ACTUAL_SHA" != "$DEPLOY_SHA" ]]; then
 fi
 
 mkdir -p SupportConfigFiles
-if [[ "$RUNTIME_ENV_CREATED" == "true" ]]; then
+if [[ "$DOPPLER_ENABLED" == "true" ]]; then
+  refresh_doppler_env
+elif [[ "$RUNTIME_ENV_CREATED" == "true" ]]; then
+  test -n "$REMOTE_ENV" || { echo "REMOTE_ENV is required when using uploaded runtime env files" >&2; exit 1; }
   test -f "$REMOTE_ENV" || { echo "Uploaded environment file missing: $REMOTE_ENV" >&2; exit 1; }
   mv "$REMOTE_ENV" SupportConfigFiles/.env
 fi

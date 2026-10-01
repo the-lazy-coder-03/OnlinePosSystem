@@ -2,11 +2,28 @@
     "use strict";
 
     const REGISTRY = new Map();
+    const MIN_QUERY_LENGTH = 2;
+    const SEARCH_DEBOUNCE_MS = 220;
+    const MAX_RESULTS = 5;
     let mapsLoader;
 
+    function validPlacesLibrary(places) {
+        return Boolean(places?.AutocompleteSuggestion?.fetchAutocompleteSuggestions
+            && places?.AutocompleteSessionToken);
+    }
+
+    function importPlaces() {
+        return Promise.resolve().then(() => window.google.maps.importLibrary("places")).then(places => {
+            if (!validPlacesLibrary(places)) {
+                throw new Error("Google Places autocomplete is unavailable.");
+            }
+            return places;
+        });
+    }
+
     function loadPlaces(apiKey) {
-        if (window.google?.maps?.places?.PlaceAutocompleteElement) {
-            return Promise.resolve(window.google.maps.places);
+        if (window.google?.maps?.importLibrary) {
+            return importPlaces();
         }
         if (!apiKey) {
             return Promise.reject(new Error("Google Maps API key is not configured."));
@@ -14,20 +31,18 @@
         if (!mapsLoader) {
             mapsLoader = new Promise((resolve, reject) => {
                 const callback = `__petesMapsInit_${Date.now()}`;
-                window[callback] = async () => {
-                    try {
-                        const places = await window.google.maps.importLibrary("places");
-                        resolve(places);
-                    } catch (error) {
-                        reject(error);
-                    } finally {
-                        delete window[callback];
-                    }
-                };
                 const script = document.createElement("script");
+                const fail = () => {
+                    delete window[callback];
+                    reject(new Error("Google address search could not be loaded."));
+                };
+
+                window[callback] = () => {
+                    importPlaces().then(resolve, reject).finally(() => delete window[callback]);
+                };
                 script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&libraries=places&loading=async&callback=${callback}`;
                 script.async = true;
-                script.onerror = () => reject(new Error("Google address lookup could not be loaded."));
+                script.onerror = fail;
                 document.head.appendChild(script);
             });
         }
@@ -45,7 +60,7 @@
 
     function setValue(element, nextValue) {
         if (!element) return;
-        element.value = nextValue || "";
+        element.value = nextValue ?? "";
         element.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
@@ -104,6 +119,52 @@
             && address.street && (address.area || address.city) && address.country);
     }
 
+    function predictionText(prediction) {
+        return prediction?.text?.toString?.() || prediction?.text || prediction?.mainText?.toString?.()
+            || prediction?.mainText || "Address result";
+    }
+
+    function createSearchUi(root, widget, initialValue) {
+        const searchId = `${root.id}-search`;
+        const listId = `${root.id}-results`;
+        const control = document.createElement("div");
+        const input = document.createElement("input");
+        const list = document.createElement("ul");
+        const attribution = document.createElement("li");
+
+        control.className = "address-search-control";
+        input.id = searchId;
+        input.className = "address-search-input";
+        input.type = "search";
+        input.placeholder = root.dataset.placeholder || "Search for your address";
+        input.autocomplete = "off";
+        input.spellcheck = false;
+        input.disabled = true;
+        input.value = initialValue || "";
+        input.setAttribute("role", "combobox");
+        input.setAttribute("aria-autocomplete", "list");
+        input.setAttribute("aria-haspopup", "listbox");
+        input.setAttribute("aria-controls", listId);
+        input.setAttribute("aria-expanded", "false");
+
+        list.id = listId;
+        list.className = "address-results";
+        list.setAttribute("role", "listbox");
+        list.hidden = true;
+
+        attribution.className = "address-attribution";
+        attribution.setAttribute("role", "presentation");
+        attribution.setAttribute("translate", "no");
+        attribution.textContent = "Google Maps";
+
+        control.append(input, list);
+        widget?.replaceChildren(control);
+        const label = root.querySelector("label");
+        if (label) label.htmlFor = searchId;
+
+        return { input, list, attribution };
+    }
+
     function createInstance(root) {
         const id = root.id || `address-${REGISTRY.size + 1}`;
         root.id = id;
@@ -127,6 +188,18 @@
         let currentAddress = readAddressFromFields();
         let isVerified = verified(currentAddress);
         let applyingSelection = false;
+        let placesLibrary;
+        let sessionToken;
+        let suggestions = [];
+        let activeIndex = -1;
+        let debounceTimer;
+        let requestVersion = 0;
+        const ui = createSearchUi(root, widget, currentAddress.formattedAddress);
+
+        if (status) {
+            status.setAttribute("aria-live", "polite");
+            status.setAttribute("aria-atomic", "true");
+        }
 
         function readAddressFromFields() {
             return {
@@ -166,6 +239,15 @@
             }));
         }
 
+        function closeResults() {
+            suggestions = [];
+            activeIndex = -1;
+            ui.list.replaceChildren();
+            ui.list.hidden = true;
+            ui.input.setAttribute("aria-expanded", "false");
+            ui.input.removeAttribute("aria-activedescendant");
+        }
+
         function clearGoogleMetadata(message) {
             currentAddress = { ...readAddressFromFields(), googlePlaceId: "", formattedAddress: "", latitude: "", longitude: "", province: "", country: "" };
             ["googlePlaceId", "formattedAddress", "latitude", "longitude", "province", "country"].forEach(name => setValue(fields[name], ""));
@@ -177,6 +259,7 @@
             applyingSelection = true;
             currentAddress = address;
             Object.entries(address).forEach(([name, nextValue]) => setValue(fields[name], nextValue));
+            ui.input.value = address.formattedAddress || "";
             isVerified = verified(address);
             applyingSelection = false;
             updateStatus(isVerified ? "Address verified." : "Google returned an incomplete address. Choose a more specific result.", isVerified ? "verified" : "invalid");
@@ -186,13 +269,116 @@
             const currentVerified = verified(readAddressFromFields());
             if (root.dataset.require === "true" && !currentVerified) {
                 updateStatus("Select an address from Google before continuing.", "invalid");
+                ui.input.focus();
                 return false;
             }
             if (root.dataset.requireOnChange === "true" && changedSinceLoad() && !currentVerified) {
                 updateStatus("Select an address from Google before saving address changes.", "invalid");
+                ui.input.focus();
                 return false;
             }
             return true;
+        }
+
+        function setActiveIndex(nextIndex) {
+            const options = Array.from(ui.list.querySelectorAll("[role='option']"));
+            if (!options.length) return;
+            activeIndex = (nextIndex + options.length) % options.length;
+            options.forEach((option, index) => option.setAttribute("aria-selected", String(index === activeIndex)));
+            ui.input.setAttribute("aria-activedescendant", options[activeIndex].id);
+            options[activeIndex].scrollIntoView({ block: "nearest" });
+        }
+
+        async function selectPrediction(index) {
+            const prediction = suggestions[index];
+            if (!prediction) return;
+            const selectionVersion = ++requestVersion;
+            clearTimeout(debounceTimer);
+            closeResults();
+            ui.input.setAttribute("aria-busy", "true");
+            updateStatus("Loading address details…", "loading");
+            try {
+                const place = prediction.toPlace();
+                await place.fetchFields({ fields: ["id", "formattedAddress", "location", "addressComponents"] });
+                if (selectionVersion !== requestVersion) return;
+                applyAddress(selectedAddress(place, value(fields.complexName)));
+                sessionToken = new placesLibrary.AutocompleteSessionToken();
+            } catch (_error) {
+                if (selectionVersion === requestVersion) {
+                    clearGoogleMetadata("Address details could not be loaded. Choose the result again or try another address.");
+                }
+            } finally {
+                ui.input.removeAttribute("aria-busy");
+            }
+        }
+
+        function renderSuggestions(nextSuggestions) {
+            closeResults();
+            suggestions = nextSuggestions.map(suggestion => suggestion.placePrediction).filter(Boolean).slice(0, MAX_RESULTS);
+
+            if (!suggestions.length) {
+                const empty = document.createElement("li");
+                empty.className = "address-results-empty";
+                empty.setAttribute("role", "presentation");
+                empty.textContent = "No matching addresses found. Try adding a street number or suburb.";
+                ui.list.append(empty, ui.attribution);
+                ui.list.hidden = false;
+                ui.input.setAttribute("aria-expanded", "true");
+                updateStatus("No address suggestions found.", "ready");
+                return;
+            }
+
+            suggestions.forEach((prediction, index) => {
+                const option = document.createElement("li");
+                option.id = `${id}-option-${index}`;
+                option.className = "address-result";
+                option.setAttribute("role", "option");
+                option.setAttribute("aria-selected", "false");
+                option.textContent = predictionText(prediction);
+                option.addEventListener("pointerdown", event => event.preventDefault());
+                option.addEventListener("click", () => selectPrediction(index));
+                ui.list.append(option);
+            });
+            ui.list.append(ui.attribution);
+            ui.list.hidden = false;
+            ui.input.setAttribute("aria-expanded", "true");
+            updateStatus(`${suggestions.length} address suggestion${suggestions.length === 1 ? "" : "s"} available.`, "ready");
+        }
+
+        async function search(query, version) {
+            ui.input.setAttribute("aria-busy", "true");
+            updateStatus("Searching for addresses…", "loading");
+            try {
+                const response = await placesLibrary.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+                    input: query,
+                    includedRegionCodes: ["za"],
+                    language: "en",
+                    region: "za",
+                    sessionToken
+                });
+                if (version !== requestVersion || value(ui.input) !== query) return;
+                renderSuggestions(Array.isArray(response?.suggestions) ? response.suggestions : []);
+            } catch (_error) {
+                if (version !== requestVersion) return;
+                closeResults();
+                updateStatus("Google address search is unavailable. Check your connection and try again.", "error");
+            } finally {
+                if (version === requestVersion) ui.input.removeAttribute("aria-busy");
+            }
+        }
+
+        function scheduleSearch() {
+            clearTimeout(debounceTimer);
+            ui.input.removeAttribute("aria-busy");
+            const query = value(ui.input);
+            const version = ++requestVersion;
+            closeResults();
+            if (!applyingSelection) clearGoogleMetadata("Select an address from Google to verify it.");
+            if (query.length < MIN_QUERY_LENGTH) {
+                updateStatus(query ? "Type at least 2 characters to search for an address." : "Start typing to search for an address.", "ready");
+                return;
+            }
+            debounceTimer = window.setTimeout(() => search(query, version), SEARCH_DEBOUNCE_MS);
         }
 
         Object.values(fields).forEach(input => {
@@ -202,6 +388,35 @@
                 }
             });
         });
+
+        ui.input.addEventListener("input", scheduleSearch);
+        ui.input.addEventListener("keydown", event => {
+            if (event.key === "ArrowDown" && suggestions.length) {
+                event.preventDefault();
+                setActiveIndex(activeIndex + 1);
+            } else if (event.key === "ArrowUp" && suggestions.length) {
+                event.preventDefault();
+                setActiveIndex(activeIndex < 0 ? suggestions.length - 1 : activeIndex - 1);
+            } else if (event.key === "Enter" && activeIndex >= 0) {
+                event.preventDefault();
+                selectPrediction(activeIndex);
+            } else if (event.key === "Escape") {
+                requestVersion += 1;
+                clearTimeout(debounceTimer);
+                ui.input.removeAttribute("aria-busy");
+                closeResults();
+            } else if (event.key === "Tab") {
+                closeResults();
+            }
+        });
+        ui.input.addEventListener("blur", () => window.setTimeout(() => {
+            if (document.activeElement !== ui.input) {
+                requestVersion += 1;
+                clearTimeout(debounceTimer);
+                ui.input.removeAttribute("aria-busy");
+                closeResults();
+            }
+        }, 100));
 
         const instance = {
             getAddress: () => readAddressFromFields(),
@@ -213,33 +428,23 @@
 
         loadPlaces(root.dataset.googleMapsKey || "")
             .then(places => {
-                const autocomplete = new places.PlaceAutocompleteElement();
-                autocomplete.includedRegionCodes = ["za"];
-                autocomplete.requestedRegion = "za";
-                autocomplete.requestedLanguage = "en";
-                autocomplete.placeholder = root.dataset.placeholder || "Search for your address";
-                autocomplete.addEventListener("input", () => {
-                    if (!applyingSelection) clearGoogleMetadata("Select a Google result to verify the address.");
-                });
-                autocomplete.addEventListener("gmp-select", async event => {
-                    try {
-                        const prediction = event.placePrediction || event.detail?.placePrediction;
-                        const place = prediction?.toPlace ? prediction.toPlace() : event.place || event.detail?.place;
-                        if (!place?.fetchFields) throw new Error("No place details were returned.");
-                        await place.fetchFields({ fields: ["id", "formattedAddress", "location", "addressComponents"] });
-                        applyAddress(selectedAddress(place, value(fields.complexName)));
-                    } catch (error) {
-                        clearGoogleMetadata(error.message || "Address selection failed. Try another result.");
-                    }
-                });
-                widget?.replaceChildren(autocomplete);
-                updateStatus(isVerified ? "Address verified." : "", isVerified ? "verified" : "ready");
+                placesLibrary = places;
+                sessionToken = new places.AutocompleteSessionToken();
+                ui.input.disabled = false;
+                updateStatus(isVerified ? "Address verified." : "Start typing to search for an address.", isVerified ? "verified" : "ready");
             })
-            .catch(error => {
-                updateStatus(error.message || "Google address lookup is unavailable.", "error");
+            .catch(() => {
+                ui.input.disabled = true;
+                updateStatus("Google address search is unavailable. Please try again later.", "error");
             });
 
         return instance;
+    }
+
+    function initialize() {
+        document.querySelectorAll("[data-address-autocomplete]").forEach(root => {
+            if (!REGISTRY.has(root.id)) createInstance(root);
+        });
     }
 
     window.PetesAddressAutocomplete = {
@@ -249,7 +454,9 @@
         }
     };
 
-    document.addEventListener("DOMContentLoaded", () => {
-        document.querySelectorAll("[data-address-autocomplete]").forEach(createInstance);
-    });
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initialize);
+    } else {
+        initialize();
+    }
 })();

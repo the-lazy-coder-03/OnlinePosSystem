@@ -118,6 +118,7 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await page.setViewportSize({width: 1280, height: 720});
     await page.locator('#deliveryButton').click();
     await expect(page.locator('#deliveryFields')).toBeVisible();
+    await expect(page.locator('#checkoutAddressAutocomplete .address-search-input')).toBeVisible();
     await expect(page.locator('#street')).toHaveAttribute('required', '');
     await expect(page.locator('#gateAccessCode')).toHaveAttribute('maxlength', '64');
     await page.locator('#gateAccessCode').fill('Gate 4*');
@@ -158,6 +159,7 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
 
 test('registration rotates the anonymous session and profile changes remain authenticated', async ({page, context}) => {
     await page.goto('/register');
+    await expect(page.locator('#registerAddressAutocomplete .address-search-input')).toBeVisible();
     const before = (await context.cookies()).find(cookie => cookie.name === 'JSESSIONID').value;
     const fields = {
         firstName: 'Registered', lastName: 'Customer', email: 'registered@example.com', password: 'Browser-test-123',
@@ -178,6 +180,8 @@ test('registration rotates the anonymous session and profile changes remain auth
     const after = (await context.cookies()).find(cookie => cookie.name === 'JSESSIONID').value;
     expect(after).not.toBe(before);
     await page.goto('/profile/edit');
+    await expect(page.locator('#profileAddressAutocomplete .address-search-input'))
+        .toHaveValue('12 Main Street, Kenridge, Cape Town, 7550, South Africa');
     await page.locator('#firstName').fill('Updated');
     await page.getByRole('button', {name: 'Save Profile', exact: true}).click();
     await expect(page).toHaveURL(/\/profile\/edit\?success/);

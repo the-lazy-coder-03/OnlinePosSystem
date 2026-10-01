@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: online-pos-system-${{ github.ref }}
+  group: onlinepos-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -182,7 +182,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_name == 'master')
     timeout-minutes: 25
     concurrency:
-      group: online-pos-system-production-deploy
+      group: onlinepos-production-deploy
       cancel-in-progress: false
 
     steps:
@@ -201,84 +201,6 @@ jobs:
           test -n "$AZURE_VM_SSH_KEY" || (echo "Missing AZURE_VM_SSH_KEY secret" && exit 1)
           test -n "$AZURE_VM_KNOWN_HOSTS" || (echo "Missing AZURE_VM_KNOWN_HOSTS secret" && exit 1)
 
-      - name: Build runtime environment file
-        id: runtime-env
-        env:
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
-          SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
-          MIGRATION_DATASOURCE_USERNAME: ${{ secrets.MIGRATION_DATASOURCE_USERNAME }}
-          MIGRATION_DATASOURCE_PASSWORD: ${{ secrets.MIGRATION_DATASOURCE_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          RLS_CONTEXT_SECRET: ${{ secrets.RLS_CONTEXT_SECRET }}
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
-          MAIL_API: ${{ secrets.MAIL_API }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
-          SESSION_COOKIE_SECURE: ${{ secrets.SESSION_COOKIE_SECURE }}
-          RUN_MIGRATION_SQL: ${{ secrets.RUN_MIGRATION_SQL }}
-          CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
-        run: |
-          umask 077
-          mkdir -p runtime
-
-          db_name="${POSTGRES_DB:-online_pos_system}"
-          db_user="${POSTGRES_USER:-pos_app}"
-          db_password="${POSTGRES_PASSWORD:-}"
-
-          runtime_user="${SPRING_DATASOURCE_USERNAME:-pos_runtime}"
-          runtime_password="${SPRING_DATASOURCE_PASSWORD:-}"
-          migration_user="${MIGRATION_DATASOURCE_USERNAME:-}"
-          migration_password="${MIGRATION_DATASOURCE_PASSWORD:-}"
-
-          if [[ -z "$runtime_password" || -z "$migration_user" || -z "$migration_password" || -z "$db_password" || -z "$JWT_SECRET" || -z "$RLS_CONTEXT_SECRET" || -z "$ADMIN_PASSWORD" || -z "${RESEND_API_KEY:-${MAIL_API:-}}" ]]; then
-            echo "A complete runtime secret set was not provided; deployment will keep the existing server .env file."
-            echo "created=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [[ "$runtime_user" == "$migration_user" || "$runtime_user" == "$db_user" || "$migration_user" == "$db_user" ]]; then
-            echo "Database administrator, migration owner, and runtime accounts must be separate" >&2
-            exit 1
-          fi
-
-          {
-            echo "POSTGRES_DB=${db_name}"
-            echo "POSTGRES_USER=${db_user}"
-            echo "POSTGRES_PASSWORD=${db_password}"
-            echo "SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${db_name}"
-            echo "SPRING_DATASOURCE_USERNAME=${runtime_user}"
-            echo "SPRING_DATASOURCE_PASSWORD=${runtime_password}"
-            echo "MIGRATION_DATASOURCE_URL=jdbc:postgresql://db:5432/${db_name}"
-            echo "MIGRATION_DATASOURCE_USERNAME=${migration_user}"
-            echo "MIGRATION_DATASOURCE_PASSWORD=${migration_password}"
-            echo "RLS_RUNTIME_ROLE=${runtime_user}"
-            echo "SERVER_ADDRESS=0.0.0.0"
-            echo "SERVER_PORT=8080"
-            echo "HTTP_PORT=80"
-            echo "HTTPS_PORT=443"
-            echo "SPRING_PROFILES_ACTIVE=default"
-            echo "RUN_MIGRATION_SQL=${RUN_MIGRATION_SQL:-true}"
-            echo "ADMIN_USERNAME=${ADMIN_USERNAME:-admin}"
-            echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
-            echo "JWT_SECRET=${JWT_SECRET}"
-            echo "RLS_CONTEXT_SECRET=${RLS_CONTEXT_SECRET}"
-            echo "JWT_EXPIRATION_SECONDS=7200"
-            echo "SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-true}"
-            echo "APP_BASE_URL=${APP_BASE_URL:-https://crowdcam.co.za}"
-            echo "RESEND_API_KEY=${RESEND_API_KEY:-${MAIL_API:-}}"
-            echo "MAIL_API=${MAIL_API:-${RESEND_API_KEY:-}}"
-            echo "RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-noreply@email.crowdcam.co.za}"
-            echo "CERTBOT_EMAIL=${CERTBOT_EMAIL:-matthewanton01@gmail.com}"
-            echo "GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}"
-          } > runtime/online-pos-system.env
-
-          echo "created=true" >> "$GITHUB_OUTPUT"
-
       - name: Configure SSH
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
@@ -293,25 +215,13 @@ jobs:
           printf '%s\n' "$AZURE_VM_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Upload runtime environment
-        if: steps.runtime-env.outputs.created == 'true'
-        env:
-          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
-          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
-          AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
-        run: |
-          remote_env="/tmp/online-pos-system-${GITHUB_SHA}.env"
-          scp -i ~/.ssh/online-pos-azure -P "${AZURE_VM_PORT:-22}" \
-            runtime/online-pos-system.env \
-            "${AZURE_VM_USER}@${AZURE_VM_HOST}:${remote_env}"
-
       - name: Upload deployment script
         env:
           AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
           AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
         run: |
-          remote_script="/tmp/online-pos-system-deploy-${GITHUB_SHA}.sh"
+          remote_script="/tmp/onlinepos-deploy-${GITHUB_SHA}.sh"
           scp -i ~/.ssh/online-pos-azure -P "${AZURE_VM_PORT:-22}" \
             scripts/deploy-production.sh \
             "${AZURE_VM_USER}@${AZURE_VM_HOST}:${remote_script}"
@@ -322,21 +232,21 @@ jobs:
           AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
           AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
           REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
-          RUNTIME_ENV_CREATED: ${{ steps.runtime-env.outputs.created }}
+          DOPPLER_PROJECT: onlinepos
+          DOPPLER_CONFIG: prd
         run: |
-          remote_env="/tmp/online-pos-system-${GITHUB_SHA}.env"
           remote_app_dir="${REMOTE_APP_DIR:-/home/${AZURE_VM_USER}/OnlinePosSystem}"
-          quoted_remote_env="$(printf '%q' "$remote_env")"
           quoted_remote_app_dir="$(printf '%q' "$remote_app_dir")"
           quoted_branch="$(printf '%q' "$GITHUB_REF_NAME")"
           quoted_sha="$(printf '%q' "$GITHUB_SHA")"
-          quoted_runtime_env_created="$(printf '%q' "$RUNTIME_ENV_CREATED")"
-          remote_script="/tmp/online-pos-system-deploy-${GITHUB_SHA}.sh"
+          quoted_doppler_project="$(printf '%q' "$DOPPLER_PROJECT")"
+          quoted_doppler_config="$(printf '%q' "$DOPPLER_CONFIG")"
+          remote_script="/tmp/onlinepos-deploy-${GITHUB_SHA}.sh"
           quoted_remote_script="$(printf '%q' "$remote_script")"
 
           ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
-            "REMOTE_ENV=${quoted_remote_env} REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} RUNTIME_ENV_CREATED=${quoted_runtime_env_created} bash ${quoted_remote_script}"
+            "DOPPLER_ENABLED=true DOPPLER_PROJECT=${quoted_doppler_project} DOPPLER_CONFIG=${quoted_doppler_config} REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} bash ${quoted_remote_script}"
 
       - name: Remove local deployment credentials
         if: always()
-        run: rm -rf runtime ~/.ssh/online-pos-azure
+        run: rm -f ~/.ssh/online-pos-azure

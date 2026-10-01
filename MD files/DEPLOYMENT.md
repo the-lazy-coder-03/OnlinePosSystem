@@ -18,6 +18,95 @@ It checks container health, the image revision, and the existing HTTPS endpoint.
 The application image can be rolled back on failure; that rollback does not undo
 database changes. Back up the database before applying schema migrations.
 
+## Doppler secrets
+
+Doppler is the source of truth for runtime application secrets. GitHub Actions
+keeps only SSH deployment secrets plus CI-only test placeholders. Production
+app, database, email, JWT, RLS, and Google Maps values belong in the Doppler
+project `onlinepos`, config `prd`; local development uses config `dev`.
+
+Install the Doppler CLI on macOS, then sign in and select the project/config:
+
+```bash
+brew install gnupg
+brew install dopplerhq/cli/doppler
+doppler --version
+doppler login
+doppler setup --project onlinepos --config dev
+```
+
+Import the current ignored `SupportConfigFiles/.env` once for local development,
+then treat Doppler as canonical. Use the helper instead of raw
+`doppler secrets upload` because Doppler prints uploaded values by default:
+
+```bash
+scripts/doppler-upload-env.sh
+```
+
+To upload production values, use a production-safe env file and explicitly
+confirm the `prd` target:
+
+```bash
+ENV_FILE=/path/to/production.env \
+DOPPLER_CONFIG=prd \
+CONFIRM_PRD_UPLOAD=onlinepos/prd \
+scripts/doppler-upload-env.sh
+```
+
+Render a Docker Compose-compatible env file for local commands:
+
+```bash
+scripts/doppler-render-env.sh
+docker compose --env-file SupportConfigFiles/.env -f docker/docker-compose.yml config
+```
+
+Install the Doppler CLI on the Debian/Ubuntu VM with Doppler's signed apt
+repository:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+curl -sLf --retry 3 --tlsv1.2 --proto '=https' \
+  'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" \
+  | sudo tee /etc/apt/sources.list.d/doppler-cli.list
+sudo apt-get update
+sudo apt-get install -y doppler
+doppler --version
+```
+
+Create a read-only Doppler Service Token scoped only to
+`onlinepos/prd`; do not use a personal token on the VM. Configure it
+for the application directory:
+
+```bash
+echo '<production-service-token>' \
+  | doppler configure set token --scope /home/<azure-user>/OnlinePosSystem
+doppler configure set project onlinepos --scope /home/<azure-user>/OnlinePosSystem
+doppler configure set config prd --scope /home/<azure-user>/OnlinePosSystem
+```
+
+The deployment script refreshes `SupportConfigFiles/.env` from Doppler before
+`docker compose up`, `provision`, and `migrate`. To verify the VM without
+printing secret values, run:
+
+```bash
+cd /home/<azure-user>/OnlinePosSystem
+doppler secrets download --no-file --format docker \
+  --project onlinepos --config prd \
+  | grep -E '^(SPRING_DATASOURCE_PASSWORD|JWT_SECRET|RLS_CONTEXT_SECRET|GOOGLE_MAPS_API_KEY)='
+```
+
+For a non-deploy dry check after rendering the env file:
+
+```bash
+doppler secrets download --no-file --format docker \
+  --project onlinepos --config prd > SupportConfigFiles/.env
+chmod 600 SupportConfigFiles/.env
+docker compose --env-file SupportConfigFiles/.env -f docker/docker-compose.yml config
+```
+
 ## Credentials and schema ownership
 
 Configure `POSTGRES_USER`/`POSTGRES_PASSWORD` for the database administrator,
@@ -83,17 +172,33 @@ Ensure `email.crowdcam.co.za` is verified in Resend and the sending key is
 allowed to send from that domain.
 
 `GOOGLE_MAPS_API_KEY` is rendered into registration, profile and checkout pages
-so the browser can load the current Google Maps JavaScript Places autocomplete
-widget. Enable Maps JavaScript API and Places API (New) for that key. Restrict
-it in Google Cloud by HTTP referrer for the deployed hostnames, and restrict API
-usage to those APIs. Do not commit a real key. Browser-provided place IDs,
+so the browser can load the Maps JavaScript Places autocomplete data API. The
+application requests South African predictions after two typed characters and
+renders the suggestions in its own accessible address list. Enable billing,
+Maps JavaScript API and Places API (New) for that key. Restrict it in Google
+Cloud by HTTP referrer to `https://crowdcam.co.za/*` and
+`https://www.crowdcam.co.za/*` (plus explicit local development origins when
+needed), and restrict API usage to those two APIs. Do not commit a real key. Browser-provided place IDs,
 coordinates and formatted addresses are stored as address metadata only; any
 future delivery fee or serviceability decision must be recalculated by the
 server using trusted provider data.
 
-After changing the live `.env`, recreate the app container to apply it:
+After changing the key, open `/register`, type at least two characters of a
+generic South African street address, and confirm that suggestions appear below
+the field and populate the structured address fields when selected. Check the
+browser console for Google authentication errors. `API Key not found` means the
+deployed key is missing, invalid, or not authorized for the request; also verify
+billing, both enabled APIs, the API restriction list, and the exact HTTP
+referrers before recreating the application container.
+
+After changing Doppler `prd` secrets, refresh the generated env file and recreate
+the app container to apply them:
 
 ```bash
+cd /home/<azure-user>/OnlinePosSystem
+doppler secrets download --no-file --format docker \
+  --project onlinepos --config prd > SupportConfigFiles/.env
+chmod 600 SupportConfigFiles/.env
 docker compose --env-file SupportConfigFiles/.env \
   -f docker/docker-compose.yml up -d --no-deps --force-recreate app
 ```

@@ -2,9 +2,9 @@
 
 The audit reviewed the Spring Boot application, PostgreSQL 16 schema and RLS model, browser and JWT authentication, password recovery, customer and administrator authorization, ordering and pricing, STOMP/WebSockets, Nginx, Docker, CI/CD, dependencies, and repository history. Testing used disposable PostgreSQL databases with separate owner and runtime roles. Production inspection was limited to read-only HTTP requests and TLS/WebSocket handshakes.
 
-Confirmed findings by severity: **0 Critical, 4 High, 9 Medium, 1 Low, and 1 Informational**. All application and database findings have code fixes and focused verification. Five findings remain externally blocked or need external verification: the exact production container image/runtime has not been inspected, the repository legacy proxy profile still needs deployment/config validation before use, the CI host-key secret has not been confirmed, and two historical credentials require provider-side rotation or rejection verification. Production now emits the reviewed CSP, Referrer-Policy, and Permissions-Policy headers. No SQL injection, cross-customer IDOR, stored XSS, CORS credential leak, public Actuator exposure, or WebSocket subscription bypass was confirmed.
+Confirmed findings by severity: **0 Critical, 5 High, 9 Medium, 1 Low, and 1 Informational**. All application and database findings have code fixes and focused verification. Several findings remain externally blocked or need external verification: the exact production container image/runtime has not been inspected, the repository legacy proxy profile still needs deployment/config validation before use, the CI host-key secret has not been confirmed, two historical credentials require provider-side rotation or rejection verification, and newly imported Doppler secrets require correction and rotation after CLI output exposed values in the local command transcript. Production now emits the reviewed CSP, Referrer-Policy, and Permissions-Policy headers. No SQL injection, cross-customer IDOR, stored XSS, CORS credential leak, public Actuator exposure, or WebSocket subscription bypass was confirmed.
 
-Status as of 2026-09-29: the canonical audit report has been consolidated into this file. Locally executable non-database validation passed, but the PostgreSQL and browser regression suites could not be rerun in this shell because no disposable PostgreSQL test URL was configured. No deployment, provider credential rotation, CI secret update, production container inspection, destructive database action, or Git-history rewrite was performed.
+Status as of 2026-10-01: Doppler CLI setup was added locally and on the VM, and deployment scripts now render runtime env files from Doppler. The real Doppler project slug is `onlinepos`. Local `dev` and `prd` imports were performed from ignored env files, but the initial Doppler upload command printed secret values in the command transcript and the `prd` database URL still points at `localhost`; no production deployment was performed. Locally executable script/template/JavaScript validation passed during this Doppler work, but the PostgreSQL and browser regression suites were not rerun for this operational change.
 
 # Architecture and Trust Boundaries
 
@@ -85,6 +85,24 @@ No Critical finding was confirmed.
 - **Evidence:** Current local database host and credential differ, but the former provider was not contacted during this audit.
 - **Remediation:** Confirm deletion/rotation at the former provider and verify the old login is rejected. Current files contain environment placeholders only.
 - **Verification needed:** Provider audit or a separately authorized authentication check against the former owned database.
+
+## SA-016 — Doppler secret import printed live secret values in command output
+
+- **Finding ID:** SA-016
+- **Descriptive title:** Doppler secret import printed live secret values in command output
+- **Severity:** High
+- **State:** CONFIRMED, BLOCKED
+- **CWE / OWASP:** CWE-532, CWE-798; OWASP A02 Cryptographic Failures
+- **Exact affected files/classes/endpoints/components:** Local Codex command transcript for the 2026-10-01 Doppler setup; Doppler project `onlinepos`, configs `dev` and `prd`; ignored local `SupportConfigFiles/.env`; VM `SupportConfigFiles/.env`; deployment secret rendering in `.github/workflows/ci-cd.yml`, `scripts/deploy-production.sh`, and `scripts/doppler-render-env.sh`.
+- **Vulnerable code or behavior:** `doppler secrets upload --project onlinepos --config dev SupportConfigFiles/.env` and the matching `prd` import were run without redirecting stdout. Doppler printed uploaded secret names and values in the command output. A later VM `.env` import redirected stdout, but the earlier command transcript already contained live application, database, Google Maps, Resend, JWT, and RLS secret values. The `prd` import also currently contains non-production-safe settings copied from local/VM env files, including a `SPRING_DATASOURCE_URL` that still points at `localhost`.
+- **Attack scenario:** Anyone with access to the local command transcript, logs, screen recording, support bundle, or synchronized terminal history containing the Doppler upload output could recover the exposed values and attempt API abuse, email-provider abuse, database login, JWT signing/forgery, or RLS context forgery depending on which values remain valid and reachable.
+- **Preconditions required for exploitation:** Access to the command transcript or a copy of the session output. Successful abuse also requires that the exposed provider/database/application secrets remain valid and are accepted by their respective services.
+- **Security impact:** Potential compromise of third-party accounts and application security boundaries, including Google Maps billing/quota abuse, Resend email abuse, database access if network-reachable, forged JWTs, or forged RLS context if combined with runtime database access.
+- **Evidence used to confirm the issue:** On 2026-10-01, `doppler secrets upload` printed a table containing secret values during import. Follow-up presence-only checks confirmed `GOOGLE_MAPS_API_KEY`, `JWT_SECRET`, `RLS_CONTEXT_SECRET`, and `SPRING_DATASOURCE_PASSWORD` exist in Doppler `onlinepos/dev` and `onlinepos/prd`. A safe predicate check confirmed `onlinepos/prd` still has a `SPRING_DATASOURCE_URL` containing `localhost`.
+- **Remediation implemented or recommended:** Updated deployment integration to use Doppler as the runtime source and added `scripts/doppler-upload-env.sh` so future imports suppress Doppler's value-printing output. Documentation now uses the helper and requires explicit confirmation before uploading to `prd`. Replace the `onlinepos/prd` values with production-safe Compose values before deployment, create a new read-only service token scoped to `onlinepos/prd`, revoke the incorrectly scoped VM token, and rotate every value printed in the transcript: Google Maps key, Resend key, JWT secret, RLS context secret, database/admin/migration/runtime passwords, and any other provider tokens included in the output. Do not deploy from Doppler `prd` until `SPRING_DATASOURCE_URL` targets the Compose database host and `SESSION_COOKIE_SECURE=true`.
+- **Tests added:** No automated regression test was added because this is an operational CLI/logging issue. Documentation now warns that Doppler upload output must be redirected.
+- **Verification performed:** `doppler --version` returned `v3.76.6` locally and on the VM; local `doppler me` succeeded; Doppler project `onlinepos` contains `dev`, `stg`, and `prd` configs; local Doppler config is `onlinepos/dev`; VM Doppler config is `onlinepos/prd` with the previously incorrect token removed; presence-only checks confirmed required names exist after import; safety check blocked deployment because `SPRING_DATASOURCE_URL` still contains `localhost`.
+- **Any remaining residual risk:** The printed secrets remain present in the local command transcript and must be considered exposed until rotated at each provider/service. The VM service token still needs replacement with a correct read-only `onlinepos/prd` token. Production deployment remains blocked until Doppler `prd` contains production-safe values and rotation is complete.
 
 # Medium Findings
 
@@ -223,6 +241,7 @@ No Critical finding was confirmed.
 4. **Historical credential disclosure → third-party/database abuse (open).** Source cleanup cannot invalidate keys recoverable from Git history; provider rotation/rejection verification is still required.
 5. **Application exploit → privileged writable container (code mitigated, deployment pending).** The reviewed container configuration limits user, capabilities, filesystem writes, and privilege escalation after rollout.
 6. **Ignored local `.env` exposure → credential abuse (local operational risk).** Git and Docker ignore rules prevent ordinary source/build leakage, but workspace archives or backups that include ignored files could still expose live secrets.
+7. **Doppler upload output → secret recovery → provider/database/application abuse (open).** The initial 2026-10-01 Doppler import printed live values into command output. Rotation, token replacement, and production-safe `prd` values are required before deploying from Doppler.
 
 # Authentication Review
 
@@ -264,7 +283,7 @@ Patched resolved versions are Jackson 2.21.5, Log4j API 2.25.5, Tomcat 10.1.60, 
 
 # Secrets Review
 
-Current tracked sources contain environment placeholders rather than passwords/tokens. `.dockerignore` excludes local environment files. `gitleaks git --redact` on 2026-09-29 again found only the two already-documented historical credentials from SA-011 and SA-012; values and matches are intentionally omitted. `gitleaks dir --redact` also found current local secrets in ignored `SupportConfigFiles/.env`; this is tracked as SA-015. The Google key still requires provider-side rotation/rejection verification. The historical database host and password differ from current local configuration, but provider-side rejection remains unverified. Git-history rewriting was not performed.
+Current tracked sources contain environment placeholders rather than passwords/tokens. `.dockerignore` excludes local environment files. `gitleaks git --redact` on 2026-09-29 again found only the two already-documented historical credentials from SA-011 and SA-012; values and matches are intentionally omitted. `gitleaks dir --redact` also found current local secrets in ignored `SupportConfigFiles/.env`; this is tracked as SA-015. On 2026-10-01, Doppler CLI setup imported env files into project `onlinepos`, but the initial upload printed secret values in command output; this is tracked as SA-016. The Google key still requires provider-side rotation/rejection verification. The historical database host and password differ from current local configuration, but provider-side rejection remains unverified. Git-history rewriting was not performed.
 
 # Production HTTP/TLS Review
 
@@ -293,6 +312,7 @@ Major changed-file groups are:
 - Browser/error hardening: `SecurityHeadersFilter`, `CustomErrorController`, Thymeleaf templates, and admin/checkout JavaScript.
 - Supply chain/deployment: `Misc/pom.xml`, `.dockerignore`, Dockerfiles, Compose, Nginx, deployment/provision/test scripts, and the CI workflow.
 - Evidence and regression coverage: PostgreSQL/security/customer tests, browser security tests, `MD files/Security audit.md`, and this report.
+- Secrets management: Doppler CLI was installed locally and on the VM; deployment now renders `SupportConfigFiles/.env` from Doppler by default and GitHub Actions no longer builds/uploads runtime app secret files.
 
 # Remaining Recommendations
 
@@ -304,7 +324,9 @@ These actions are required before the audit can be closed:
 4. Inspect the exact production image/container for non-root user, dropped capabilities, read-only root filesystem, OCI revision, and health.
 5. Run the image scanner against the exact built production image and resolve any applicable findings.
 6. Keep `SupportConfigFiles/.env` out of support bundles/backups, restrict local permissions, and rotate any values if the local file has been shared.
-7. Make a separate explicit decision about Git-history rewriting after rotations. History rewriting is not a substitute for rotation.
+7. Rotate every secret printed during the 2026-10-01 Doppler upload output, including Google Maps, Resend, JWT, RLS, database, migration, runtime, and administrator credentials where applicable.
+8. Replace Doppler `onlinepos/prd` with production-safe values before deployment; verify `SPRING_DATASOURCE_URL` does not point at `localhost`, `SESSION_COOKIE_SECURE=true`, and the VM has a read-only `onlinepos/prd` service token.
+9. Make a separate explicit decision about Git-history rewriting after rotations. History rewriting is not a substitute for rotation.
 
 # Security Test Coverage
 
@@ -312,7 +334,7 @@ The PostgreSQL integration profile covers two customers, both branch admins, a n
 
 Browser tests cover public/customer/admin navigation, renderer XSS safety, CSRF/login behavior, POS queues, catalog filtering, specials, and ordering. Static validation checks JavaScript, inline template scripts, shell, SQL through migration execution, YAML, and Docker/Nginx configuration where tooling is available.
 
-Final full-suite results from 2026-09-28 remain the last successful PostgreSQL/browser regression evidence: the full Maven PostgreSQL profile passed 192 unit/integration tests and 19 dedicated RLS tests; Playwright passed five scenarios. On 2026-09-29, embedded-template JavaScript validation, static JavaScript syntax checks, shell syntax checks, and `npm audit --audit-level=low` passed. A direct `./scripts/test-postgres.sh -B -Dtest=ApiSecurityTest,MultiLoginTest,RlsPostgresIT test -Prls-it` rerun was blocked because `RLS_TEST_ADMIN_URL` was not configured in this shell; plain Maven test was also blocked by unresolved `${TEST_DATASOURCE_URL}`. Browser regression tests were not rerun because they depend on the same disposable PostgreSQL harness. OSV reported zero vulnerability entries but exited non-zero after enrichment; Semgrep reported 19 previously triaged findings; Trivy could not update its DB because the local credential helper `docker-credential-desktop` is missing.
+Final full-suite results from 2026-09-28 remain the last successful PostgreSQL/browser regression evidence: the full Maven PostgreSQL profile passed 192 unit/integration tests and 19 dedicated RLS tests; Playwright passed five scenarios. On 2026-09-29, embedded-template JavaScript validation, static JavaScript syntax checks, shell syntax checks, and `npm audit --audit-level=low` passed. On 2026-10-01, Doppler deployment-script changes passed `bash -n scripts/*.sh`, `python3 scripts/check-template-scripts.py`, static JavaScript syntax checks, workflow YAML parsing, and `git diff --check`. A direct `./scripts/test-postgres.sh -B -Dtest=ApiSecurityTest,MultiLoginTest,RlsPostgresIT test -Prls-it` rerun was blocked because `RLS_TEST_ADMIN_URL` was not configured in this shell; plain Maven test was also blocked by unresolved `${TEST_DATASOURCE_URL}`. Browser regression tests were not rerun because they depend on the same disposable PostgreSQL harness. OSV reported zero vulnerability entries but exited non-zero after enrichment; Semgrep reported 19 previously triaged findings; Trivy could not update its DB because the local credential helper `docker-credential-desktop` is missing.
 
 # Commands Used
 
@@ -340,10 +362,15 @@ curl/openssl read-only production HTTP, CORS, Host, WebSocket, certificate, and 
 2026-09-29: trivy fs --scanners vuln,misconfig,secret --format json --timeout 5m . (blocked by missing local Docker credential helper)
 2026-09-29: ./scripts/test-postgres.sh -B -Dtest=ApiSecurityTest,MultiLoginTest,RlsPostgresIT test -Prls-it (blocked by missing RLS_TEST_ADMIN_URL)
 2026-09-29: curl/openssl read-only production HTTP, CORS, Host/SNI, certificate, and TLS checks
+2026-10-01: brew install gnupg && brew install dopplerhq/cli/doppler && doppler --version
+2026-10-01: ssh azureuser@130.131.162.110 doppler apt repository install and doppler --version
+2026-10-01: doppler projects; doppler configs; doppler secrets download --no-file --format docker --project onlinepos --config dev/prd | grep <required names> (presence-only output)
+2026-10-01: doppler secrets upload --project onlinepos --config dev/prd <env file> (initial command printed secret values; tracked as SA-016)
+2026-10-01: bash -n scripts/*.sh; python3 scripts/check-template-scripts.py; node --check <JavaScript files>; workflow YAML parse; git diff --check
 ```
 
 Scanner output is stored only in temporary local files and was manually validated. Secret values are excluded from this report.
 
 # Final Risk Summary
 
-Application-layer residual risk is substantially reduced, and the last complete PostgreSQL security suite passed. Production now shows the reviewed browser security headers and low-impact HTTP/TLS checks remain favorable. Historical credentials, local secret hygiene, CI host-key verification, production container inspection, and image scanning keep the overall risk at **High** until rotations and rollout/provider checks are completed. After those actions, the remaining expected risk is ordinary operational risk around application-host compromise, migration-owner compromise, dependency drift, local secret handling, and third-party service availability.
+Application-layer residual risk is substantially reduced, and the last complete PostgreSQL security suite passed. Production now shows the reviewed browser security headers and low-impact HTTP/TLS checks remain favorable. Historical credentials, Doppler upload transcript exposure, local secret hygiene, CI host-key verification, production container inspection, and image scanning keep the overall risk at **High** until rotations, Doppler `prd` correction, token replacement, and rollout/provider checks are completed. After those actions, the remaining expected risk is ordinary operational risk around application-host compromise, migration-owner compromise, dependency drift, local secret handling, and third-party service availability.
