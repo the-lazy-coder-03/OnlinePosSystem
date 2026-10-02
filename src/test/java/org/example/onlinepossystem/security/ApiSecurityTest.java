@@ -66,6 +66,14 @@ class ApiSecurityTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test void orderConfirmationPageRequiresCustomerRole() throws Exception {
+        mvc.perform(get("/orders/1/confirmation"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrlPattern("**/login"));
+        mvc.perform(get("/orders/1/confirmation").session(login()))
+                .andExpect(status().isForbidden());
+    }
+
     @Test void untrustedWebsitesCannotReadCredentialedApiResponses() throws Exception {
         mvc.perform(options("/api/admin/orders").header("Origin", "https://untrusted.example")
                         .header("Access-Control-Request-Method", "GET"))

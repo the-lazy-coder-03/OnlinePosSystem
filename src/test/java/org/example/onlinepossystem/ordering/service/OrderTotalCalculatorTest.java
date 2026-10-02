@@ -32,6 +32,14 @@ class OrderTotalCalculatorTest {
         order.setMenuItems(List.of(burger));
         order.setPizzaItems(List.of(pizza));
 
-        assertThat(new OrderTotalCalculator().total(order)).isEqualByComparingTo(new BigDecimal("460.00"));
+        OrderTotalCalculator calculator = new OrderTotalCalculator();
+        assertThat(calculator.menuItemUnitTotal(burger)).isEqualByComparingTo(new BigDecimal("95.00"));
+        assertThat(calculator.menuItemLineTotal(burger)).isEqualByComparingTo(new BigDecimal("190.00"));
+        assertThat(calculator.pizzaItemUnitTotal(pizza)).isEqualByComparingTo(new BigDecimal("135.00"));
+        assertThat(calculator.pizzaItemLineTotal(pizza)).isEqualByComparingTo(new BigDecimal("270.00"));
+        assertThat(calculator.total(order)).isEqualByComparingTo(new BigDecimal("460.00"));
+        assertThat(calculator.breakdown(order).subtotal()).isEqualByComparingTo(new BigDecimal("460.00"));
+        assertThat(calculator.breakdown(order).deliveryFee()).isEqualByComparingTo(new BigDecimal("0.00"));
+        assertThat(calculator.breakdown(order).total()).isEqualByComparingTo(new BigDecimal("460.00"));
     }
 }

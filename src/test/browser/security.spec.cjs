@@ -70,6 +70,19 @@ test('order renderer treats every customer field as text and allows only known s
     expect(await page.evaluate(() => window.nextStatus)).toBe('Preparing');
 });
 
+test('order confirmation map fallback hides failed map images', async ({page}) => {
+    await page.setContent(`
+        <div class="map-frame">
+            <img data-confirmation-map src="/missing-map.png" alt="Delivery map">
+            <div data-map-fallback hidden>Map unavailable</div>
+        </div>
+    `);
+    await page.addScriptTag({path: path.join(projectRoot, 'src/main/resources/static/js/order-confirmation.js')});
+    await page.locator('[data-confirmation-map]').dispatchEvent('error');
+    await expect(page.locator('[data-confirmation-map]')).toBeHidden();
+    await expect(page.locator('[data-map-fallback]')).toBeVisible();
+});
+
 test('pizza customization defaults to the available 30cm size', async ({page}) => {
     await login(page, 'browser@example.com');
     await page.goto('/order');
@@ -150,6 +163,16 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     const response = await placed;
     expect(response.status()).toBe(200);
     const order = await response.json();
+    await expect(page).toHaveURL(new RegExp(`/orders/${order.id}/confirmation$`));
+    await expect(page.getByRole('heading', {name: 'Order Confirmed'})).toBeVisible();
+    await expect(page.locator('body')).toContainText(`Order #${order.id}`);
+    await expect(page.locator('body')).toContainText('Your order has been received by Pete\'s Pizzas Kenridge.');
+    await expect(page.locator('body')).toContainText('Delivery');
+    await expect(page.locator('body')).toContainText('12 Main Street, Kenridge, Cape Town, 7550, South Africa');
+    await expect(page.locator('body')).toContainText('Gate 4*');
+    await expect(page.locator('body')).toContainText('Map preview is unavailable for this order.');
+    await expect(page.locator('[data-confirmation-map]')).toHaveCount(0);
+    await expect(page.locator('.summary-total')).toContainText('R');
     expect(order.gateAccessCode).toBe('Gate 4*');
     expect(order.googlePlaceId).toBe('places/browser-saved');
     expect(order.formattedAddress).toBe('12 Main Street, Kenridge, Cape Town, 7550, South Africa');

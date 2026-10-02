@@ -28,4 +28,5 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByStatusInOrderByCreatedAtDesc(Collection<String> statuses);
     List<Order> findByBranchIdAndStatusInOrderByCreatedAtDesc(Integer branchId, Collection<String> statuses);
     Optional<Order> findByCustomerIdAndIdempotencyKey(Long customerId, String idempotencyKey);
+    Optional<Order> findByIdAndCustomerId(Long id, Long customerId);
 }

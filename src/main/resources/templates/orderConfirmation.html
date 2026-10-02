@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <title th:text="|Order ${confirmation.orderNumber} confirmed — Pete’s Pizza|">Order confirmed — Pete’s Pizza</title>
+    <link rel="stylesheet" th:href="@{/css/order-confirmation.css}">
+</head>
+<body>
+<header class="topbar">
+    <div class="topbar-inner">
+        <a class="brand" th:href="@{/}">Pete’s Pizza</a>
+        <nav class="top-actions" aria-label="Main navigation">
+            <a class="nav-link" th:href="@{/}">Home</a>
+            <a class="nav-link" th:href="@{/menu}">Menu</a>
+            <a class="nav-link nav-link-primary" th:href="@{/profile/edit}">My Account</a>
+        </nav>
+    </div>
+</header>
+
+<section class="confirmation-hero">
+    <div class="confirmation-hero-inner">
+        <p class="eyebrow">Order confirmed</p>
+        <h1>Order Confirmed</h1>
+        <p class="order-number" th:text="|Order ${confirmation.orderNumber}|">Order #12345</p>
+        <p class="received-message" th:text="${confirmation.receivedMessage}">Your order has been received.</p>
+    </div>
+</section>
+
+<main class="confirmation-layout">
+    <section class="confirmation-main" aria-label="Order confirmation details">
+        <article class="confirmation-card map-card" th:if="${confirmation.delivery}">
+            <div class="card-heading">
+                <p class="eyebrow">Delivery location</p>
+                <h2>Delivery Address</h2>
+            </div>
+            <div class="map-frame" th:if="${confirmation.showMap}">
+                <img th:src="${confirmation.staticMapUrl}"
+                     th:alt="${confirmation.mapAltText}"
+                     data-confirmation-map
+                     loading="lazy">
+                <div class="map-fallback" data-map-fallback hidden>
+                    <strong>Map unavailable</strong>
+                    <span>Your delivery address is saved with the order.</span>
+                </div>
+            </div>
+            <address class="delivery-address" th:text="${confirmation.displayAddress}">12 Main Street, Cape Town</address>
+            <p class="muted" th:if="${!confirmation.showMap}">Map preview is unavailable for this order.</p>
+        </article>
+
+        <article class="confirmation-card">
+            <div class="card-heading">
+                <p class="eyebrow">Fulfilment</p>
+                <h2>Order Details</h2>
+            </div>
+            <dl class="detail-grid">
+                <div>
+                    <dt>Store</dt>
+                    <dd th:text="${confirmation.order.branchName}">Kenridge</dd>
+                </div>
+                <div>
+                    <dt>Order Type</dt>
+                    <dd th:text="${confirmation.orderTypeLabel}">Delivery</dd>
+                </div>
+                <div th:if="${confirmation.delivery}">
+                    <dt>Delivery Address</dt>
+                    <dd th:text="${confirmation.displayAddress}">12 Main Street</dd>
+                </div>
+                <div th:unless="${confirmation.delivery}">
+                    <dt>Collection Branch</dt>
+                    <dd th:text="${confirmation.order.branchName}">Kenridge</dd>
+                </div>
+                <div>
+                    <dt>Customer</dt>
+                    <dd th:text="${confirmation.order.customerName}">Customer Name</dd>
+                </div>
+                <div th:if="${confirmation.order.phone != null and !#strings.isEmpty(confirmation.order.phone)}">
+                    <dt>Phone</dt>
+                    <dd th:text="${confirmation.order.phone}">0712345678</dd>
+                </div>
+                <div th:if="${confirmation.order.gateAccessCode != null and !#strings.isEmpty(confirmation.order.gateAccessCode)}">
+                    <dt>Gate Access</dt>
+                    <dd th:text="${confirmation.order.gateAccessCode}">Gate 4</dd>
+                </div>
+            </dl>
+        </article>
+
+        <article class="confirmation-card">
+            <div class="card-heading order-lines-heading">
+                <div>
+                    <p class="eyebrow">Saved order</p>
+                    <h2>Order Contents</h2>
+                </div>
+                <span th:text="|${#lists.size(confirmation.lines)} line${#lists.size(confirmation.lines) == 1 ? '' : 's'}|">1 line</span>
+            </div>
+            <div class="order-lines">
+                <div class="order-line" th:each="line : ${confirmation.lines}">
+                    <div class="line-quantity" th:text="|${line.quantity}×|">1×</div>
+                    <div class="line-info">
+                        <div class="line-title">
+                            <strong th:text="${line.name}">Pizza</strong>
+                            <span th:if="${line.size != null and !#strings.isEmpty(line.size)}" th:text="${line.size}">30 cm</span>
+                        </div>
+                        <p class="line-category" th:text="${line.category}">Pizza</p>
+                        <ul th:if="${line.details != null and !#lists.isEmpty(line.details)}">
+                            <li th:each="detail : ${line.details}" th:text="${detail}">Extra cheese</li>
+                        </ul>
+                    </div>
+                    <div class="line-prices">
+                        <span th:text="|R${#numbers.formatDecimal(line.unitPrice, 1, 'COMMA', 2, 'POINT')} each|">R0.00 each</span>
+                        <strong th:text="|R${#numbers.formatDecimal(line.lineTotal, 1, 'COMMA', 2, 'POINT')}|">R0.00</strong>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <aside class="confirmation-summary" aria-label="Order total">
+        <article class="confirmation-card summary-card">
+            <div class="card-heading">
+                <p class="eyebrow">Summary</p>
+                <h2>Pricing</h2>
+            </div>
+            <div class="summary-line">
+                <span>Subtotal</span>
+                <strong th:text="|R${#numbers.formatDecimal(confirmation.totals.subtotal, 1, 'COMMA', 2, 'POINT')}|">R0.00</strong>
+            </div>
+            <div class="summary-line" th:if="${confirmation.delivery}">
+                <span>Delivery Fee</span>
+                <strong th:text="|R${#numbers.formatDecimal(confirmation.totals.deliveryFee, 1, 'COMMA', 2, 'POINT')}|">R0.00</strong>
+            </div>
+            <div class="summary-line" th:if="${confirmation.totals.hasDiscount()}">
+                <span>Discounts</span>
+                <strong th:text="|-R${#numbers.formatDecimal(confirmation.totals.discountTotal, 1, 'COMMA', 2, 'POINT')}|">-R0.00</strong>
+            </div>
+            <div class="summary-total">
+                <span>Total</span>
+                <strong th:text="|R${#numbers.formatDecimal(confirmation.totals.total, 1, 'COMMA', 2, 'POINT')}|">R0.00</strong>
+            </div>
+            <p class="summary-note">Specials and customisations are included in the saved item pricing.</p>
+        </article>
+
+        <div class="confirmation-actions">
+            <a class="button button-primary" th:href="@{/order}">Start another order</a>
+            <a class="button button-secondary" th:href="@{/profile/edit}">View my account</a>
+        </div>
+    </aside>
+</main>
+
+<script th:src="@{/js/order-confirmation.js}" defer></script>
+</body>
+</html>

@@ -151,7 +151,7 @@ Required environment values:
 APP_BASE_URL=https://email.crowdcam.co.za
 RESEND_API_KEY=<Resend sending_access API key>
 RESEND_FROM_EMAIL=noreply@email.crowdcam.co.za
-GOOGLE_MAPS_API_KEY=<restricted browser key for Maps JavaScript and Places API (New)>
+GOOGLE_MAPS_API_KEY=<restricted browser key for Maps JavaScript, Places API (New), and Maps Static API>
 RUN_MIGRATION_SQL=true
 ```
 
@@ -171,15 +171,16 @@ verify key validity, domain status, delivery, or send test emails.
 Ensure `email.crowdcam.co.za` is verified in Resend and the sending key is
 allowed to send from that domain.
 
-`GOOGLE_MAPS_API_KEY` is rendered into registration, profile and checkout pages
-so the browser can load the Maps JavaScript Places autocomplete data API. The
-application requests South African predictions after two typed characters and
-renders the suggestions in its own accessible address list. Enable billing,
-Maps JavaScript API and Places API (New) for that key. Restrict it in Google
+`GOOGLE_MAPS_API_KEY` is rendered into registration, profile, checkout, and
+delivery order-confirmation pages so the browser can load address search and
+the saved delivery map preview. The application requests South African
+predictions after two typed characters and renders the suggestions in its own
+accessible address list. Enable billing, Maps JavaScript API, Places API (New),
+and Maps Static API for that key. Restrict it in Google
 Cloud by HTTP referrer to `https://crowdcam.co.za/*` and
 `https://www.crowdcam.co.za/*` (plus explicit local development origins when
-needed), and restrict API usage to those two APIs. Do not commit a real key. Browser-provided place IDs,
-coordinates and formatted addresses are stored as address metadata only; any
+needed), and restrict API usage to those three APIs. Do not commit a real key.
+Browser-provided place IDs, coordinates and formatted addresses are stored as address metadata only; any
 future delivery fee or serviceability decision must be recalculated by the
 server using trusted provider data.
 
@@ -188,7 +189,7 @@ generic South African street address, and confirm that suggestions appear below
 the field and populate the structured address fields when selected. Check the
 browser console for Google authentication errors. `API Key not found` means the
 deployed key is missing, invalid, or not authorized for the request; also verify
-billing, both enabled APIs, the API restriction list, and the exact HTTP
+billing, enabled APIs, the API restriction list, and the exact HTTP
 referrers before recreating the application container.
 
 After changing Doppler `prd` secrets, refresh the generated env file and recreate

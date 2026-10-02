@@ -311,13 +311,7 @@
 
             const placedOrder = await response.json();
             sessionStorage.removeItem(STORAGE_KEY);
-            showNotice(`Order #${placedOrder.id} has been placed. Status: ${placedOrder.status}.`, "success");
-            placeOrderButton.textContent = "Order placed";
-            document.getElementById("editOrderLink").hidden = true;
-            document.getElementById("backToOrderTop").hidden = true;
-            form.querySelectorAll("input").forEach(input => { input.disabled = true; });
-            deliveryButton.disabled = true;
-            pickupButton.disabled = true;
+            window.location.assign(`/orders/${encodeURIComponent(placedOrder.id)}/confirmation`);
         } catch (error) {
             showNotice(error.message || "Could not place the order. Please try again.", "error");
             placeOrderButton.textContent = "Place order";

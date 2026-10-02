@@ -24,9 +24,11 @@ the source of truth. Maven and the Docker build explicitly select the RLS
 contract rather than copying the entire configuration directory into the
 application.
 
-Live address search uses `GOOGLE_MAPS_API_KEY` from configuration on registration,
-profile and checkout pages. It displays South African predictions after two
-typed characters through the Maps JavaScript Places autocomplete data API. Use
-a browser key restricted by HTTP referrer and limited to Maps JavaScript API plus
-Places API (New). Leave it blank in automated tests; browser coverage supplies a
-mock Places library without transmitting a key or calling Google.
+Live address search and delivery confirmation maps use `GOOGLE_MAPS_API_KEY`
+from configuration on registration, profile, checkout, and delivery confirmation
+pages. Address search displays South African predictions after two typed
+characters through the Maps JavaScript Places autocomplete data API. Use a
+browser key restricted by HTTP referrer and limited to Maps JavaScript API,
+Places API (New), and Maps Static API. Leave it blank in automated tests;
+browser coverage supplies a mock Places library without transmitting a key or
+calling Google.
