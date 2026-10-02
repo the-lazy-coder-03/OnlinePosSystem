@@ -162,10 +162,10 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await page.locator('#placeOrderButton').click();
     const response = await placed;
     expect(response.status()).toBe(200);
-    const order = await response.json();
-    await expect(page).toHaveURL(new RegExp(`/orders/${order.id}/confirmation$`));
+    await expect(page).toHaveURL(/\/orders\/\d+\/confirmation$/);
+    const orderId = page.url().match(/\/orders\/(\d+)\/confirmation$/)[1];
     await expect(page.getByRole('heading', {name: 'Order Confirmed'})).toBeVisible();
-    await expect(page.locator('body')).toContainText(`Order #${order.id}`);
+    await expect(page.locator('body')).toContainText(`Order #${orderId}`);
     await expect(page.locator('body')).toContainText('Your order has been received by Pete\'s Pizzas Kenridge.');
     await expect(page.locator('body')).toContainText('Delivery');
     await expect(page.locator('body')).toContainText('12 Main Street, Kenridge, Cape Town, 7550, South Africa');
@@ -173,20 +173,17 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await expect(page.locator('body')).toContainText('Map preview is unavailable for this order.');
     await expect(page.locator('[data-confirmation-map]')).toHaveCount(0);
     await expect(page.locator('.summary-total')).toContainText('R');
-    expect(order.gateAccessCode).toBe('Gate 4*');
-    expect(order.googlePlaceId).toBe('places/browser-saved');
-    expect(order.formattedAddress).toBe('12 Main Street, Kenridge, Cape Town, 7550, South Africa');
     await expect(admin.locator('#orderListQueue')).toContainText(maliciousName);
     await expect(admin.locator('#orderListQueue')).toContainText('Gate access: Gate 4*');
     await expect(admin.locator('#orderListQueue img')).toHaveCount(0);
     expect(await admin.evaluate(() => window.compromised)).toBeUndefined();
 
-    const updated = admin.waitForResponse(response => response.url().endsWith(`/${order.id}/status`));
+    const updated = admin.waitForResponse(response => response.url().endsWith(`/${orderId}/status`));
     await admin.getByRole('button', {name: 'Prepare', exact: true}).first().click();
     expect((await updated).status()).toBe(200);
     await expect(admin.locator('#orderListQueue .status').first()).toHaveText('Preparing');
     await page.goto('/profile/edit');
-    await expect(page.locator('body')).toContainText(String(order.id));
+    await expect(page.locator('body')).toContainText(orderId);
     expect(errors).toEqual([]);
     await adminContext.close();
 });

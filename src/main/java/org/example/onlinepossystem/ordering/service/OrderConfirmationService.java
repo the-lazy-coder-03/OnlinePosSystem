@@ -9,9 +9,10 @@ import org.example.onlinepossystem.ordering.repository.OrderRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -147,17 +148,25 @@ public class OrderConfirmationService {
             return "";
         }
         String center = coordinate(order.getLatitude()) + "," + coordinate(order.getLongitude());
-        return UriComponentsBuilder.fromUriString("https://maps.googleapis.com/maps/api/staticmap")
-                .queryParam("center", center)
-                .queryParam("zoom", "16")
-                .queryParam("size", "960x360")
-                .queryParam("scale", "2")
-                .queryParam("maptype", "roadmap")
-                .queryParam("markers", "color:red|" + center)
-                .queryParam("key", googleMapsApiKey)
-                .build()
-                .encode()
-                .toUriString();
+        return "https://maps.googleapis.com/maps/api/staticmap?"
+                + queryParam("center", center)
+                + "&" + queryParam("zoom", "16")
+                + "&" + queryParam("size", "960x360")
+                + "&" + queryParam("scale", "2")
+                + "&" + queryParam("maptype", "roadmap")
+                + "&" + queryParam("markers", "color:red|" + center)
+                + "&" + queryParam("key", googleMapsApiKey);
+    }
+
+    private String queryParam(String name, String value) {
+        return encodeQueryValue(name) + "=" + encodeQueryValue(value);
+    }
+
+    private String encodeQueryValue(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8)
+                .replace("+", "%20")
+                .replace("%2C", ",")
+                .replace("%3A", ":");
     }
 
     private String displayAddress(OrderResponseDTO order) {
