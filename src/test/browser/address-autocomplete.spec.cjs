@@ -214,3 +214,41 @@ test('address search stays usable at a phone viewport', async ({page}) => {
     expect(resultsBox.width).toBeLessThanOrEqual(390);
     await expect(page.locator('.address-result').first()).toHaveCSS('min-height', '44px');
 });
+
+test('programmatically loaded saved addresses synchronize with the visible search field', async ({page}) => {
+    await mountAddressSearch(page);
+    await page.evaluate(() => {
+        const values = {
+            googlePlaceId: 'places/saved-address',
+            formattedAddress: '12 Main Road, Kenridge, Cape Town, 7550, South Africa',
+            latitude: '-33.861000',
+            longitude: '18.650000',
+            houseNumber: '12',
+            street: 'Main Road',
+            area: 'Kenridge',
+            city: 'Cape Town',
+            postalCode: '7550',
+            province: 'Western Cape',
+            country: 'South Africa'
+        };
+        for (const [id, nextValue] of Object.entries(values)) document.getElementById(id).value = nextValue;
+        window.PetesAddressAutocomplete.get('testAddress').syncFromFields();
+    });
+
+    await expect(page.locator('.address-search-input'))
+        .toHaveValue('12 Main Road, Kenridge, Cape Town, 7550, South Africa');
+    await expect(page.locator('[data-address-status]')).toHaveText('Address verified.');
+    expect(await page.evaluate(() => window.PetesAddressAutocomplete.get('testAddress').isVerified())).toBe(true);
+    expect(await page.evaluate(() => window.PetesAddressAutocomplete.get('testAddress').hasChanged())).toBe(false);
+
+    await page.evaluate(() => {
+        for (const id of ['googlePlaceId', 'formattedAddress', 'latitude', 'longitude', 'province', 'country']) {
+            document.getElementById(id).value = '';
+        }
+        window.PetesAddressAutocomplete.get('testAddress').syncFromFields();
+    });
+    await expect(page.locator('.address-search-input')).toHaveValue('12 Main Road, Kenridge, Cape Town, 7550');
+    await expect(page.locator('[data-address-status]'))
+        .toHaveText('Saved address loaded. Select a Google result to verify it.');
+    expect(await page.evaluate(() => window.PetesAddressAutocomplete.get('testAddress').requireValid())).toBe(false);
+});

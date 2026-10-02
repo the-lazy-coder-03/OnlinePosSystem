@@ -33,9 +33,17 @@ java -jar "$jar" --spring.config.import= --spring.profiles.active=migrate \
     --spring.datasource.url="jdbc:${test_uri}" --app.database.migration.enabled=true
 
 psql -X -v ON_ERROR_STOP=1 -q -d "$test_uri" <<'SQL'
+INSERT INTO customers(
+    email,password,access_level,role,first_name,last_name,phone1,
+    house_number,street,area,complex_name,preferred_store,postal_code,city,
+    google_place_id,formatted_address,latitude,longitude,province,country)
+VALUES (
+    'browser@example.com','{noop}Browser-test-123',0,'USER','Browser','Customer','0712345678',
+    '12','Main Street','Kenridge','Oak Mews','Kenridge Branch','7550','Cape Town',
+    'places/browser-saved','12 Main Street, Kenridge, Cape Town, 7550, South Africa',
+    -33.861000,18.650000,'Western Cape','South Africa');
 INSERT INTO customers(email,password,access_level,role,first_name,last_name)
-VALUES ('browser@example.com','{noop}Browser-test-123',0,'USER','Browser','Customer'),
-       ('branch@example.com','{noop}Browser-test-123',1,'ADMIN','Branch','Admin');
+VALUES ('branch@example.com','{noop}Browser-test-123',1,'ADMIN','Branch','Admin');
 SQL
 
 java -jar "$jar" --spring.config.import= --spring.profiles.active=default \

@@ -126,10 +126,14 @@
 
     function customerValue(key) {
         const draftKey = key === "fullName" ? "name" : key;
-        const fromDraftAddress = draft?.customer?.deliveryAddress?.[key];
-        if (typeof fromDraftAddress === "string" && fromDraftAddress.trim()) return fromDraftAddress.trim();
-        const fromDraft = draft?.customer?.[draftKey]?.trim();
-        if (fromDraft) return fromDraft;
+        const draftAddress = draft?.customer?.deliveryAddress;
+        if (draftAddress && Object.prototype.hasOwnProperty.call(draftAddress, key)) {
+            return typeof draftAddress[key] === "string" ? draftAddress[key].trim() : "";
+        }
+        const draftCustomer = draft?.customer;
+        if (draftCustomer && Object.prototype.hasOwnProperty.call(draftCustomer, draftKey)) {
+            return typeof draftCustomer[draftKey] === "string" ? draftCustomer[draftKey].trim() : "";
+        }
         const fromServer = serverCustomer[key]?.trim();
         if (fromServer) return fromServer;
         return "";
@@ -140,6 +144,7 @@
             document.getElementById(id).value = customerValue(id);
         });
         document.getElementById("email").value = serverCustomer.email;
+        addressInstance()?.syncFromFields();
     }
 
     function updatePlaceOrderAvailability() {

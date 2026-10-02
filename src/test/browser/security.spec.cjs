@@ -13,6 +13,11 @@ async function login(page, username) {
     await expect(page).not.toHaveURL(/\/login/);
 }
 
+async function chooseKenridgeWhenPrompted(page) {
+    const branchButton = page.locator('#branchKenridge');
+    if (await branchButton.isVisible()) await branchButton.click();
+}
+
 async function seedVerifiedAddress(page, ids = {}) {
     await page.evaluate(ids => {
         const values = {
@@ -68,7 +73,7 @@ test('order renderer treats every customer field as text and allows only known s
 test('pizza customization defaults to the available 30cm size', async ({page}) => {
     await login(page, 'browser@example.com');
     await page.goto('/order');
-    await page.locator('#branchKenridge').click();
+    await chooseKenridgeWhenPrompted(page);
     const pizza = page.locator('#listBody .row:not(.special-unavailable)')
         .filter({hasText: /Click to customize/}).first();
     await expect(pizza).toContainText('Click to customize');
@@ -82,7 +87,7 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     await login(page, 'browser@example.com');
     await page.goto('/order');
-    await page.locator('#branchKenridge').click();
+    await chooseKenridgeWhenPrompted(page);
     await expect(page.locator('#branchOverlay')).not.toHaveClass(/show/);
     await expect(page.locator('#typeCollection, #typeDelivery')).toHaveCount(0);
     await page.locator('#listBody .row').filter({hasText: /Click to customize|Click to add/}).first().click();
@@ -118,7 +123,16 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await page.setViewportSize({width: 1280, height: 720});
     await page.locator('#deliveryButton').click();
     await expect(page.locator('#deliveryFields')).toBeVisible();
-    await expect(page.locator('#checkoutAddressAutocomplete .address-search-input')).toBeVisible();
+    await expect(page.locator('#checkoutAddressAutocomplete .address-search-input'))
+        .toHaveValue('12 Main Street, Kenridge, Cape Town, 7550, South Africa');
+    await expect(page.locator('#houseNumber')).toHaveValue('12');
+    await expect(page.locator('#street')).toHaveValue('Main Street');
+    await expect(page.locator('#area')).toHaveValue('Kenridge');
+    await expect(page.locator('#city')).toHaveValue('Cape Town');
+    await expect(page.locator('#postalCode')).toHaveValue('7550');
+    await expect(page.locator('#googlePlaceId')).toHaveValue('places/browser-saved');
+    expect(await page.evaluate(() => window.PetesAddressAutocomplete
+        .get('checkoutAddressAutocomplete').isVerified())).toBe(true);
     await expect(page.locator('#street')).toHaveAttribute('required', '');
     await expect(page.locator('#gateAccessCode')).toHaveAttribute('maxlength', '64');
     await page.locator('#gateAccessCode').fill('Gate 4*');
@@ -128,11 +142,6 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await expect(page.locator('#placeOrderButton')).toBeEnabled();
     await page.locator('#deliveryButton').click();
     await expect(page.locator('#gateAccessCode')).toHaveValue('Gate 4*');
-    await page.locator('#street').fill('Main Street');
-    await page.locator('#area').fill('Kenridge');
-    await page.locator('#city').fill('Cape Town');
-    await page.locator('#postalCode').fill('7550');
-    await seedVerifiedAddress(page);
     await page.locator('#fullName').fill(maliciousName);
     await page.locator('#phone').fill('0712345678');
 
@@ -142,6 +151,8 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     expect(response.status()).toBe(200);
     const order = await response.json();
     expect(order.gateAccessCode).toBe('Gate 4*');
+    expect(order.googlePlaceId).toBe('places/browser-saved');
+    expect(order.formattedAddress).toBe('12 Main Street, Kenridge, Cape Town, 7550, South Africa');
     await expect(admin.locator('#orderListQueue')).toContainText(maliciousName);
     await expect(admin.locator('#orderListQueue')).toContainText('Gate access: Gate 4*');
     await expect(admin.locator('#orderListQueue img')).toHaveCount(0);
@@ -157,13 +168,59 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await adminContext.close();
 });
 
+test('checkout preserves a temporary delivery address for the current order only', async ({page}) => {
+    await login(page, 'browser@example.com');
+    await page.goto('/order');
+    await page.evaluate(() => {
+        sessionStorage.setItem('petesPizza.checkoutDraft.v1', JSON.stringify({
+            accountEmail: 'browser@example.com',
+            branch: {id: 1, name: 'Kenridge'},
+            orderType: 'delivery',
+            customer: {
+                name: 'Browser Customer',
+                phone: '0712345678',
+                deliveryAddress: {
+                    googlePlaceId: 'places/temporary-address',
+                    formattedAddress: '44 Temporary Road, Durbanville, Cape Town, 7550, South Africa',
+                    latitude: '-33.833000',
+                    longitude: '18.650000',
+                    houseNumber: '44',
+                    street: 'Temporary Road',
+                    area: 'Durbanville',
+                    city: 'Cape Town',
+                    postalCode: '7550',
+                    complexName: '',
+                    province: 'Western Cape',
+                    country: 'South Africa'
+                }
+            },
+            items: [{type: 'menu', menuItemId: 1, name: 'Draft item', quantity: 1, pricing: {lineTotal: 10}}]
+        }));
+    });
+
+    await page.goto('/checkout');
+    await expect(page.locator('#checkoutAddressAutocomplete .address-search-input'))
+        .toHaveValue('44 Temporary Road, Durbanville, Cape Town, 7550, South Africa');
+    await expect(page.locator('#street')).toHaveValue('Temporary Road');
+    await page.goto('/order');
+    await page.goto('/checkout');
+    await expect(page.locator('#checkoutAddressAutocomplete .address-search-input'))
+        .toHaveValue('44 Temporary Road, Durbanville, Cape Town, 7550, South Africa');
+
+    await page.evaluate(() => sessionStorage.removeItem('petesPizza.checkoutDraft.v1'));
+    await page.reload();
+    await expect(page.locator('#checkoutAddressAutocomplete .address-search-input'))
+        .toHaveValue('12 Main Street, Kenridge, Cape Town, 7550, South Africa');
+    await expect(page.locator('#googlePlaceId')).toHaveValue('places/browser-saved');
+});
+
 test('registration rotates the anonymous session and profile changes remain authenticated', async ({page, context}) => {
     await page.goto('/register');
     await expect(page.locator('#registerAddressAutocomplete .address-search-input')).toBeVisible();
     const before = (await context.cookies()).find(cookie => cookie.name === 'JSESSIONID').value;
     const fields = {
         firstName: 'Registered', lastName: 'Customer', email: 'registered@example.com', password: 'Browser-test-123',
-        house_number: '12', street: 'Main Street', area: 'Kenridge', city: 'Cape Town', postalCode: '7550', phone: '0712345678'
+        house_number: '12', street: 'Main Street', area: 'Kenridge', city: 'Cape Town', postalCode: '7550', phone: '0798765432'
     };
     for (const [name, value] of Object.entries(fields)) await page.locator(`[name="${name}"]`).fill(value);
     await seedVerifiedAddress(page, {

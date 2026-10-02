@@ -134,6 +134,16 @@
             && address.street && (address.area || address.city) && address.country);
     }
 
+    function displayAddress(address) {
+        if (address.formattedAddress) return address.formattedAddress;
+        return [
+            [address.houseNumber, address.street].filter(Boolean).join(" "),
+            address.area,
+            address.city,
+            address.postalCode
+        ].filter(Boolean).join(", ");
+    }
+
     function predictionText(prediction) {
         return prediction?.text?.toString?.() || prediction?.text || prediction?.mainText?.toString?.()
             || prediction?.mainText || "Address result";
@@ -199,7 +209,7 @@
             province: field(root, "fieldProvince"),
             country: field(root, "fieldCountry")
         };
-        const initialCore = coreFingerprint();
+        let initialCore = coreFingerprint();
         let currentAddress = readAddressFromFields();
         let isVerified = verified(currentAddress);
         let applyingSelection = false;
@@ -209,7 +219,7 @@
         let activeIndex = -1;
         let debounceTimer;
         let requestVersion = 0;
-        const ui = createSearchUi(root, widget, currentAddress.formattedAddress);
+        const ui = createSearchUi(root, widget, displayAddress(currentAddress));
 
         if (status) {
             status.setAttribute("aria-live", "polite");
@@ -278,6 +288,26 @@
             isVerified = verified(address);
             applyingSelection = false;
             updateStatus(isVerified ? "Address verified." : "Google returned an incomplete address. Choose a more specific result.", isVerified ? "verified" : "invalid");
+        }
+
+        function syncFromFields() {
+            requestVersion += 1;
+            clearTimeout(debounceTimer);
+            closeResults();
+            currentAddress = readAddressFromFields();
+            isVerified = verified(currentAddress);
+            initialCore = coreFingerprint();
+            ui.input.value = displayAddress(currentAddress);
+            const hasSavedAddress = Boolean(ui.input.value);
+            updateStatus(
+                isVerified
+                    ? "Address verified."
+                    : (hasSavedAddress
+                        ? "Saved address loaded. Select a Google result to verify it."
+                        : "Start typing to search for an address."),
+                isVerified ? "verified" : "ready"
+            );
+            return currentAddress;
         }
 
         function requireValid() {
@@ -437,7 +467,8 @@
             getAddress: () => readAddressFromFields(),
             isVerified: () => verified(readAddressFromFields()),
             hasChanged: changedSinceLoad,
-            requireValid
+            requireValid,
+            syncFromFields
         };
         REGISTRY.set(id, instance);
 
