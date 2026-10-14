@@ -6,11 +6,16 @@ set -Eeuo pipefail
 
 PUBLIC_HOST="${PUBLIC_HOST:-crowdcam.co.za}"
 VERIFY_URL="${VERIFY_URL:-https://${PUBLIC_HOST}/}"
+COMPOSE_OVERRIDE_FILE="${COMPOSE_OVERRIDE_FILE:-}"
 ROLLBACK_TAG="onlinepossystem-app:rollback"
 
 compose() {
+  local compose_files=(-f docker/docker-compose.yml)
+  if [[ -n "$COMPOSE_OVERRIDE_FILE" ]]; then
+    compose_files+=(-f "$COMPOSE_OVERRIDE_FILE")
+  fi
   docker compose --env-file SupportConfigFiles/.env \
-    -f docker/docker-compose.yml -p onlinepossystem "$@"
+    "${compose_files[@]}" -p onlinepossystem "$@"
 }
 
 verify_app() {

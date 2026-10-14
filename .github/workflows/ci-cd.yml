@@ -206,6 +206,7 @@ jobs:
           DOPPLER_ENABLED: "false"
           PUBLIC_HOST: crowdcam.co.za
           VERIFY_URL: http://127.0.0.1:18080/
+          COMPOSE_OVERRIDE_FILE: docker/docker-compose.override.yml
           KEEP_ROLLBACK_IMAGE: "true"
         run: bash scripts/deploy-production.sh
 
@@ -225,4 +226,5 @@ jobs:
         env:
           REMOTE_APP_DIR: /home/matthew/OnlinePosSystem
           VERIFY_URL: http://127.0.0.1:18080/
+          COMPOSE_OVERRIDE_FILE: docker/docker-compose.override.yml
         run: DEPLOY_ACTION=rollback bash "$REMOTE_APP_DIR/scripts/manage-production-rollback.sh"
