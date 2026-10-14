@@ -5,11 +5,16 @@ set -Eeuo pipefail
 : "${DEPLOY_ACTION:?DEPLOY_ACTION must be finalize or rollback}"
 
 PUBLIC_HOST="${PUBLIC_HOST:-crowdcam.co.za}"
+VERIFY_URL="${VERIFY_URL:-https://${PUBLIC_HOST}/}"
 ROLLBACK_TAG="onlinepossystem-app:rollback"
 
 compose() {
   docker compose --env-file SupportConfigFiles/.env \
     -f docker/docker-compose.yml -p onlinepossystem "$@"
+}
+
+verify_app() {
+  curl --fail --silent --show-error --max-time 10 "$VERIFY_URL" >/dev/null
 }
 
 cd "$REMOTE_APP_DIR"
@@ -33,9 +38,7 @@ case "$DEPLOY_ACTION" in
     test -n "$app_container_id"
     for _ in $(seq 1 60); do
       health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$app_container_id")"
-      if [[ "$health_status" == "healthy" ]] && \
-          curl --fail --silent --show-error --max-time 10 \
-            --resolve "${PUBLIC_HOST}:443:127.0.0.1" "https://${PUBLIC_HOST}/" >/dev/null; then
+      if [[ "$health_status" == "healthy" ]] && verify_app; then
         break
       fi
       sleep 2

@@ -6,6 +6,7 @@ set -Eeuo pipefail
 : "${DEPLOY_SHA:?DEPLOY_SHA is required}"
 
 PUBLIC_HOST="${PUBLIC_HOST:-crowdcam.co.za}"
+VERIFY_URL="${VERIFY_URL:-https://${PUBLIC_HOST}/}"
 DOPPLER_ENABLED="${DOPPLER_ENABLED:-true}"
 DOPPLER_PROJECT="${DOPPLER_PROJECT:-onlinepos}"
 DOPPLER_CONFIG="${DOPPLER_CONFIG:-prd}"
@@ -28,6 +29,10 @@ trap cleanup EXIT
 compose() {
   docker compose --env-file SupportConfigFiles/.env \
     -f docker/docker-compose.yml -p onlinepossystem "$@"
+}
+
+verify_app() {
+  curl --fail --silent --show-error --max-time 10 "$VERIFY_URL" >/dev/null
 }
 
 refresh_doppler_env() {
@@ -158,9 +163,7 @@ test -n "$APP_CONTAINER_ID"
 
 for _ in $(seq 1 60); do
   HEALTH_STATUS="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}' "$APP_CONTAINER_ID")"
-  if [[ "$HEALTH_STATUS" == "healthy" ]] && \
-      curl --fail --silent --show-error --max-time 10 \
-        --resolve "${PUBLIC_HOST}:443:127.0.0.1" "https://${PUBLIC_HOST}/" >/dev/null; then
+  if [[ "$HEALTH_STATUS" == "healthy" ]] && verify_app; then
     break
   fi
   sleep 2
@@ -175,8 +178,7 @@ IMAGE_REVISION="$(docker inspect --format '{{index .Config.Labels "org.openconta
   false
 }
 
-curl --fail --silent --show-error --max-time 10 \
-  --resolve "${PUBLIC_HOST}:443:127.0.0.1" "https://${PUBLIC_HOST}/" >/dev/null
+verify_app
 
 trap - ERR
 if [[ "$ROLLBACK_AVAILABLE" == "true" && "$KEEP_ROLLBACK_IMAGE" != "true" ]]; then

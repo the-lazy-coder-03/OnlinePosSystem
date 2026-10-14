@@ -178,8 +178,8 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 
   deploy:
-    name: Deploy to Azure VM
-    runs-on: ubuntu-latest
+    name: Deploy to LAN server
+    runs-on: [self-hosted, linux, x64, onlinepos-lan]
     needs: [backend-tests, browser-tests, validation]
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref_name == 'master')
     timeout-minutes: 30
@@ -191,122 +191,38 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - name: Validate required secrets
-        env:
-          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
-          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
-          AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
-          AZURE_VM_KNOWN_HOSTS: ${{ secrets.AZURE_VM_KNOWN_HOSTS }}
+      - name: Validate LAN deployment prerequisites
         run: |
-          test -n "$AZURE_VM_HOST" || (echo "Missing AZURE_VM_HOST secret" && exit 1)
-          test -n "$AZURE_VM_USER" || (echo "Missing AZURE_VM_USER secret" && exit 1)
-          test -n "$AZURE_VM_SSH_KEY" || (echo "Missing AZURE_VM_SSH_KEY secret" && exit 1)
-          test -n "$AZURE_VM_KNOWN_HOSTS" || (echo "Missing AZURE_VM_KNOWN_HOSTS secret" && exit 1)
-
-      - name: Set up production smoke runtime
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: SupportConfigFiles/package-lock.json
-
-      - name: Install production smoke dependencies
-        run: npm --prefix SupportConfigFiles ci
-
-      - name: Cache production smoke Chromium
-        id: production-playwright-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('SupportConfigFiles/package-lock.json') }}
-
-      - name: Install production smoke Chromium
-        run: |
-          npm --prefix SupportConfigFiles exec -- playwright install-deps chromium
-          if [[ "${{ steps.production-playwright-cache.outputs.cache-hit }}" != "true" ]]; then
-            npm --prefix SupportConfigFiles exec -- playwright install chromium
-          fi
-
-      - name: Configure SSH
-        env:
-          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
-          AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
-          AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
-          AZURE_VM_KNOWN_HOSTS: ${{ secrets.AZURE_VM_KNOWN_HOSTS }}
-        run: |
-          umask 077
-          mkdir -p ~/.ssh
-          printf '%s\n' "$AZURE_VM_SSH_KEY" > ~/.ssh/online-pos-azure
-          chmod 600 ~/.ssh/online-pos-azure
-          printf '%s\n' "$AZURE_VM_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
-
-      - name: Upload deployment script
-        env:
-          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
-          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
-          AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
-        run: |
-          remote_script="/tmp/onlinepos-deploy-${GITHUB_SHA}.sh"
-          scp -i ~/.ssh/online-pos-azure -P "${AZURE_VM_PORT:-22}" \
-            scripts/deploy-production.sh \
-            "${AZURE_VM_USER}@${AZURE_VM_HOST}:${remote_script}"
+          test -d /home/matthew/OnlinePosSystem/.git
+          test -f /home/matthew/OnlinePosSystem/SupportConfigFiles/.env
+          test "$(stat -c '%a' /home/matthew/OnlinePosSystem/SupportConfigFiles/.env)" = 600
 
       - name: Deploy Docker Compose stack
         id: deploy-stack
         env:
-          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
-          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
-          AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
-          REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
-          DOPPLER_PROJECT: onlinepos
-          DOPPLER_CONFIG: prd
+          REMOTE_APP_DIR: /home/matthew/OnlinePosSystem
+          DEPLOY_BRANCH: master
+          DEPLOY_SHA: ${{ github.sha }}
+          DOPPLER_ENABLED: "false"
+          PUBLIC_HOST: crowdcam.co.za
+          VERIFY_URL: http://127.0.0.1:18080/
+          KEEP_ROLLBACK_IMAGE: "true"
+        run: bash scripts/deploy-production.sh
+
+      - name: Verify LAN application smoke checks
+        id: lan-smoke
         run: |
-          remote_app_dir="${REMOTE_APP_DIR:-/home/${AZURE_VM_USER}/OnlinePosSystem}"
-          quoted_remote_app_dir="$(printf '%q' "$remote_app_dir")"
-          quoted_branch="$(printf '%q' "$GITHUB_REF_NAME")"
-          quoted_sha="$(printf '%q' "$GITHUB_SHA")"
-          quoted_doppler_project="$(printf '%q' "$DOPPLER_PROJECT")"
-          quoted_doppler_config="$(printf '%q' "$DOPPLER_CONFIG")"
-          remote_script="/tmp/onlinepos-deploy-${GITHUB_SHA}.sh"
-          quoted_remote_script="$(printf '%q' "$remote_script")"
-
-          ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
-            "DOPPLER_ENABLED=true DOPPLER_PROJECT=${quoted_doppler_project} DOPPLER_CONFIG=${quoted_doppler_config} KEEP_ROLLBACK_IMAGE=true REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_BRANCH=${quoted_branch} DEPLOY_SHA=${quoted_sha} bash ${quoted_remote_script}"
-
-      - name: Verify live production address search
-        id: production-smoke
-        env:
-          PRODUCTION_ORIGIN: https://crowdcam.co.za
-        run: node scripts/production-address-smoke.cjs
+          curl --fail --silent --show-error --max-time 10 http://127.0.0.1:18080/ >/dev/null
+          curl --fail --silent --show-error --max-time 10 http://127.0.0.1:18080/login >/dev/null
 
       - name: Finalize production deployment
         env:
-          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
-          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
-          AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
-          REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
-        run: |
-          remote_app_dir="${REMOTE_APP_DIR:-/home/${AZURE_VM_USER}/OnlinePosSystem}"
-          quoted_remote_app_dir="$(printf '%q' "$remote_app_dir")"
-          quoted_helper="$(printf '%q' "$remote_app_dir/scripts/manage-production-rollback.sh")"
-          ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
-            "REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_ACTION=finalize bash ${quoted_helper}"
+          REMOTE_APP_DIR: /home/matthew/OnlinePosSystem
+        run: DEPLOY_ACTION=finalize bash "$REMOTE_APP_DIR/scripts/manage-production-rollback.sh"
 
-      - name: Roll back failed production smoke test
-        if: failure() && steps.deploy-stack.outcome == 'success' && steps.production-smoke.outcome == 'failure'
+      - name: Roll back failed LAN smoke test
+        if: failure() && steps.deploy-stack.outcome == 'success' && steps.lan-smoke.outcome == 'failure'
         env:
-          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
-          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
-          AZURE_VM_PORT: ${{ secrets.AZURE_VM_PORT }}
-          REMOTE_APP_DIR: ${{ secrets.REMOTE_APP_DIR }}
-        run: |
-          remote_app_dir="${REMOTE_APP_DIR:-/home/${AZURE_VM_USER}/OnlinePosSystem}"
-          quoted_remote_app_dir="$(printf '%q' "$remote_app_dir")"
-          quoted_helper="$(printf '%q' "$remote_app_dir/scripts/manage-production-rollback.sh")"
-          ssh -i ~/.ssh/online-pos-azure -p "${AZURE_VM_PORT:-22}" "${AZURE_VM_USER}@${AZURE_VM_HOST}" \
-            "REMOTE_APP_DIR=${quoted_remote_app_dir} DEPLOY_ACTION=rollback bash ${quoted_helper}"
-
-      - name: Remove local deployment credentials
-        if: always()
-        run: rm -f ~/.ssh/online-pos-azure
+          REMOTE_APP_DIR: /home/matthew/OnlinePosSystem
+          VERIFY_URL: http://127.0.0.1:18080/
+        run: DEPLOY_ACTION=rollback bash "$REMOTE_APP_DIR/scripts/manage-production-rollback.sh"

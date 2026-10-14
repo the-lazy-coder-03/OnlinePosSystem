@@ -1,20 +1,24 @@
 # CI/CD deployment
 
-The repository workflow deploys a Docker Compose stack using the configured
-`AZURE_VM_*` secrets and `REMOTE_APP_DIR`. Treat historical server addresses as
-inventory requiring verification, not a source of deployment configuration.
+The repository workflow deploys a Docker Compose stack on the dedicated
+self-hosted runner installed at `192.168.1.23`. The runner is restricted to the
+`onlinepos-lan` label and the deploy job only runs after the hosted test jobs on
+pushes to `master` or manual workflow dispatches. The server-local ignored
+`SupportConfigFiles/.env` supplies runtime secrets for this deployment.
 
 ## Verification and deployment flow
 
 Pull requests and pushes to `master`/`main` run Java 17 Maven verification against
 PostgreSQL 16, including the dedicated RLS integration profile. The workflow then
 runs Chromium browser regressions and script syntax checks. Pull requests never
-run the deployment job. Pushes to those branches and manual workflow dispatches
-retain the existing deployment behavior after all build checks pass.
+run the deployment job. Pushes to `master` and manual workflow dispatches deploy
+after all build checks pass; pushes to `main` run verification only.
 
 Deployment checks out the tested revision, builds images, provisions database
 roles, runs owner migrations, and recreates the runtime application container.
-It checks container health, the image revision, and the existing HTTPS endpoint.
+It checks container health, the image revision, and the server-local application
+URL (`http://127.0.0.1:18080/`). The deployment helper still defaults to the
+existing HTTPS verification URL when run outside this LAN workflow.
 The application image can be rolled back on failure; that rollback does not undo
 database changes. Back up the database before applying schema migrations.
 
