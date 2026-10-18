@@ -7,6 +7,7 @@ import jakarta.persistence.EntityManagerFactory;
 import org.example.onlinepossystem.MigrationConfiguration;
 import org.example.onlinepossystem.OnlinePosSystemApplication;
 import org.example.onlinepossystem.bootstrap.MigrationSqlRunner;
+import org.example.onlinepossystem.driver.DriverDispatchService;
 import org.example.onlinepossystem.customer.persistence.AccountBootstrapStore;
 import org.example.onlinepossystem.security.api.AccountPrincipal;
 import org.junit.jupiter.api.*;
@@ -674,6 +675,223 @@ class RlsPostgresIT {
     }
 
     @Test @Order(12)
+    void driverDispatchIsBranchScopedAndCashUpUsesPersistedPrices() throws Exception {
+        DriverDispatchService dispatch = application.getBean(DriverDispatchService.class);
+        long newDriver;
+        long firstOrder;
+        long secondOrder;
+        long otherBranchOrder;
+        try (Connection c = ownerConnection()) {
+            newDriver = insert(c, "INSERT INTO customers(email,password,access_level,role,first_name,last_name) "
+                    + "VALUES ('dispatch-driver@example.com','{noop}pass',0,'USER','Test','Driver') RETURNING id");
+            firstOrder = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type,customer_name) "
+                    + "VALUES (1," + customerA + ",'Pending',now()-interval '2 minutes','delivery','Customer A') RETURNING order_id");
+            secondOrder = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type,customer_name) "
+                    + "VALUES (1," + customerA + ",'Pending',now()-interval '1 minute','delivery','Customer A') RETURNING order_id");
+            otherBranchOrder = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type,customer_name) "
+                    + "VALUES (2," + customerB + ",'Pending',now(),'delivery','Customer B') RETURNING order_id");
+            try (var statement = c.createStatement()) {
+                statement.execute("INSERT INTO order_menu_item(order_id,menu_item_id,qty,unit_price_at_time) "
+                        + "SELECT " + firstOrder + ",burger_id,1,100 FROM burger_recipe_assignment ORDER BY burger_id LIMIT 1");
+                statement.execute("INSERT INTO order_menu_item(order_id,menu_item_id,qty,unit_price_at_time) "
+                        + "SELECT " + secondOrder + ",burger_id,1,100 FROM burger_recipe_assignment ORDER BY burger_id LIMIT 1");
+            }
+        }
+
+        as("one@example.com");
+        var manager = SecurityContextHolder.getContext().getAuthentication();
+        var initialManager = manager;
+        assertThat(dispatch.promote(manager, "dispatch-driver@example.com", 1).id()).isEqualTo(newDriver);
+        dispatch.updateRates(manager, newDriver, 1, new BigDecimal("60.00"), new BigDecimal("10.00"));
+        assertThat(dispatch.managerDashboard(manager, 1).drivers()).extracting(DriverDispatchService.Profile::id)
+                .contains(newDriver);
+        assertThatThrownBy(() -> dispatch.managerDashboard(initialManager, 2))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        mvc.perform(get("/api/driver").with(user(accounts.loadUserByUsername("one@example.com"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/admin/dispatch/drivers").with(user(accounts.loadUserByUsername("one@example.com")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"b@example.com\",\"branchId\":2}"))
+                .andExpect(status().isForbidden());
+
+        as("dispatch-driver@example.com");
+        var driverAuth = SecurityContextHolder.getContext().getAuthentication();
+        var initialDriver = driverAuth;
+        mvc.perform(post("/api/driver/clock-in")
+                .with(user(accounts.loadUserByUsername("dispatch-driver@example.com"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/driver").with(user(accounts.loadUserByUsername("a@example.com"))))
+                .andExpect(status().isForbidden());
+        as("dispatch-driver@example.com");
+        assertThat(ids("customer_order", "order_id")).isEmpty();
+        var shift = dispatch.clockIn(driverAuth);
+        assertThat(shift.hourlyRate()).isEqualByComparingTo("60.00");
+        assertThatCode(() -> dispatch.claimNext(initialDriver)).doesNotThrowAnyException();
+        assertThat(dispatch.driverDashboard(driverAuth).deliveries()).extracting(d -> d.order().getId())
+                .containsExactly(firstOrder);
+        assertThatThrownBy(() -> dispatch.claimNext(initialDriver)).isInstanceOf(RuntimeException.class);
+        assertThat(ids("customer_order", "order_id")).containsExactly(firstOrder);
+        assertThat(update("UPDATE customer_order SET status='Completed' WHERE order_id=?", firstOrder)).isZero();
+        assertThatThrownBy(() -> dispatch.pickup(initialDriver, firstOrder)).isInstanceOf(IllegalStateException.class);
+
+        as("one@example.com");
+        manager = SecurityContextHolder.getContext().getAuthentication();
+        mvc.perform(post("/api/admin/dispatch/assignments")
+                .with(user(accounts.loadUserByUsername("one@example.com")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"orderId\":" + secondOrder + ",\"driverId\":" + newDriver + ",\"branchId\":1}"))
+                .andExpect(status().isForbidden());
+        as("one@example.com");
+        manager = SecurityContextHolder.getContext().getAuthentication();
+        dispatch.updateRates(manager, newDriver, 1, new BigDecimal("80.00"), new BigDecimal("15.00"));
+        dispatch.assign(manager, secondOrder, newDriver, 1);
+        assertThat(update("UPDATE customer_order SET status='Completed' WHERE order_id=?", firstOrder)).isEqualTo(1);
+        assertThat(update("UPDATE customer_order SET status='Completed' WHERE order_id=?", secondOrder)).isEqualTo(1);
+        as("dispatch-driver@example.com");
+        driverAuth = SecurityContextHolder.getContext().getAuthentication();
+        assertThat(ids("customer_order", "order_id")).containsExactly(firstOrder, secondOrder);
+        assertThat(ids("customer_order", "order_id")).doesNotContain(otherBranchOrder);
+        dispatch.pickup(driverAuth, firstOrder);
+        dispatch.delivered(driverAuth, firstOrder);
+        dispatch.pickup(driverAuth, secondOrder);
+        dispatch.delivered(driverAuth, secondOrder);
+        assertThat(dispatch.returning(driverAuth).returningAt()).isNotNull();
+        dispatch.clockOut(driverAuth);
+        assertThatThrownBy(() -> dispatch.clockIn(initialDriver)).isInstanceOf(IllegalStateException.class);
+
+        as("one@example.com");
+        manager = SecurityContextHolder.getContext().getAuthentication();
+        var preview = dispatch.preview(manager, shift.id(), 1, 60);
+        assertThat(preview.deliveredCount()).isEqualTo(2);
+        assertThat(preview.orderSales()).isEqualByComparingTo("200.00");
+        assertThat(preview.onlineOrderPaid()).isZero();
+        assertThat(preview.onlineTips()).isZero();
+        assertThat(preview.hourlyPay()).isEqualByComparingTo("60.00");
+        assertThat(preview.deliveryPay()).isEqualByComparingTo("20.00");
+        assertThat(preview.expectedCashDue()).isEqualByComparingTo("120.00");
+        var currentManager = manager;
+        assertThatThrownBy(() -> dispatch.cashUp(currentManager, shift.id(), 1, 60,
+                new BigDecimal("119.00"), BigDecimal.ZERO, ""))
+                .isInstanceOf(IllegalArgumentException.class);
+        var result = dispatch.cashUp(manager, shift.id(), 1, 60,
+                new BigDecimal("120.00"), BigDecimal.ZERO, "");
+        assertThat(result.variance()).isZero();
+        assertThat(dispatch.settlements(manager, 1)).extracting(DriverDispatchService.Settlement::shiftId)
+                .contains(shift.id());
+        assertThatThrownBy(() -> dispatch.cashUp(currentManager, shift.id(), 1, 60,
+                new BigDecimal("120.00"), BigDecimal.ZERO, ""))
+                .isInstanceOf(IllegalStateException.class);
+        dispatch.updateRates(manager, newDriver, 1, new BigDecimal("60.00"), new BigDecimal("10.00"));
+
+        long payoutOrder;
+        try (Connection c = ownerConnection()) {
+            payoutOrder = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) "
+                    + "VALUES (1," + customerA + ",'Completed',now(),'delivery') RETURNING order_id");
+            try (var statement = c.createStatement()) {
+                statement.execute("INSERT INTO order_menu_item(order_id,menu_item_id,qty,unit_price_at_time) "
+                        + "SELECT " + payoutOrder + ",burger_id,1,50 FROM burger_recipe_assignment ORDER BY burger_id LIMIT 1");
+            }
+        }
+        as("dispatch-driver@example.com");
+        driverAuth = SecurityContextHolder.getContext().getAuthentication();
+        var payoutShift = dispatch.clockIn(driverAuth);
+        as("one@example.com");
+        manager = SecurityContextHolder.getContext().getAuthentication();
+        dispatch.assign(manager, payoutOrder, newDriver, 1);
+        as("dispatch-driver@example.com");
+        driverAuth = SecurityContextHolder.getContext().getAuthentication();
+        dispatch.pickup(driverAuth, payoutOrder);
+        dispatch.delivered(driverAuth, payoutOrder);
+        dispatch.clockOut(driverAuth);
+        as("one@example.com");
+        manager = SecurityContextHolder.getContext().getAuthentication();
+        var payoutPreview = dispatch.preview(manager, payoutShift.id(), 1, 60);
+        assertThat(payoutPreview.orderSales()).isEqualByComparingTo("50.00");
+        assertThat(payoutPreview.expectedCashDue()).isEqualByComparingTo("-20.00");
+        assertThat(dispatch.cashUp(manager, payoutShift.id(), 1, 60, BigDecimal.ZERO,
+                new BigDecimal("21.00"), "One rand paid out above expected").variance())
+                .isEqualByComparingTo("-1.00");
+        as("dispatch-driver@example.com");
+        assertThat(dispatch.driverDashboard(SecurityContextHolder.getContext().getAuthentication()).settlements())
+                .hasSize(2);
+        assertThat(ids("customer_order", "order_id")).containsExactly(firstOrder, secondOrder, payoutOrder);
+        mvc.perform(get("/api/admin/dispatch").with(user(accounts.loadUserByUsername("dispatch-driver@example.com"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/driver").with(anonymous())).andExpect(status().is3xxRedirection());
+        mvc.perform(get("/driver").with(user(accounts.loadUserByUsername("dispatch-driver@example.com"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test @Order(13)
+    void simultaneousClaimsAreDistinctAndRejectedAssignmentCanBeCancelled() throws Exception {
+        DriverDispatchService dispatch = application.getBean(DriverDispatchService.class);
+        long first;
+        long second;
+        long third;
+        long fourth;
+        long otherBranch;
+        try (Connection c = ownerConnection()) {
+            insert(c, "INSERT INTO customers(email,password,access_level,role) "
+                    + "VALUES ('claim-one@example.com','{noop}pass',0,'USER') RETURNING id");
+            insert(c, "INSERT INTO customers(email,password,access_level,role) "
+                    + "VALUES ('claim-two@example.com','{noop}pass',0,'USER') RETURNING id");
+            first = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) "
+                    + "VALUES (1," + customerA + ",'Pending',now()-interval '4 minutes','delivery') RETURNING order_id");
+            second = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) "
+                    + "VALUES (1," + customerA + ",'Pending',now()-interval '3 minutes','delivery') RETURNING order_id");
+            third = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) "
+                    + "VALUES (1," + customerA + ",'Pending',now()-interval '2 minutes','delivery') RETURNING order_id");
+            fourth = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) "
+                    + "VALUES (1," + customerA + ",'Pending',now()-interval '1 minute','delivery') RETURNING order_id");
+            otherBranch = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) "
+                    + "VALUES (2," + customerB + ",'Pending',now(),'delivery') RETURNING order_id");
+        }
+        as("one@example.com");
+        var manager = SecurityContextHolder.getContext().getAuthentication();
+        long firstDriverId = dispatch.promote(manager, "claim-one@example.com", 1).id();
+        dispatch.promote(manager, "claim-two@example.com", 1);
+        as("claim-one@example.com");
+        var firstAuth = SecurityContextHolder.getContext().getAuthentication();
+        dispatch.clockIn(firstAuth);
+        as("claim-two@example.com");
+        var secondAuth = SecurityContextHolder.getContext().getAuthentication();
+        dispatch.clockIn(secondAuth);
+        pool.setMaximumPoolSize(3);
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        CountDownLatch go = new CountDownLatch(1);
+        try {
+            List<Callable<Long>> tasks = List.of(firstAuth, secondAuth).stream().map(auth -> (Callable<Long>) () -> {
+                SecurityContextHolder.getContext().setAuthentication(auth);
+                try {
+                    go.await(5, TimeUnit.SECONDS);
+                    return dispatch.claimNext(auth).deliveries().stream().filter(DriverDispatchService.Delivery::selfClaimed)
+                            .findFirst().orElseThrow().order().getId();
+                } finally { SecurityContextHolder.clearContext(); }
+            }).toList();
+            var results = tasks.stream().map(workers::submit).toList();
+            go.countDown();
+            assertThat(List.of(results.get(0).get(10, TimeUnit.SECONDS), results.get(1).get(10, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(first, second);
+        } finally { workers.shutdownNow(); pool.setMaximumPoolSize(1); }
+        as("one@example.com");
+        manager = SecurityContextHolder.getContext().getAuthentication();
+        var finalManager = manager;
+        assertThatThrownBy(() -> dispatch.assignBatch(finalManager, List.of(third, otherBranch), firstDriverId, 1))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(dispatch.managerDashboard(manager, 1).queue()).extracting(DriverDispatchService.OrderBrief::id)
+                .contains(third, fourth);
+        dispatch.assignBatch(manager, List.of(fourth, third), firstDriverId, 1);
+        assertThat(dispatch.managerDashboard(manager, 1).assignments()).extracting(d -> d.order().getId())
+                .contains(third, fourth);
+        assertThat(update("UPDATE customer_order SET status='Rejected' WHERE order_id=?", first)).isEqualTo(1);
+        dispatch.cancelRejected(manager, first, 1);
+        assertThat(dispatch.managerDashboard(manager, 1).assignments()).extracting(d -> d.order().getId())
+                .doesNotContain(first);
+        assertThatThrownBy(() -> dispatch.cancelRejected(finalManager, second, 1))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test @Order(14)
     void unsafeOwnerLoginCannotStartAsRuntime() {
         SpringApplication app = new SpringApplication(OnlinePosSystemApplication.class);
         String[] arguments = Arrays.stream(runtimeArguments())
@@ -686,7 +904,7 @@ class RlsPostgresIT {
                 .hasStackTraceContaining("Runtime database role has unsafe privileges");
     }
 
-    @Test @Order(13)
+    @Test @Order(15)
     void existingTimestampSchemaCanUpgradeAndValidate() throws Exception {
         application.close();
         application = null;

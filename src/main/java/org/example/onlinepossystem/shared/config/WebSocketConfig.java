@@ -19,6 +19,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private static final String ALL_ADMIN_ORDERS = "/topic/admin/orders";
+    private static final String ALL_ADMIN_DISPATCH = "/topic/admin/dispatch";
     private static final String BRANCH_ADMIN_PREFIX = "/topic/admin/branches/";
 
     private final AccountAccessReader accountAccessReader;
@@ -62,6 +63,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 String destination = accessor.getDestination();
                 // Spring resolves this destination to the authenticated user's private queue.
                 if ("/user/queue/orders".equals(destination)) return message;
+                if ("/user/queue/driver".equals(destination)) {
+                    if (authentication.getAuthorities().stream().noneMatch(a -> "ROLE_DRIVER".equals(a.getAuthority()))) {
+                        throw new AccessDeniedException("Driver subscription requires driver access.");
+                    }
+                    return message;
+                }
                 if (destination == null || !destination.startsWith("/topic/admin/")) {
                     throw new AccessDeniedException("Unknown subscription destination.");
                 }
@@ -69,7 +76,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     throw new AccessDeniedException("Admin authentication is required for this subscription.");
                 }
                 AccountAccess access = accountAccessReader.findByUsername(accessor.getUser().getName());
-                if (ALL_ADMIN_ORDERS.equals(destination)) {
+                if (ALL_ADMIN_ORDERS.equals(destination) || ALL_ADMIN_DISPATCH.equals(destination)) {
                     if (!access.isSuperAdmin()) {
                         throw new AccessDeniedException("Only super admins can subscribe to all branch orders.");
                     }
@@ -90,12 +97,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     }
 
     private Integer branchId(String destination) {
-        if (!destination.startsWith(BRANCH_ADMIN_PREFIX) || !destination.endsWith("/orders")) {
+        if (!destination.startsWith(BRANCH_ADMIN_PREFIX)
+                || !(destination.endsWith("/orders") || destination.endsWith("/dispatch"))) {
             return null;
         }
+        String suffix = destination.endsWith("/orders") ? "/orders" : "/dispatch";
         String value = destination.substring(
                 BRANCH_ADMIN_PREFIX.length(),
-                destination.length() - "/orders".length()
+                destination.length() - suffix.length()
         );
         try {
             return Integer.valueOf(value);

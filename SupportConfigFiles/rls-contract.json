@@ -6,12 +6,17 @@
     "actor_customer_id()": "CREATE OR REPLACE FUNCTION app_security.actor_customer_id()\n RETURNS bigint\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT c.id\n    FROM public.customers c\n    WHERE c.id = app_security.verified_customer_id()\n$function$\n",
     "actor_role()": "CREATE OR REPLACE FUNCTION app_security.actor_role()\n RETURNS text\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT CASE WHEN app_security.verified_environment_admin() THEN 'SUPER_ADMIN' ELSE coalesce((\n        SELECT CASE c.access_level\n            WHEN 1 THEN 'ADMIN' WHEN 2 THEN 'ADMIN' WHEN 3 THEN 'SUPER_ADMIN'\n            WHEN 4 THEN 'DRIVER' ELSE 'USER'\n        END\n        FROM public.customers c\n        WHERE c.id = app_security.verified_customer_id() AND c.access_level BETWEEN 0 AND 4\n    ), '') END\n$function$\n",
     "cancel_reset(hash_value text)": "CREATE OR REPLACE FUNCTION app_security.cancel_reset(hash_value text)\n RETURNS void\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    DELETE FROM public.password_reset_tokens WHERE token_hash = hash_value AND NOT used\n$function$\n",
+    "claim_next_delivery(shift_value bigint)": "CREATE OR REPLACE FUNCTION app_security.claim_next_delivery(shift_value bigint)\n RETURNS bigint\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE driver_value bigint; branch_value integer; order_value bigint;\nBEGIN\n    driver_value := app_security.actor_customer_id();\n    IF app_security.actor_role() <> 'DRIVER' THEN\n        RAISE EXCEPTION 'Driver access is required' USING ERRCODE = '42501';\n    END IF;\n    SELECT s.branch_id INTO branch_value FROM public.driver_shift s JOIN public.driver_profile p ON p.driver_id = s.driver_id\n    WHERE s.shift_id = shift_value AND s.driver_id = driver_value AND s.state = 'ACTIVE' AND p.active\n      AND p.branch_id = s.branch_id FOR UPDATE OF s;\n    IF branch_value IS NULL THEN\n        RAISE EXCEPTION 'Active shift is required' USING ERRCODE = '22023';\n    END IF;\n    IF EXISTS (SELECT 1 FROM public.delivery_assignment a WHERE a.driver_id = driver_value\n            AND a.self_claimed AND a.state IN ('ASSIGNED', 'PICKED_UP')) THEN\n        RAISE EXCEPTION 'Finish the claimed delivery first' USING ERRCODE = '22023';\n    END IF;\n    SELECT o.order_id INTO order_value FROM public.customer_order o\n    WHERE o.branch_id = branch_value AND o.order_type = 'delivery'\n      AND o.status IN ('Pending', 'Preparing', 'Completed')\n      AND NOT EXISTS (SELECT 1 FROM public.delivery_assignment a WHERE a.order_id = o.order_id)\n    ORDER BY o.created_at, o.order_id LIMIT 1 FOR UPDATE OF o SKIP LOCKED;\n    IF order_value IS NULL THEN RETURN NULL; END IF;\n    INSERT INTO public.delivery_assignment(order_id, driver_id, shift_id, branch_id, self_claimed)\n    VALUES (order_value, driver_value, shift_value, branch_value, true);\n    RETURN order_value;\nEND $function$\n",
     "consume_reset(hash_value text, password_value text)": "CREATE OR REPLACE FUNCTION app_security.consume_reset(hash_value text, password_value text)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE account_id bigint; token_id bigint; account_email text;\nBEGIN\n    SELECT customer_id INTO account_id FROM public.password_reset_tokens WHERE token_hash = hash_value;\n    IF account_id IS NULL THEN RETURN NULL; END IF;\n    PERFORM id FROM public.customers WHERE id = account_id FOR UPDATE;\n    SELECT id INTO token_id FROM public.password_reset_tokens\n        WHERE token_hash = hash_value AND NOT used AND expires_at > LOCALTIMESTAMP FOR UPDATE;\n    IF token_id IS NULL THEN RETURN NULL; END IF;\n    UPDATE public.customers SET password = password_value WHERE id = account_id RETURNING email INTO account_email;\n    UPDATE public.password_reset_tokens SET used = true WHERE id = token_id;\n    DELETE FROM public.password_reset_tokens WHERE customer_id = account_id AND NOT used;\n    RETURN account_email;\nEND $function$\n",
     "context_key_fingerprint()": "CREATE OR REPLACE FUNCTION app_security.context_key_fingerprint()\n RETURNS text\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT encode(public.hmac('rls-key-check-v1', s.secret, 'sha256'), 'hex')\n    FROM app_security.rls_context_secret s WHERE s.singleton\n$function$\n",
     "create_reset(email_value text, hash_value text, expiry timestamp without time zone)": "CREATE OR REPLACE FUNCTION app_security.create_reset(email_value text, hash_value text, expiry timestamp without time zone)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE account_id bigint; recipient text;\nBEGIN\n    SELECT id, email INTO account_id, recipient FROM public.customers WHERE email = email_value FOR UPDATE;\n    IF account_id IS NULL THEN RETURN NULL; END IF;\n    IF hash_value !~ '^[0-9a-f]{64}$' OR expiry <= LOCALTIMESTAMP OR expiry > LOCALTIMESTAMP + interval '31 minutes' THEN\n        RAISE EXCEPTION 'Invalid recovery request' USING ERRCODE = '22023';\n    END IF;\n    DELETE FROM public.password_reset_tokens WHERE customer_id = account_id AND NOT used;\n    INSERT INTO public.password_reset_tokens (customer_id, token_hash, expires_at, created_at, used)\n    VALUES (account_id, hash_value, expiry, LOCALTIMESTAMP, false);\n    RETURN recipient;\nEND $function$\n",
     "guard_account_update()": "CREATE OR REPLACE FUNCTION app_security.guard_account_update()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE expected_role text;\nBEGIN\n    IF current_user = pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid = TG_RELID)) THEN RETURN NEW; END IF;\n    IF NEW.id IS DISTINCT FROM OLD.id OR NEW.environment_admin IS DISTINCT FROM OLD.environment_admin THEN\n        RAISE EXCEPTION 'Operation is not permitted' USING ERRCODE = '42501';\n    END IF;\n    IF (NEW.access_level IS DISTINCT FROM OLD.access_level OR NEW.role IS DISTINCT FROM OLD.role)\n       AND app_security.actor_role() <> 'SUPER_ADMIN' THEN\n        RAISE EXCEPTION 'Operation is not permitted' USING ERRCODE = '42501';\n    END IF;\n    expected_role := CASE NEW.access_level\n        WHEN 1 THEN 'ADMIN' WHEN 2 THEN 'ADMIN' WHEN 3 THEN 'SUPER_ADMIN'\n        WHEN 4 THEN 'DRIVER' ELSE 'USER' END;\n    IF NEW.role IS DISTINCT FROM expected_role THEN\n        RAISE EXCEPTION 'Role and access level are inconsistent' USING ERRCODE = '23514';\n    END IF;\n    RETURN NEW;\nEND $function$\n",
+    "guard_delivery_assignment()": "CREATE OR REPLACE FUNCTION app_security.guard_delivery_assignment()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE order_branch integer; order_type_value text; kitchen_status text;\n    shift_driver bigint; shift_branch integer; shift_state text;\nBEGIN\n    SELECT branch_id, order_type, status INTO order_branch, order_type_value, kitchen_status\n    FROM public.customer_order WHERE order_id = NEW.order_id;\n    SELECT driver_id, branch_id, state INTO shift_driver, shift_branch, shift_state\n    FROM public.driver_shift WHERE shift_id = NEW.shift_id;\n    IF order_type_value IS DISTINCT FROM 'delivery' OR NEW.branch_id IS DISTINCT FROM order_branch\n       OR NEW.driver_id IS DISTINCT FROM shift_driver OR NEW.branch_id IS DISTINCT FROM shift_branch\n       OR shift_state <> 'ACTIVE' THEN\n        RAISE EXCEPTION 'Assignment must match a delivery order and driver shift' USING ERRCODE = '23514';\n    END IF;\n    IF TG_OP = 'INSERT' AND (NEW.state <> 'ASSIGNED' OR NEW.picked_up_at IS NOT NULL\n       OR NEW.delivered_at IS NOT NULL OR kitchen_status NOT IN ('Pending', 'Preparing', 'Completed')) THEN\n        RAISE EXCEPTION 'Invalid new assignment' USING ERRCODE = '23514';\n    END IF;\n    IF TG_OP = 'UPDATE' THEN\n        IF NEW.order_id IS DISTINCT FROM OLD.order_id OR NEW.branch_id IS DISTINCT FROM OLD.branch_id\n           OR OLD.state IN ('DELIVERED', 'CANCELLED') OR NEW.assigned_at IS DISTINCT FROM OLD.assigned_at THEN\n            RAISE EXCEPTION 'Assignment history cannot be changed' USING ERRCODE = '42501';\n        END IF;\n        IF (NEW.driver_id IS DISTINCT FROM OLD.driver_id OR NEW.shift_id IS DISTINCT FROM OLD.shift_id)\n           AND (OLD.state <> 'ASSIGNED' OR app_security.actor_role() NOT IN ('ADMIN', 'SUPER_ADMIN')) THEN\n            RAISE EXCEPTION 'Only a manager can reassign before pickup' USING ERRCODE = '42501';\n        END IF;\n        IF app_security.actor_role() = 'DRIVER' AND\n           (NEW.driver_id IS DISTINCT FROM OLD.driver_id OR NEW.shift_id IS DISTINCT FROM OLD.shift_id\n           OR NEW.self_claimed IS DISTINCT FROM OLD.self_claimed OR NEW.assigned_by IS DISTINCT FROM OLD.assigned_by\n           OR (OLD.state = 'ASSIGNED' AND NEW.state NOT IN ('ASSIGNED', 'PICKED_UP'))\n           OR (OLD.state = 'PICKED_UP' AND NEW.state NOT IN ('PICKED_UP', 'DELIVERED'))) THEN\n            RAISE EXCEPTION 'Invalid driver assignment transition' USING ERRCODE = '42501';\n        END IF;\n        IF (OLD.state = 'ASSIGNED' AND NEW.state = 'PICKED_UP'\n                AND (kitchen_status <> 'Completed' OR NEW.picked_up_at IS NULL\n                    OR NEW.picked_up_at > now() OR NEW.picked_up_at < now() - interval '1 minute'))\n           OR (OLD.state = 'PICKED_UP' AND NEW.state = 'DELIVERED'\n                AND (NEW.delivered_at IS NULL OR NEW.delivered_at > now()\n                    OR NEW.delivered_at < now() - interval '1 minute'))\n           OR (NEW.state <> OLD.state AND NOT (\n                OLD.state = 'ASSIGNED' AND NEW.state IN ('PICKED_UP', 'CANCELLED')\n                OR OLD.state = 'PICKED_UP' AND NEW.state = 'DELIVERED'))\n           OR (NEW.picked_up_at IS DISTINCT FROM OLD.picked_up_at AND NEW.state <> 'PICKED_UP')\n           OR (NEW.delivered_at IS DISTINCT FROM OLD.delivered_at AND NEW.state <> 'DELIVERED') THEN\n            RAISE EXCEPTION 'Invalid delivery transition' USING ERRCODE = '23514';\n        END IF;\n    END IF;\n    RETURN NEW;\nEND $function$\n",
+    "guard_driver_profile()": "CREATE OR REPLACE FUNCTION app_security.guard_driver_profile()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nBEGIN\n    IF NEW.driver_id IS DISTINCT FROM OLD.driver_id OR NEW.branch_id IS DISTINCT FROM OLD.branch_id\n       OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN\n        RAISE EXCEPTION 'Driver identity and branch cannot be changed' USING ERRCODE = '42501';\n    END IF;\n    RETURN NEW;\nEND $function$\n",
+    "guard_driver_shift()": "CREATE OR REPLACE FUNCTION app_security.guard_driver_shift()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE profile_branch integer; profile_hourly numeric(10,2); profile_delivery numeric(10,2); profile_active boolean;\nBEGIN\n    IF TG_OP = 'INSERT' THEN\n        SELECT branch_id, hourly_rate, per_delivery_rate, active\n        INTO profile_branch, profile_hourly, profile_delivery, profile_active\n        FROM public.driver_profile WHERE driver_id = NEW.driver_id;\n        IF NOT profile_active OR NEW.branch_id IS DISTINCT FROM profile_branch\n           OR NEW.hourly_rate IS DISTINCT FROM profile_hourly\n           OR NEW.per_delivery_rate IS DISTINCT FROM profile_delivery\n           OR NEW.business_date IS DISTINCT FROM (now() AT TIME ZONE 'Africa/Johannesburg')::date\n           OR NEW.state <> 'ACTIVE' OR NEW.clocked_out_at IS NOT NULL\n           OR NEW.approved_minutes IS NOT NULL OR NEW.returning_at IS NOT NULL\n           OR NEW.clocked_in_at > now() OR NEW.clocked_in_at < now() - interval '1 minute' THEN\n            RAISE EXCEPTION 'Invalid driver shift clock-in' USING ERRCODE = '23514';\n        END IF;\n        RETURN NEW;\n    END IF;\n    IF NEW.shift_id IS DISTINCT FROM OLD.shift_id OR NEW.driver_id IS DISTINCT FROM OLD.driver_id\n       OR NEW.branch_id IS DISTINCT FROM OLD.branch_id OR NEW.business_date IS DISTINCT FROM OLD.business_date\n       OR NEW.clocked_in_at IS DISTINCT FROM OLD.clocked_in_at\n       OR NEW.hourly_rate IS DISTINCT FROM OLD.hourly_rate\n       OR NEW.per_delivery_rate IS DISTINCT FROM OLD.per_delivery_rate\n       OR OLD.state = 'SETTLED' THEN\n        RAISE EXCEPTION 'Shift history cannot be changed' USING ERRCODE = '42501';\n    END IF;\n    IF app_security.actor_role() = 'DRIVER' THEN\n        IF NEW.approved_minutes IS DISTINCT FROM OLD.approved_minutes OR NEW.state = 'SETTLED'\n           OR (OLD.state = 'CLOCKED_OUT' AND NEW.state <> OLD.state)\n           OR (OLD.state = 'ACTIVE' AND NEW.state NOT IN ('ACTIVE', 'CLOCKED_OUT'))\n           OR (NEW.state = 'ACTIVE' AND NEW.clocked_out_at IS NOT NULL)\n           OR (NEW.state = 'CLOCKED_OUT' AND (OLD.state <> 'ACTIVE' OR NEW.clocked_out_at IS NULL))\n           OR (NEW.clocked_out_at IS DISTINCT FROM OLD.clocked_out_at\n               AND (OLD.clocked_out_at IS NOT NULL OR NEW.clocked_out_at > now()\n                    OR NEW.clocked_out_at < now() - interval '1 minute'))\n           OR (NEW.returning_at IS DISTINCT FROM OLD.returning_at AND NEW.returning_at IS NOT NULL\n               AND (NEW.returning_at > now() OR NEW.returning_at < now() - interval '1 minute')) THEN\n            RAISE EXCEPTION 'Invalid driver shift transition' USING ERRCODE = '42501';\n        END IF;\n    END IF;\n    IF NEW.state = 'SETTLED' AND (OLD.state <> 'CLOCKED_OUT'\n       OR NEW.approved_minutes IS NULL OR NOT EXISTS (\n           SELECT 1 FROM public.driver_settlement WHERE shift_id = NEW.shift_id)) THEN\n        RAISE EXCEPTION 'Shift requires a completed settlement' USING ERRCODE = '23514';\n    END IF;\n    RETURN NEW;\nEND $function$\n",
     "guard_order_relationship()": "CREATE OR REPLACE FUNCTION app_security.guard_order_relationship()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE column_name text;\nBEGIN\n    IF current_user = pg_get_userbyid((SELECT relowner FROM pg_class WHERE oid = TG_RELID)) THEN RETURN NEW; END IF;\n    FOREACH column_name IN ARRAY TG_ARGV LOOP\n        IF (to_jsonb(NEW) -> column_name) IS DISTINCT FROM (to_jsonb(OLD) -> column_name) THEN\n            RAISE EXCEPTION 'Operation is not permitted' USING ERRCODE = '42501';\n        END IF;\n    END LOOP;\n    RETURN NEW;\nEND $function$\n",
     "login_credentials(identifier text)": "CREATE OR REPLACE FUNCTION app_security.login_credentials(identifier text)\n RETURNS TABLE(id bigint, email character varying, password character varying, access_level smallint)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    SELECT c.id, c.email, c.password, c.access_level FROM public.customers c\n    WHERE lower(c.email) = lower(btrim(identifier)) OR c.phone1 = btrim(identifier)\n    ORDER BY CASE WHEN lower(c.email) = lower(btrim(identifier)) THEN 0 ELSE 1 END, c.id LIMIT 1\n$function$\n",
+    "promote_branch_driver(email_value text, branch_value integer)": "CREATE OR REPLACE FUNCTION app_security.promote_branch_driver(email_value text, branch_value integer)\n RETURNS bigint\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE target_id bigint; current_level smallint;\nBEGIN\n    IF app_security.actor_role() NOT IN ('ADMIN', 'SUPER_ADMIN')\n       OR (app_security.actor_role() = 'ADMIN' AND app_security.actor_branch_id() <> branch_value)\n       OR NOT EXISTS (SELECT 1 FROM public.branch WHERE branch_id = branch_value AND active) THEN\n        RAISE EXCEPTION 'Driver promotion is not permitted' USING ERRCODE = '42501';\n    END IF;\n    SELECT id, access_level INTO target_id, current_level FROM public.customers\n    WHERE lower(email) = lower(btrim(email_value)) AND NOT environment_admin FOR UPDATE;\n    IF target_id IS NULL OR current_level <> 0 THEN\n        RAISE EXCEPTION 'Registered customer account is required' USING ERRCODE = '22023';\n    END IF;\n    UPDATE public.customers SET role = 'DRIVER', access_level = 4 WHERE id = target_id;\n    INSERT INTO public.driver_profile(driver_id, branch_id) VALUES(target_id, branch_value);\n    RETURN target_id;\nEND $function$\n",
     "register_customer(first_name_value text, last_name_value text, email_value text, password_value text, phone1_value text, phone2_value text, house_value text, street_value text, area_value text, complex_value text, store_value text, postal_value text, city_value text, ordered_at timestamp without time zone, google_place_id_value text, formatted_address_value text, latitude_value numeric, longitude_value numeric, province_value text, country_value text)": "CREATE OR REPLACE FUNCTION app_security.register_customer(first_name_value text, last_name_value text, email_value text, password_value text, phone1_value text, phone2_value text, house_value text, street_value text, area_value text, complex_value text, store_value text, postal_value text, city_value text, ordered_at timestamp without time zone, google_place_id_value text, formatted_address_value text, latitude_value numeric, longitude_value numeric, province_value text, country_value text)\n RETURNS bigint\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\n    INSERT INTO public.customers (first_name, last_name, email, password, phone1, phone2,\n        house_number, street, area, complex_name, preferred_store, postal_code, city, last_ordered_at,\n        google_place_id, formatted_address, latitude, longitude, province, country, role, access_level)\n    VALUES (first_name_value, last_name_value, email_value, password_value, phone1_value, phone2_value,\n        house_value, street_value, area_value, complex_value, store_value, postal_value, city_value, ordered_at,\n        google_place_id_value, formatted_address_value, latitude_value, longitude_value, province_value, country_value, 'USER', 0)\n    RETURNING id\n$function$\n",
     "setting_id(setting_name text)": "CREATE OR REPLACE FUNCTION app_security.setting_id(setting_name text)\n RETURNS bigint\n LANGUAGE plpgsql\n STABLE\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nBEGIN\n    RETURN nullif(current_setting(setting_name, true), '')::bigint;\nEXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN\n    RETURN NULL;\nEND $function$\n",
     "validate_special_selection_relationship()": "CREATE OR REPLACE FUNCTION app_security.validate_special_selection_relationship()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'pg_catalog', 'pg_temp'\nAS $function$\nDECLARE special_order_id bigint; selected_order_id bigint;\nBEGIN\n    SELECT s.order_id INTO special_order_id\n    FROM public.order_special_item s\n    WHERE s.order_special_item_id = NEW.order_special_item_id;\n    IF NEW.order_menu_item_id IS NOT NULL THEN\n        SELECT m.order_id INTO selected_order_id FROM public.order_menu_item m\n        WHERE m.order_menu_item_id = NEW.order_menu_item_id;\n    ELSE\n        SELECT p.order_id INTO selected_order_id FROM public.order_pizza_item p\n        WHERE p.order_pizza_item_id = NEW.order_pizza_item_id;\n    END IF;\n    IF special_order_id IS NULL OR selected_order_id IS NULL OR special_order_id <> selected_order_id THEN\n        RAISE EXCEPTION 'Special selection must reference an item from the same order' USING ERRCODE = '23514';\n    END IF;\n    RETURN NEW;\nEND $function$\n",
@@ -71,7 +76,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))"
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n   FROM public.delivery_assignment a\n  WHERE ((a.order_id = customer_order.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text))))))"
     },
     "customer_order.orders_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))",
@@ -116,7 +121,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.customer_id = customers.id) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.customer_id = customers.id) AND (o.branch_id = app_security.actor_branch_id()))))) OR ((app_security.actor_role() = 'ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.driver_profile p\n  WHERE ((p.driver_id = customers.id) AND (p.branch_id = app_security.actor_branch_id()))))))"
     },
     "customers.customers_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.actor_customer_id())))",
@@ -128,6 +133,177 @@
       "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = ANY (ARRAY['USER'::text, 'ADMIN'::text, 'DRIVER'::text])) AND (id = app_security.actor_customer_id())))"
     },
     "customers.owner_maintenance": {
+      "check": "true",
+      "command": "*",
+      "permissive": true,
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true"
+    },
+    "delivery_assignment.delivery_assignment_insert": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))",
+      "command": "a",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": null
+    },
+    "delivery_assignment.delivery_assignment_read": {
+      "check": null,
+      "command": "r",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (driver_id = app_security.actor_customer_id()) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))"
+    },
+    "delivery_assignment.delivery_assignment_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (driver_id = app_security.actor_customer_id()) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))",
+      "command": "w",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (driver_id = app_security.actor_customer_id()) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))"
+    },
+    "delivery_assignment.owner_maintenance": {
+      "check": "true",
+      "command": "*",
+      "permissive": true,
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true"
+    },
+    "delivery_payment.delivery_payment_read": {
+      "check": null,
+      "command": "r",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE (o.order_id = delivery_payment.order_id)))"
+    },
+    "delivery_payment.owner_maintenance": {
+      "check": "true",
+      "command": "*",
+      "permissive": true,
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true"
+    },
+    "driver_dispatch_event.driver_dispatch_event_insert": {
+      "check": "((NOT (actor_id IS DISTINCT FROM app_security.actor_customer_id())) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n   FROM public.driver_shift s\n  WHERE ((s.shift_id = driver_dispatch_event.shift_id) AND (s.driver_id = driver_dispatch_event.actor_id)))))))",
+      "command": "a",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": null
+    },
+    "driver_dispatch_event.driver_dispatch_event_read": {
+      "check": null,
+      "command": "r",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (EXISTS ( SELECT 1\n   FROM public.driver_shift s\n  WHERE ((s.shift_id = driver_dispatch_event.shift_id) AND (s.driver_id = app_security.actor_customer_id())))) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))"
+    },
+    "driver_dispatch_event.owner_maintenance": {
+      "check": "true",
+      "command": "*",
+      "permissive": true,
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true"
+    },
+    "driver_profile.driver_profile_read": {
+      "check": null,
+      "command": "r",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (driver_id = app_security.actor_customer_id()) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))"
+    },
+    "driver_profile.driver_profile_write": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))",
+      "command": "w",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))"
+    },
+    "driver_profile.owner_maintenance": {
+      "check": "true",
+      "command": "*",
+      "permissive": true,
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true"
+    },
+    "driver_settlement.driver_settlement_insert": {
+      "check": "((NOT (manager_id IS DISTINCT FROM app_security.actor_customer_id())) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id()))))",
+      "command": "a",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": null
+    },
+    "driver_settlement.driver_settlement_read": {
+      "check": null,
+      "command": "r",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (driver_id = app_security.actor_customer_id()) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))"
+    },
+    "driver_settlement.owner_maintenance": {
+      "check": "true",
+      "command": "*",
+      "permissive": true,
+      "roles": [
+        "TABLE_OWNER"
+      ],
+      "using": "true"
+    },
+    "driver_shift.driver_shift_insert": {
+      "check": "((app_security.actor_role() = 'DRIVER'::text) AND (driver_id = app_security.actor_customer_id()) AND (EXISTS ( SELECT 1\n   FROM public.driver_profile p\n  WHERE ((p.driver_id = driver_shift.driver_id) AND (p.branch_id = driver_shift.branch_id) AND p.active))))",
+      "command": "a",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": null
+    },
+    "driver_shift.driver_shift_read": {
+      "check": null,
+      "command": "r",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (driver_id = app_security.actor_customer_id()) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))"
+    },
+    "driver_shift.driver_shift_update": {
+      "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (driver_id = app_security.actor_customer_id()) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))",
+      "command": "w",
+      "permissive": true,
+      "roles": [
+        "RUNTIME_ROLE"
+      ],
+      "using": "((app_security.actor_role() = 'SUPER_ADMIN'::text) OR (driver_id = app_security.actor_customer_id()) OR ((app_security.actor_role() = 'ADMIN'::text) AND (branch_id = app_security.actor_branch_id())))"
+    },
+    "driver_shift.owner_maintenance": {
       "check": "true",
       "command": "*",
       "permissive": true,
@@ -161,7 +337,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_burger_extra_component.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_burger_extra_component.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_burger_extra_component.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_burger_extra_component.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -206,7 +382,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_burger_protein.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_burger_protein.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_burger_protein.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_burger_protein.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -251,7 +427,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_burger_removed_component.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_burger_removed_component.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_burger_removed_component.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_burger_removed_component.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -296,7 +472,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.order_id = order_menu_item.order_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.order_id = order_menu_item.order_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_menu_item.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.order_id = order_menu_item.order_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -341,7 +517,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_menu_item_extra.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_menu_item_extra.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_menu_item_extra.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_menu_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_menu_item_id = order_menu_item_extra.order_menu_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -386,7 +562,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.order_id = order_pizza_item.order_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.order_id = order_pizza_item.order_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_pizza_item.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.order_id = order_pizza_item.order_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -431,7 +607,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_pizza_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_pizza_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_pizza_item_base_option.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_pizza_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_pizza_item_id = order_pizza_item_base_option.order_pizza_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -476,7 +652,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_pizza_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_pizza_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_pizza_item_extra.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_pizza_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_pizza_item_id = order_pizza_item_extra.order_pizza_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -521,7 +697,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_pizza_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_pizza_item_id = order_pizza_item_removed_ingredient.order_pizza_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_pizza_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_pizza_item_id = order_pizza_item_removed_ingredient.order_pizza_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_pizza_item_removed_ingredient.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_pizza_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_pizza_item_id = order_pizza_item_removed_ingredient.order_pizza_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -566,7 +742,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.order_id = order_special_item.order_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.order_id = order_special_item.order_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_special_item.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM public.customer_order o\n  WHERE ((o.order_id = order_special_item.order_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -611,7 +787,7 @@
       "roles": [
         "RUNTIME_ROLE"
       ],
-      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_special_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_special_item_id = order_special_selection.order_special_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id()))))))"
+      "using": "(EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_special_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_special_item_id = order_special_selection.order_special_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())) OR ((app_security.actor_role() = 'DRIVER'::text) AND (EXISTS ( SELECT 1\n           FROM public.delivery_assignment a\n          WHERE ((a.order_id = o.order_id) AND (a.driver_id = app_security.actor_customer_id()) AND (a.state <> 'CANCELLED'::text)))))))))"
     },
     "order_special_selection.child_update": {
       "check": "((app_security.actor_role() = 'SUPER_ADMIN'::text) AND (EXISTS ( SELECT 1\n   FROM (public.customer_order o\n     JOIN public.order_special_item p ON ((p.order_id = o.order_id)))\n  WHERE ((p.order_special_item_id = order_special_selection.order_special_item_id) AND ((app_security.actor_role() = 'SUPER_ADMIN'::text) OR ((app_security.actor_role() = 'USER'::text) AND (o.customer_id = app_security.actor_customer_id())) OR ((app_security.actor_role() = 'ADMIN'::text) AND (o.branch_id = app_security.actor_branch_id())))))))",
@@ -666,6 +842,18 @@
     },
     "customers.guard_account_update": {
       "definition": "CREATE TRIGGER guard_account_update BEFORE UPDATE ON public.customers FOR EACH ROW EXECUTE FUNCTION app_security.guard_account_update()",
+      "enabled": "O"
+    },
+    "delivery_assignment.guard_delivery_assignment": {
+      "definition": "CREATE TRIGGER guard_delivery_assignment BEFORE INSERT OR UPDATE ON public.delivery_assignment FOR EACH ROW EXECUTE FUNCTION app_security.guard_delivery_assignment()",
+      "enabled": "O"
+    },
+    "driver_profile.guard_driver_profile": {
+      "definition": "CREATE TRIGGER guard_driver_profile BEFORE UPDATE ON public.driver_profile FOR EACH ROW EXECUTE FUNCTION app_security.guard_driver_profile()",
+      "enabled": "O"
+    },
+    "driver_shift.guard_driver_shift": {
+      "definition": "CREATE TRIGGER guard_driver_shift BEFORE INSERT OR UPDATE ON public.driver_shift FOR EACH ROW EXECUTE FUNCTION app_security.guard_driver_shift()",
       "enabled": "O"
     },
     "order_burger_extra_component.guard_order_relationship": {

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <title>Driver | Pete's Pizza</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}">
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css}">
+    <link rel="stylesheet" th:href="@{/css/driver.css}">
+</head>
+<body>
+<header class="driver-topbar"><div class="driver-container driver-topbar-inner"><a href="/driver" class="driver-brand"><i class="bi bi-bicycle" aria-hidden="true"></i> Pete's Pizza</a><form method="post" th:action="@{/logout}"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button type="submit" class="driver-logout" title="Sign out"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="visually-hidden">Sign out</span></button></form></div></header>
+<main class="driver-container">
+    <div class="driver-heading"><div><p class="driver-kicker">Delivery team</p><h1>My shift</h1><p id="driverBranch" class="driver-muted">Loading...</p></div><span id="driverConnection" class="driver-connection">Connecting</span></div>
+    <div id="driverError" class="alert alert-danger d-none" role="alert"></div>
+    <section class="driver-shift" aria-label="Shift status"><div><strong id="driverShiftState">Loading shift</strong><p id="driverShiftMeta" class="driver-muted mb-0"></p></div><div class="driver-actions"><button type="button" id="driverClockIn" class="btn btn-primary d-none"><i class="bi bi-play-fill me-1"></i>Clock in</button><button type="button" id="driverClockOut" class="btn btn-outline-dark d-none"><i class="bi bi-stop-fill me-1"></i>Clock out</button></div></section>
+    <div class="driver-summary"><div><span>Delivered</span><strong id="driverDelivered">0</strong></div><div><span>Order sales</span><strong id="driverSales">R0.00</strong></div><div><span>Pay estimate</span><strong id="driverPay">R0.00</strong></div></div>
+    <section class="driver-work"><div class="driver-section-heading"><h2>My deliveries</h2><div class="driver-actions"><button type="button" id="driverClaim" class="btn btn-primary d-none"><i class="bi bi-plus-lg me-1"></i>Claim next</button><button type="button" id="driverReturning" class="btn btn-outline-primary d-none"><i class="bi bi-arrow-return-left me-1"></i>Returning</button></div></div><div id="driverOrders" class="driver-orders"></div></section>
+    <section class="driver-work"><div class="driver-section-heading"><h2>Past cash-ups</h2></div><div id="driverSettlements" class="driver-orders"></div></section>
+</main>
+<script th:src="@{/js/stomp-client.js}"></script>
+<script th:src="@{/js/driver.js}"></script>
+</body>
+</html>

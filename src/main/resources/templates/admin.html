@@ -20,6 +20,7 @@
         <nav class="admin-nav nav nav-pills flex-column" role="tablist" aria-orientation="vertical">
             <button class="nav-link active" type="button" data-admin-panel="overview" role="tab" aria-selected="true"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i><span data-panel-title="overview">Overview</span></button>
             <button class="nav-link" type="button" data-admin-panel="orders" role="tab" aria-selected="false"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i><span data-panel-title="orders">Live Orders</span></button>
+            <button class="nav-link" type="button" data-admin-panel="dispatch" role="tab" aria-selected="false"><i class="bi bi-bicycle" aria-hidden="true"></i><span data-panel-title="dispatch">Dispatch</span></button>
             <button class="nav-link" type="button" data-admin-panel="users" role="tab" aria-selected="false"><i class="bi bi-person-lines-fill" aria-hidden="true"></i><span data-panel-title="users">Users</span></button>
             <button class="nav-link" type="button" data-admin-panel="items" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-box-seam" aria-hidden="true"></i><span data-panel-title="items">Items</span></button>
             <button class="nav-link" type="button" data-admin-panel="specials" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-stars" aria-hidden="true"></i><span data-panel-title="specials">Specials</span></button>
@@ -45,6 +46,7 @@
         <div class="offcanvas-body p-0"><nav class="admin-nav nav nav-pills flex-column" role="tablist" aria-orientation="vertical">
             <button class="nav-link active" type="button" data-admin-panel="overview" role="tab" aria-selected="true"><i class="bi bi-grid-1x2-fill"></i>Overview</button>
             <button class="nav-link" type="button" data-admin-panel="orders" role="tab" aria-selected="false"><i class="bi bi-receipt-cutoff"></i>Live Orders</button>
+            <button class="nav-link" type="button" data-admin-panel="dispatch" role="tab" aria-selected="false"><i class="bi bi-bicycle"></i>Dispatch</button>
             <button class="nav-link" type="button" data-admin-panel="users" role="tab" aria-selected="false"><i class="bi bi-person-lines-fill"></i>Users</button>
             <button class="nav-link" type="button" data-admin-panel="items" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-box-seam"></i>Items</button>
             <button class="nav-link" type="button" data-admin-panel="specials" role="tab" aria-selected="false" th:if="${superAdmin}"><i class="bi bi-stars"></i>Specials</button>
@@ -94,6 +96,31 @@
             <section id="orders" class="admin-panel" aria-labelledby="ordersHeading">
                 <div class="panel-heading"><div><h2 id="ordersHeading">Live Orders</h2><p>Pending and in-progress orders for your permitted branch scope.</p></div><button class="btn btn-outline-primary" type="button" id="adminOrdersRefresh"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button></div>
                 <div class="order-list" id="adminOrderList"><div class="empty-state">Loading live orders...</div></div>
+            </section>
+
+            <section id="dispatch" class="admin-panel" aria-labelledby="dispatchHeading">
+                <div class="panel-heading"><div><h2 id="dispatchHeading">Driver dispatch</h2><p>Branch deliveries, active shifts and cash-up.</p></div><button class="btn btn-outline-primary" id="dispatchRefresh" type="button" title="Refresh dispatch"><i class="bi bi-arrow-clockwise"></i></button></div>
+                <div class="dispatch-toolbar" th:if="${superAdmin}"><label for="dispatchBranch">Branch</label><select id="dispatchBranch" class="form-select"><option value="1">Kenridge</option><option value="2">Uitzicht</option></select></div>
+                <div id="dispatchAlert" class="alert alert-warning d-none" role="status"></div>
+                <div id="dispatchError" class="alert alert-danger d-none" role="alert"></div>
+                <div class="admin-section"><div class="section-title"><h3>Waiting for a driver</h3></div><div id="dispatchQueue" class="dispatch-list"></div><div class="dispatch-batch"><select id="dispatchBatchDriver" class="form-select" aria-label="Driver for selected orders"></select><button id="dispatchBatchAssign" type="button" class="btn btn-primary"><i class="bi bi-check2-square me-1"></i>Assign selected</button></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Assigned deliveries</h3></div><div id="dispatchAssignments" class="dispatch-list"></div></div>
+                <div class="admin-section"><div class="section-title"><h3>Drivers and shifts</h3></div><div id="dispatchRoster" class="dispatch-list"></div></div>
+                <div id="dispatchCashUp" class="admin-section d-none" aria-labelledby="dispatchCashUpHeading">
+                    <div class="section-title"><h3 id="dispatchCashUpHeading">Cash-up</h3><button type="button" id="dispatchCashUpClose" class="btn btn-sm btn-outline-secondary" title="Close cash-up"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>
+                    <form id="dispatchCashUpForm">
+                        <div class="dispatch-cash-fields">
+                            <label for="dispatchApprovedMinutes">Approved minutes<input id="dispatchApprovedMinutes" type="number" min="0" max="1440" step="1" class="form-control" required></label>
+                            <label for="dispatchCashHanded">Cash handed in<input id="dispatchCashHanded" type="number" min="0" step="0.01" class="form-control" value="0.00" required></label>
+                            <label for="dispatchCashPaid">Cash paid out<input id="dispatchCashPaid" type="number" min="0" step="0.01" class="form-control" value="0.00" required></label>
+                        </div>
+                        <dl class="dispatch-cash-summary"><div><dt>Delivered orders</dt><dd id="dispatchDeliveredCount">0</dd></div><div><dt>Order sales</dt><dd id="dispatchOrderSales">R0.00</dd></div><div><dt>Online order payments</dt><dd id="dispatchOnlinePaid">R0.00</dd></div><div><dt>Hourly pay</dt><dd id="dispatchHourlyPay">R0.00</dd></div><div><dt>Delivery pay</dt><dd id="dispatchDeliveryPay">R0.00</dd></div><div><dt>Online tips</dt><dd id="dispatchOnlineTips">R0.00</dd></div><div><dt>Cash tips (driver keeps)</dt><dd id="dispatchCashTips">R0.00</dd></div><div class="dispatch-cash-total"><dt>Expected cash due to store</dt><dd id="dispatchExpectedCash">R0.00</dd></div><div><dt>Variance</dt><dd id="dispatchVariance">R0.00</dd></div></dl>
+                        <label for="dispatchVarianceReason" class="form-label">Variance reason</label><textarea id="dispatchVarianceReason" class="form-control" maxlength="1000" rows="2"></textarea>
+                        <div class="d-flex justify-content-end gap-2 mt-3"><button type="button" id="dispatchCashUpCancel" class="btn btn-outline-secondary">Cancel</button><button type="submit" id="dispatchCashUpSubmit" class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Settle shift</button></div>
+                    </form>
+                </div>
+                <div class="admin-section"><div class="section-title"><h3>Promote customer to driver</h3></div><form id="dispatchPromote" class="dispatch-inline-form"><label for="dispatchEmail">Registered email</label><input id="dispatchEmail" class="form-control" type="email" autocomplete="off" required><button class="btn btn-primary" type="submit"><i class="bi bi-person-plus me-1"></i>Promote</button></form></div>
+                <div class="admin-section"><div class="section-title"><h3>Past cash-ups</h3></div><div id="dispatchHistory" class="dispatch-list"></div></div>
             </section>
 
             <section id="users" class="admin-panel" aria-labelledby="usersHeading">
@@ -338,5 +365,6 @@
 <script th:src="@{/webjars/bootstrap/5.3.8/js/bootstrap.bundle.min.js}"></script>
 <script th:src="@{/js/stomp-client.js}"></script>
 <script th:src="@{/js/admin.js}"></script>
+<script th:src="@{/js/admin-dispatch.js}"></script>
 </body>
 </html>

@@ -8,7 +8,9 @@ WITH protected AS (
         'order_burger_protein', 'order_burger_removed_component', 'order_burger_extra_component',
         'order_pizza_item', 'order_pizza_item_extra', 'order_pizza_item_base_option',
         'customer_notes', 'staff', 'password_reset_tokens', 'order_special_item',
-        'order_special_selection', 'order_pizza_item_removed_ingredient'
+        'order_special_selection', 'order_pizza_item_removed_ingredient',
+        'driver_profile', 'driver_shift', 'delivery_assignment', 'driver_dispatch_event',
+        'driver_settlement', 'delivery_payment'
     )
 )
 SELECT jsonb_build_object(

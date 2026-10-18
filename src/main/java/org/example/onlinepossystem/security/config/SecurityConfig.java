@@ -148,6 +148,7 @@ public class SecurityConfig {
                         // Protect order and profile pages
                         .requestMatchers("/order", "/checkout", "/orders/*/confirmation", "/profile/edit").hasRole("USER")
                         .requestMatchers("/profile/update").hasRole("USER")
+                        .requestMatchers("/driver", "/api/driver/**").hasRole("DRIVER")
                         .requestMatchers("/admin/login").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
 

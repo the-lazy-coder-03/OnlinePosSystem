@@ -50,6 +50,12 @@ public class RlsRuntimeVerifier {
         policies.put("customer_notes", new String[]{"customer_notes_read", "customer_notes_insert"});
         policies.put("staff", new String[]{"staff_admin"});
         policies.put("password_reset_tokens", new String[]{});
+        policies.put("driver_profile", new String[]{"driver_profile_read", "driver_profile_write"});
+        policies.put("driver_shift", new String[]{"driver_shift_read", "driver_shift_insert", "driver_shift_update"});
+        policies.put("delivery_assignment", new String[]{"delivery_assignment_read", "delivery_assignment_insert", "delivery_assignment_update"});
+        policies.put("driver_dispatch_event", new String[]{"driver_dispatch_event_read", "driver_dispatch_event_insert"});
+        policies.put("driver_settlement", new String[]{"driver_settlement_read", "driver_settlement_insert"});
+        policies.put("delivery_payment", new String[]{"delivery_payment_read"});
         return Map.copyOf(policies);
     }
 
@@ -216,7 +222,7 @@ public class RlsRuntimeVerifier {
                             'actor_role', 'actor_customer_id', 'actor_branch_id', 'account_context',
                             'login_credentials', 'account_exists', 'register_customer', 'create_reset',
                             'cancel_reset', 'consume_reset', 'verified_environment_admin',
-                            'context_key_fingerprint')))
+                            'context_key_fingerprint', 'promote_branch_driver', 'claim_next_delivery')))
                 """)) {
             result.next();
             String unsafeFunctions = result.getString(1);
@@ -306,6 +312,9 @@ public class RlsRuntimeVerifier {
             case "password_reset_tokens" -> java.util.Set.of();
             case "orders" -> java.util.Set.of("SELECT");
             case "customer_notes" -> java.util.Set.of("SELECT", "INSERT");
+            case "delivery_payment" -> java.util.Set.of("SELECT");
+            case "driver_dispatch_event", "driver_settlement" -> java.util.Set.of("SELECT", "INSERT");
+            case "driver_profile", "driver_shift", "delivery_assignment" -> java.util.Set.of("SELECT", "INSERT", "UPDATE");
             default -> java.util.Set.of("SELECT", "INSERT", "UPDATE", "DELETE");
         };
         try (var statement = connection.prepareStatement("""

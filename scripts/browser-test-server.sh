@@ -44,6 +44,24 @@ VALUES (
     -33.861000,18.650000,'Western Cape','South Africa');
 INSERT INTO customers(email,password,access_level,role,first_name,last_name)
 VALUES ('branch@example.com','{noop}Browser-test-123',1,'ADMIN','Branch','Admin');
+INSERT INTO customers(email,password,access_level,role,first_name,last_name)
+VALUES ('browser-driver@example.com','{noop}Browser-test-123',0,'USER','Browser','Driver');
+INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type,customer_name,phone,formatted_address)
+SELECT 1,id,'Completed',now(),'delivery','Browser Customer','0712345678',
+    '12 Main Street, Kenridge, Cape Town, 7550, South Africa'
+FROM customers WHERE email='browser@example.com';
+INSERT INTO order_menu_item(order_id,menu_item_id,qty,unit_price_at_time)
+SELECT o.order_id,m.id,1,50.00 FROM customer_order o
+CROSS JOIN (SELECT id FROM menu_item ORDER BY id LIMIT 1) m
+WHERE o.customer_name='Browser Customer' AND o.order_type='delivery';
+INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type,customer_name,phone,formatted_address)
+SELECT 1,id,'Completed',now()+interval '1 second','delivery','Browser Batch','0712345678',
+    '12 Main Street, Kenridge, Cape Town, 7550, South Africa'
+FROM customers WHERE email='browser@example.com';
+INSERT INTO order_menu_item(order_id,menu_item_id,qty,unit_price_at_time)
+SELECT o.order_id,m.id,1,25.00 FROM customer_order o
+CROSS JOIN (SELECT id FROM menu_item ORDER BY id LIMIT 1) m
+WHERE o.customer_name='Browser Batch' AND o.order_type='delivery';
 SQL
 
 java -jar "$jar" --spring.config.import= --spring.profiles.active=default \

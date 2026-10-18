@@ -53,11 +53,16 @@ class WebSocketConfigTest {
 
         Message<?> ownBranch = subscription("/topic/admin/branches/1/orders", "kenridge-admin");
         assertThat(interceptor.preSend(ownBranch, mock(MessageChannel.class))).isSameAs(ownBranch);
+        Message<?> ownDispatch = subscription("/topic/admin/branches/1/dispatch", "kenridge-admin");
+        assertThat(interceptor.preSend(ownDispatch, mock(MessageChannel.class))).isSameAs(ownDispatch);
         assertThatThrownBy(() -> interceptor.preSend(
                 subscription("/topic/admin/branches/2/orders", "kenridge-admin"), mock(MessageChannel.class)))
                 .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> interceptor.preSend(
                 subscription("/topic/admin/orders", "kenridge-admin"), mock(MessageChannel.class)))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> interceptor.preSend(
+                subscription("/topic/admin/branches/2/dispatch", "kenridge-admin"), mock(MessageChannel.class)))
                 .isInstanceOf(AccessDeniedException.class);
     }
 
@@ -69,6 +74,8 @@ class WebSocketConfigTest {
         Message<?> combined = subscription("/topic/admin/orders", "super-admin");
 
         assertThat(interceptor.preSend(combined, mock(MessageChannel.class))).isSameAs(combined);
+        Message<?> allDispatch = subscription("/topic/admin/dispatch", "super-admin");
+        assertThat(interceptor.preSend(allDispatch, mock(MessageChannel.class))).isSameAs(allDispatch);
     }
 
     @Test
@@ -80,6 +87,10 @@ class WebSocketConfigTest {
             assertThatThrownBy(() -> interceptor.preSend(subscription(destination, "customer@example.com"), mock(MessageChannel.class)))
                     .isInstanceOf(AccessDeniedException.class);
         }
+        assertThatThrownBy(() -> interceptor.preSend(subscription("/user/queue/driver", "customer@example.com"),
+                mock(MessageChannel.class))).isInstanceOf(AccessDeniedException.class);
+        Message<?> driverQueue = subscription("/user/queue/driver", "driver@example.com", "ROLE_DRIVER");
+        assertThat(interceptor.preSend(driverQueue, mock(MessageChannel.class))).isSameAs(driverQueue);
     }
 
     private ChannelInterceptor interceptor(WebSocketConfig config) {
@@ -94,9 +105,13 @@ class WebSocketConfigTest {
     }
 
     private Message<?> subscription(String destination, String username) {
+        return subscription(destination, username, "ROLE_USER");
+    }
+
+    private Message<?> subscription(String destination, String username, String role) {
         StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
         accessor.setDestination(destination);
-        accessor.setUser(new TestingAuthenticationToken(username, "n/a", "ROLE_USER"));
+        accessor.setUser(new TestingAuthenticationToken(username, "n/a", role));
         return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
     }
 }

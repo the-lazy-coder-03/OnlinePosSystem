@@ -47,6 +47,8 @@ public class RoleAwareAuthenticationSuccessHandler implements AuthenticationSucc
         boolean adminLogin = "true".equals(request.getParameter("adminLogin"));
         boolean isAdmin = authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+        boolean isDriver = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_DRIVER".equals(authority.getAuthority()));
         if (adminLogin && !isAdmin) {
             SecurityContextHolder.clearContext();
             request.getSession().invalidate();
@@ -62,7 +64,7 @@ public class RoleAwareAuthenticationSuccessHandler implements AuthenticationSucc
 
         String target = isAllowed(savedTarget, adminLogin, authentication)
                 ? savedTarget
-                : (adminLogin ? "/admin" : "/");
+                : (adminLogin ? "/admin" : isDriver ? "/driver" : "/");
         redirectStrategy.sendRedirect(request, response, target);
     }
 
@@ -82,6 +84,9 @@ public class RoleAwareAuthenticationSuccessHandler implements AuthenticationSucc
         String path = target.contains("?") ? target.substring(0, target.indexOf('?')) : target;
         if (adminLogin) {
             return path.equals("/admin") || path.startsWith("/admin/") || ADMIN_ALIASES.contains(path);
+        }
+        if (authentication.getAuthorities().stream().anyMatch(authority -> "ROLE_DRIVER".equals(authority.getAuthority()))) {
+            return path.equals("/driver");
         }
         boolean isCustomer = authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_USER".equals(authority.getAuthority()));
