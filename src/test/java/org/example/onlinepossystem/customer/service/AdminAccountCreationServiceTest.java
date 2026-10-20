@@ -4,6 +4,8 @@ import org.example.onlinepossystem.customer.entity.Customer;
 import org.example.onlinepossystem.customer.repository.CustomerRepository;
 import org.example.onlinepossystem.security.DefaultPasswordPolicy;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,15 +22,16 @@ class AdminAccountCreationServiceTest {
     private final AdminAccountCreationService service =
             new AdminAccountCreationService(customers, encoder, new DefaultPasswordPolicy());
 
-    @Test
-    void createsAdminWithOnlyNameEmailPasswordAndLevel() {
+    @ParameterizedTest
+    @ValueSource(strings = {"Strong12", "Strong1!"})
+    void createsAdminWithOnlyNameEmailPasswordAndLevel(String password) {
         when(customers.saveAndFlush(any(Customer.class))).thenAnswer(invocation -> {
             Customer customer = invocation.getArgument(0);
             customer.setId(42L);
             return customer;
         });
 
-        Long id = service.create(" Ada ", " Smith ", " ADA@EXAMPLE.COM ", "Strong1!", 2);
+        Long id = service.create(" Ada ", " Smith ", " ADA@EXAMPLE.COM ", password, 2);
 
         assertThat(id).isEqualTo(42L);
         org.mockito.ArgumentCaptor<Customer> saved = org.mockito.ArgumentCaptor.forClass(Customer.class);
@@ -37,7 +40,7 @@ class AdminAccountCreationServiceTest {
         assertThat(account.getFirstName()).isEqualTo("Ada");
         assertThat(account.getLastName()).isEqualTo("Smith");
         assertThat(account.getEmail()).isEqualTo("ada@example.com");
-        assertThat(encoder.matches("Strong1!", account.getPassword())).isTrue();
+        assertThat(encoder.matches(password, account.getPassword())).isTrue();
         assertThat(account.getAccessLevel()).isEqualTo(2);
         assertThat(account.getRole()).isEqualTo("ADMIN");
         assertThat(account.getPhone1()).isNull();

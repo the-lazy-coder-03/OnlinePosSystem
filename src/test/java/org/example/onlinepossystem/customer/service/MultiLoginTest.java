@@ -228,7 +228,7 @@ public class MultiLoginTest {
     public void changingPasswordRequiresCurrentPasswordAndRevokesExistingCredentials() throws Exception {
         String email = "password-change@example.com";
         String oldPassword = "Password1!";
-        String newPassword = "Changed2@";
+        String newPassword = "Changed2";
         customerService.registerCustomer("Password", "Change", email, oldPassword, "0712345677", null,
                 "12", "Main Street", "Kenridge", null, "Kenridge Branch", "7550");
         UserDetails principal = userDetailsService.loadUserByUsername(email);
@@ -291,7 +291,7 @@ public class MultiLoginTest {
                         .param("firstName", "New")
                         .param("lastName", "Customer")
                         .param("email", email)
-                        .param("password", "Password1!")
+                        .param("password", "Password1")
                         .param("house_number", "12")
                         .param("street", "Main Street")
                         .param("area", "Kenridge")

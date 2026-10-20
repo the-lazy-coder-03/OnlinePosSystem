@@ -6,6 +6,8 @@ import org.example.onlinepossystem.notification.email.NotificationDeliveryExcept
 import org.example.onlinepossystem.security.DefaultPasswordPolicy;
 import org.example.onlinepossystem.security.SimpleRateLimiter;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -63,12 +65,13 @@ class PasswordResetServiceTest {
         verify(accounts).cancelReset(hash.getValue());
     }
 
-    @Test
-    void consumesTokenWithEncodedPassword() {
-        when(encoder.encode("ValidPass1!")).thenReturn("{bcrypt}new");
+    @ParameterizedTest
+    @ValueSource(strings = {"ValidPass1", "ValidPass1!"})
+    void consumesTokenWithEncodedPassword(String password) {
+        when(encoder.encode(password)).thenReturn("{bcrypt}new");
         when(accounts.consumeReset(anyString(), eq("{bcrypt}new")))
                 .thenReturn(Optional.of("customer@example.com"));
-        service.resetPassword("raw-token", "ValidPass1!", "ValidPass1!");
+        service.resetPassword("raw-token", password, password);
         verify(accounts).consumeReset(matches("[a-f0-9]{64}"), eq("{bcrypt}new"));
         verify(events).publishEvent(new org.example.onlinepossystem.customer.api.AccountCredentialsChanged(
                 "customer@example.com"));

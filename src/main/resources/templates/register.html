@@ -218,7 +218,7 @@
 
         <input type="email" name="email" placeholder="Email Address" required>
         <input type="password" name="password" placeholder="Password" minlength="8" required
-               title="Use at least 8 characters with uppercase, lowercase, number, and special character.">
+               title="Use at least 8 characters with uppercase, lowercase, and a number.">
         <div id="registerAddressAutocomplete"
              class="address-autocomplete"
              data-address-autocomplete
@@ -267,7 +267,7 @@
             We could not create that account. Check the details or <a href="/login">sign in</a>.
         </div>
         <div th:if="${param.error != null and param.error[0] == 'password'}" class="error">
-            Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
+            Password must be at least 8 characters and include uppercase, lowercase, and a number.
         </div>
         <div th:if="${param.error != null and param.error[0] == 'address'}" class="error">
             Select a delivery address from Google before creating your account.

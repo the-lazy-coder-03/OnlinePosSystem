@@ -306,7 +306,7 @@
         <div class="tab-content active" id="profile" th:unless="${readOnlyHistory}">
             <h2>1. Edit Profile</h2>
             <div th:if="${param.success}" class="message">Profile updated successfully!</div>
-            <div th:if="${param.error != null and param.error[0] == 'password'}" class="message">Password must be at least 8 characters and include uppercase, lowercase, number, and special character.</div>
+            <div th:if="${param.error != null and param.error[0] == 'password'}" class="message">Password must be at least 8 characters and include uppercase, lowercase, and a number.</div>
             <div th:if="${param.error != null and param.error[0] == 'current-password'}" class="message">Enter your current password before choosing a new one.</div>
             <div th:if="${param.error != null and param.error[0] == 'address'}" class="message">Select an address from Google before saving address changes.</div>
             <form id="profileForm" th:action="@{/profile/update}" method="post" th:object="${customer}">

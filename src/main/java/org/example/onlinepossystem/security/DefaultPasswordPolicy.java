@@ -8,11 +8,10 @@ import java.util.regex.Pattern;
 @Component
 public class DefaultPasswordPolicy implements PasswordPolicy {
     private static final String MESSAGE =
-            "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+            "Password must be at least 8 characters and include uppercase, lowercase, and a number.";
     private static final Pattern UPPERCASE = Pattern.compile("[A-Z]");
     private static final Pattern LOWERCASE = Pattern.compile("[a-z]");
     private static final Pattern NUMBER = Pattern.compile("\\d");
-    private static final Pattern SPECIAL = Pattern.compile("[^A-Za-z0-9]");
 
     @Override
     public boolean isValid(String password) {
@@ -20,8 +19,7 @@ public class DefaultPasswordPolicy implements PasswordPolicy {
                 && password.length() >= 8
                 && UPPERCASE.matcher(password).find()
                 && LOWERCASE.matcher(password).find()
-                && NUMBER.matcher(password).find()
-                && SPECIAL.matcher(password).find();
+                && NUMBER.matcher(password).find();
     }
 
     @Override
