@@ -231,3 +231,14 @@ The certificate includes all three hostnames. The renewal container checks
 twice daily and Nginx reloads certificates periodically. The main host proxies
 the full application; the email host serves password-reset and static asset
 requests and redirects other paths to `https://crowdcam.co.za`.
+
+### Host Nginx API hostname
+
+The LAN server's system Nginx uses `docker/nginx/host-api.crowdcam.co.za.conf`
+for `api.crowdcam.co.za`. Its DNS A record points to the same public IP as the
+main site. The vhost redirects HTTP to HTTPS, serves only `/api/` and `/ws` over
+HTTPS, and proxies them to the app's loopback binding at `127.0.0.1:18080`.
+The separate Let's Encrypt certificate is issued with Certbot's webroot at
+`/var/www/letsencrypt`; the `certbot.timer` renewal uses a deploy hook to reload
+system Nginx after successful renewal. PostgreSQL remains Docker-internal;
+Android clients connect to the API over HTTPS on port 443, never to port 5432.

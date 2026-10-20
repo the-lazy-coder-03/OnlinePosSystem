@@ -5,6 +5,7 @@
     const fixedBranch = Number(document.body.dataset.adminBranchId || 0);
     const csrf = document.querySelector('meta[name="_csrf"]')?.content || "";
     const money = value => new Intl.NumberFormat("en-ZA",{style:"currency",currency:"ZAR"}).format(Number(value || 0));
+    const shiftTime = value => new Intl.DateTimeFormat("en-ZA",{timeZone:"Africa/Johannesburg",dateStyle:"medium",timeStyle:"short"}).format(new Date(value));
     const esc = value => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[character]);
     const branch = () => fixedBranch || Number(element("dispatchBranch")?.value || 1);
     let snapshot = null;
@@ -36,12 +37,13 @@
     }
     function updateBatchButton(){element("dispatchBatchAssign").disabled=!element("dispatchBatchDriver").value||!document.querySelector('[data-batch-order]:checked');}
     async function refresh() {try {render(await request(`/api/admin/dispatch?branchId=${branch()}`));error("");await history();}catch(e){error(e.message);}}
-    async function history(){const rows=await request(`/api/admin/dispatch/settlements?branchId=${branch()}`);element("dispatchHistory").innerHTML=rows.length?rows.map(s=>`<div class="dispatch-row"><div><strong>Shift #${s.shiftId} · ${esc(s.managerUsername)}</strong><small>${esc(s.settledAt)} · ${money(s.orderSales)} sales · ${money(s.expectedCashDue)} expected · ${money(s.variance)} variance</small></div></div>`).join(""):'<p class="text-secondary mb-0">No settled shifts yet.</p>';}
+    async function history(){const rows=await request(`/api/admin/dispatch/settlements?branchId=${branch()}`);element("dispatchHistory").innerHTML=rows.length?rows.map(s=>`<div class="dispatch-row"><div><strong>Shift #${s.shiftId} · ${esc(s.managerUsername)}</strong><small>${esc(s.settledAt)} · ${money(s.orderSales)} sales · ${money(s.expectedCashDue)} expected · ${money(s.variance)} variance</small>${s.approvedClockInAt&&s.approvedClockOutAt?`<small>Payable time: ${esc(shiftTime(s.approvedClockInAt))} – ${esc(shiftTime(s.approvedClockOutAt))}</small>`:""}${s.timeAdjustmentReason?`<small>Time adjustment: ${esc(s.timeAdjustmentReason)}</small>`:""}</div></div>`).join(""):'<p class="text-secondary mb-0">No settled shifts yet.</p>';}
     async function mutate(path,method,body){try{await request(path,method,body);error("");await refresh();}catch(e){error(e.message);}}
     function closeCashUp(){previewRevision++;cashUpShift=null;cashPreview=null;element("dispatchCashUp").classList.add("d-none");}
     function renderCashPreview(preview){
         cashPreview=preview;
-        const values={dispatchDeliveredCount:preview.deliveredCount,dispatchOrderSales:money(preview.orderSales),
+        const values={dispatchApprovedDuration:`${Math.floor(preview.approvedMinutes/60)}h ${preview.approvedMinutes%60}m`,
+            dispatchDeliveredCount:preview.deliveredCount,dispatchOrderSales:money(preview.orderSales),
             dispatchOnlinePaid:money(preview.onlineOrderPaid),dispatchHourlyPay:money(preview.hourlyPay),
             dispatchDeliveryPay:money(preview.deliveryPay),dispatchOnlineTips:money(preview.onlineTips),
             dispatchCashTips:money(preview.cashTips),dispatchExpectedCash:money(preview.expectedCashDue)};
@@ -58,15 +60,16 @@
     }
     async function updateCashPreview(){
         if(cashUpShift===null)return;
-        const minutes=Number(element("dispatchApprovedMinutes").value);
-        if(!Number.isInteger(minutes)||minutes<0||minutes>1440)return;
+        const clockInTime=element("dispatchClockInTime").value;
+        const clockOutTime=element("dispatchClockOutTime").value;
+        if(!clockInTime||!clockOutTime){cashPreview=null;element("dispatchCashUpSubmit").disabled=true;return;}
         const revision=++previewRevision;
         cashPreview=null;
         element("dispatchCashUpSubmit").disabled=true;
         try{
-            const preview=await request(`/api/admin/dispatch/shifts/${cashUpShift}/cash-up?branchId=${branch()}&approvedMinutes=${minutes}`);
-            if(revision===previewRevision){renderCashPreview(preview);element("dispatchCashUpSubmit").disabled=false;}
-        }catch(e){error(e.message);}
+            const preview=await request(`/api/admin/dispatch/shifts/${cashUpShift}/cash-up?branchId=${branch()}&clockInTime=${encodeURIComponent(clockInTime)}&clockOutTime=${encodeURIComponent(clockOutTime)}`);
+            if(revision===previewRevision){renderCashPreview(preview);element("dispatchCashUpSubmit").disabled=false;error("");}
+        }catch(e){if(revision===previewRevision)error(e.message);}
     }
     async function cashUp(shiftId){
         try{
@@ -75,10 +78,12 @@
             previewRevision++;
             element("dispatchCashUpSubmit").disabled=false;
             element("dispatchCashUpHeading").textContent=`Cash-up · Shift #${shiftId}`;
-            element("dispatchApprovedMinutes").value=String(preview.approvedMinutes);
+            element("dispatchClockInTime").value=preview.clockInTime.slice(0,5);
+            element("dispatchClockOutTime").value=preview.clockOutTime.slice(0,5);
             element("dispatchCashHanded").value=Math.max(0,Number(preview.expectedCashDue)).toFixed(2);
             element("dispatchCashPaid").value=Math.max(0,-Number(preview.expectedCashDue)).toFixed(2);
             element("dispatchVarianceReason").value="";
+            element("dispatchTimeReason").value="";
             renderCashPreview(preview);
             element("dispatchCashUp").classList.remove("d-none");
             element("dispatchCashUp").scrollIntoView({behavior:"smooth",block:"start"});
@@ -88,14 +93,15 @@
     async function settleCashUp(event){
         event.preventDefault();
         if(cashUpShift===null||!cashPreview)return;
-        const approvedMinutes=Number(element("dispatchApprovedMinutes").value);
+        const clockInTime=element("dispatchClockInTime").value;
+        const clockOutTime=element("dispatchClockOutTime").value;
         const cashHandedIn=Number(element("dispatchCashHanded").value);
         const cashPaidOut=Number(element("dispatchCashPaid").value);
         const varianceReason=element("dispatchVarianceReason").value.trim();
-        if(!Number.isInteger(approvedMinutes)||approvedMinutes<0||approvedMinutes>1440
+        if(!clockInTime||!clockOutTime
             ||!Number.isFinite(cashHandedIn)||cashHandedIn<0||!Number.isFinite(cashPaidOut)||cashPaidOut<0
             ||(cashHandedIn>0&&cashPaidOut>0)){
-            error("Review the approved minutes and cash amounts.");return;
+            error("Review the selected times and cash amounts.");return;
         }
         if(Math.abs(cashHandedIn-cashPaidOut-Number(cashPreview.expectedCashDue))>0.005&&!varianceReason){
             error("A variance reason is required.");return;
@@ -103,7 +109,8 @@
         if(!confirm(`Settle shift #${cashUpShift}? This cannot be changed.`))return;
         try{
             await request(`/api/admin/dispatch/shifts/${cashUpShift}/cash-up`,"POST",
-                {branchId:branch(),approvedMinutes,cashHandedIn,cashPaidOut,varianceReason});
+                {branchId:branch(),clockInTime,clockOutTime,cashHandedIn,cashPaidOut,varianceReason,
+                    timeAdjustmentReason:element("dispatchTimeReason").value.trim()});
             closeCashUp();error("");await refresh();
         }catch(e){error(e.message);}
     }
@@ -119,7 +126,8 @@
             mutate("/api/admin/dispatch/assignments/batch","POST",{branchId:branch(),orderIds,driverId});
         });
         element("dispatchBranch")?.addEventListener("change",()=>{element("dispatchAlert").classList.add("d-none");closeCashUp();refresh();});
-        element("dispatchApprovedMinutes").addEventListener("change",updateCashPreview);
+        element("dispatchClockInTime").addEventListener("change",updateCashPreview);
+        element("dispatchClockOutTime").addEventListener("change",updateCashPreview);
         element("dispatchCashHanded").addEventListener("input",updateVariance);
         element("dispatchCashPaid").addEventListener("input",updateVariance);
         element("dispatchCashUpForm").addEventListener("submit",settleCashUp);

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.math.BigDecimal;
+import java.time.LocalTime;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -118,16 +119,18 @@ public class DriverDispatchController {
     @ResponseBody
     public DriverDispatchService.CashUpPreview preview(@PathVariable long shiftId,
             @RequestParam(required = false) Integer branchId,
-            @RequestParam(required = false) Integer approvedMinutes, Authentication authentication) {
-        return service.preview(authentication, shiftId, branchId, approvedMinutes);
+            @RequestParam(required = false) LocalTime clockInTime,
+            @RequestParam(required = false) LocalTime clockOutTime, Authentication authentication) {
+        return service.preview(authentication, shiftId, branchId, clockInTime, clockOutTime);
     }
 
     @PostMapping("/api/admin/dispatch/shifts/{shiftId}/cash-up")
     @ResponseBody
     public DriverDispatchService.CashUpResult cashUp(@PathVariable long shiftId, @RequestBody CashUpRequest request,
                                                       Authentication authentication) {
-        return service.cashUp(authentication, shiftId, request.branchId(), request.approvedMinutes(),
-                request.cashHandedIn(), request.cashPaidOut(), request.varianceReason());
+        return service.cashUp(authentication, shiftId, request.branchId(), request.clockInTime(),
+                request.clockOutTime(), request.cashHandedIn(), request.cashPaidOut(),
+                request.varianceReason(), request.timeAdjustmentReason());
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class,
@@ -144,6 +147,7 @@ public class DriverDispatchController {
     public record RatesRequest(Integer branchId, BigDecimal hourlyRate, BigDecimal perDeliveryRate) {}
     public record AssignmentRequest(Integer branchId, long orderId, long driverId) {}
     public record BatchAssignmentRequest(Integer branchId, java.util.List<Long> orderIds, long driverId) {}
-    public record CashUpRequest(Integer branchId, int approvedMinutes, BigDecimal cashHandedIn,
-                                BigDecimal cashPaidOut, String varianceReason) {}
+    public record CashUpRequest(Integer branchId, LocalTime clockInTime, LocalTime clockOutTime,
+                                BigDecimal cashHandedIn, BigDecimal cashPaidOut, String varianceReason,
+                                String timeAdjustmentReason) {}
 }

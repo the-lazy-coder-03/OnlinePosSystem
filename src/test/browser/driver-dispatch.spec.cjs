@@ -23,6 +23,7 @@ test('manager dispatch and mobile driver shift flow', async ({browser}) => {
     await manager.locator('#dispatchEmail').fill('browser-driver@example.com');
     await manager.locator('#dispatchPromote button').click();
     await expect(manager.locator('#dispatchRoster')).toContainText('Browser Driver');
+    await manager.locator('[data-hourly]').first().fill('60.00');
     await manager.locator('[data-delivery]').first().fill('10.00');
     await Promise.all([
         manager.waitForResponse(response => response.url().includes('/rates') && response.status() === 200),
@@ -59,12 +60,28 @@ test('manager dispatch and mobile driver shift flow', async ({browser}) => {
 
     await manager.getByRole('button', {name:'Cash-up'}).click();
     await expect(manager.locator('#dispatchCashUp')).toBeVisible();
-    await manager.locator('#dispatchApprovedMinutes').fill('0');
-    await manager.locator('#dispatchApprovedMinutes').dispatchEvent('change');
+    await manager.locator('#dispatchClockInTime').fill('00:00');
+    await manager.locator('#dispatchClockOutTime').fill('00:00');
+    await manager.locator('#dispatchClockOutTime').dispatchEvent('change');
+    await expect(manager.locator('#dispatchApprovedDuration')).toHaveText('0h 0m');
     await expect(manager.locator('#dispatchExpectedCash')).toContainText(/R\s*55,00/);
     await manager.locator('#dispatchCashHanded').fill('55.00');
     await manager.locator('#dispatchCashPaid').fill('0.00');
     await expect(manager.locator('#dispatchVariance')).toContainText(/R\s*0,00/);
+    const localTime = new Intl.DateTimeFormat('en-GB', {timeZone:'Africa/Johannesburg',
+        hour:'2-digit', minute:'2-digit', hourCycle:'h23'}).format(new Date());
+    const [hour, minute] = localTime.split(':').map(Number);
+    if (hour * 60 + minute >= 2) {
+        await manager.locator('#dispatchClockOutTime').fill('00:01');
+        await manager.locator('#dispatchClockOutTime').dispatchEvent('change');
+        await expect(manager.locator('#dispatchApprovedDuration')).toHaveText('0h 1m');
+        await expect(manager.locator('#dispatchHourlyPay')).toContainText(/R\s*1,00/);
+        await expect(manager.locator('#dispatchVariance')).toContainText(/R\s*1,00/);
+        await expect(manager.locator('#dispatchCashHanded')).toHaveValue('55.00');
+        await manager.locator('#dispatchClockOutTime').fill('00:00');
+        await manager.locator('#dispatchClockOutTime').dispatchEvent('change');
+        await expect(manager.locator('#dispatchVariance')).toContainText(/R\s*0,00/);
+    }
     manager.once('dialog', dialog => dialog.accept());
     await manager.locator('#dispatchCashUpSubmit').click();
     await expect(manager.locator('#dispatchHistory')).toContainText(/R\s*75,00/);

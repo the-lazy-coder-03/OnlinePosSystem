@@ -6,11 +6,11 @@
 - Drivers sign in at `/login` and are sent to `/driver`. Clock-in creates one active shift for the Africa/Johannesburg business date and freezes the current rates on that shift. A new shift cannot start while the previous shift is awaiting cash-up.
 - Managers can assign individual uncollected deliveries or select up to 100 queue orders for an atomic batch assignment to an active driver. Drivers may self-claim one unassigned order at a time from their branch's FIFO queue. The assignment is separate from kitchen status; pickup is available only after the kitchen marks the order `Completed`.
 - After marking all assigned deliveries delivered, the driver can signal **Returning**. This state is saved and broadcast to the branch dashboard; reconnecting reloads the saved state. A rejected order assigned before pickup can be cancelled by the manager, preserving a dispatch event.
-- The driver clocks out after all assignments are delivered or cancelled. The manager reviews the shift, approves payable minutes, records cash handed in or paid out, and settles it. A nonzero variance requires a reason. Closed settlements remain read-only history.
+- The driver clocks out after all assignments are delivered or cancelled. At cash-up the manager selects clock-in and clock-out times in SAST; the server calculates payable minutes and pay automatically. The original clock events remain unchanged, and the selected times plus an optional adjustment reason are retained in settlement history. A nonzero cash variance requires a reason. Closed settlements remain read-only history.
 
 ## Accounting
 
-Cash-up includes every delivered order assigned to the shift. Order sales are calculated from persisted order-line prices using the ordering module's existing total calculator, not browser totals. Hourly pay is `approved minutes / 60 * shift hourly rate`, rounded to cents; delivery pay is `delivered count * shift per-delivery rate`.
+Cash-up includes every delivered order assigned to the shift. Order sales are calculated from persisted order-line prices using the ordering module's existing total calculator, not browser totals. Hourly pay is `server-calculated payable minutes / 60 * shift hourly rate`, rounded to cents; delivery pay is `delivered count * shift per-delivery rate`. Time-only selections use the recorded clock-in date; a clock-out time earlier than clock-in means the next day, while equal times mean zero minutes. Future clock-out and shifts over 24 hours are rejected.
 
 `expected cash due to store = order sales - verified online order payments - hourly pay - delivery pay - online tips`. A negative result is cash payable by the store to the driver. Actual net cash is handed-in cash minus paid-out cash; variance is actual net cash minus expected cash due. Cash tips belong to the driver and are reported separately from order sales.
 
@@ -18,6 +18,6 @@ The current application has no payment provider or customer tipping flow. Every 
 
 ## Security and deployment
 
-`rls-v6-drivers.sql` is an immutable migration. Run it through the existing owner migration process before starting the runtime app. The runtime role must not own protected tables. Forced RLS limits drivers to their own shifts and assigned delivery orders, while manager reads/writes are branch-scoped. The reviewed policy/function contract in `SupportConfigFiles/rls-contract.json` is checked at application startup.
+`rls-v6-drivers.sql` and `rls-v7-driver-times.sql` are immutable migrations. Run them through the existing owner migration process before starting the runtime app. The runtime role must not own protected tables. Forced RLS limits drivers to their own shifts and assigned delivery orders, while manager reads/writes are branch-scoped. The reviewed policy/function contract in `SupportConfigFiles/rls-contract.json` is checked at application startup.
 
 Actions use authenticated REST with CSRF protection. WebSocket messages are server-published notifications only; clients cannot send state changes over STOMP. No payment provider, production deployment, or credential changes are part of this feature.

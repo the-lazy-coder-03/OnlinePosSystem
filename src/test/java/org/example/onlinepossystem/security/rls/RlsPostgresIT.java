@@ -33,6 +33,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -756,32 +757,49 @@ class RlsPostgresIT {
         dispatch.pickup(driverAuth, secondOrder);
         dispatch.delivered(driverAuth, secondOrder);
         assertThat(dispatch.returning(driverAuth).returningAt()).isNotNull();
-        dispatch.clockOut(driverAuth);
+        var recordedClockOut = dispatch.clockOut(driverAuth);
         assertThatThrownBy(() -> dispatch.clockIn(initialDriver)).isInstanceOf(IllegalStateException.class);
 
         as("one@example.com");
         manager = SecurityContextHolder.getContext().getAuthentication();
-        var preview = dispatch.preview(manager, shift.id(), 1, 60);
+        var preview = dispatch.preview(manager, shift.id(), 1, java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT);
         assertThat(preview.deliveredCount()).isEqualTo(2);
         assertThat(preview.orderSales()).isEqualByComparingTo("200.00");
         assertThat(preview.onlineOrderPaid()).isZero();
         assertThat(preview.onlineTips()).isZero();
-        assertThat(preview.hourlyPay()).isEqualByComparingTo("60.00");
+        assertThat(preview.hourlyPay()).isZero();
         assertThat(preview.deliveryPay()).isEqualByComparingTo("20.00");
-        assertThat(preview.expectedCashDue()).isEqualByComparingTo("120.00");
+        assertThat(preview.expectedCashDue()).isEqualByComparingTo("180.00");
         var currentManager = manager;
-        assertThatThrownBy(() -> dispatch.cashUp(currentManager, shift.id(), 1, 60,
-                new BigDecimal("119.00"), BigDecimal.ZERO, ""))
+        assertThatThrownBy(() -> dispatch.cashUp(currentManager, shift.id(), 1,
+                java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT,
+                new BigDecimal("179.00"), BigDecimal.ZERO, "", null))
                 .isInstanceOf(IllegalArgumentException.class);
-        var result = dispatch.cashUp(manager, shift.id(), 1, 60,
-                new BigDecimal("120.00"), BigDecimal.ZERO, "");
+        var result = dispatch.cashUp(manager, shift.id(), 1,
+                java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT,
+                new BigDecimal("180.00"), BigDecimal.ZERO, "", "Test shift adjustment");
         assertThat(result.variance()).isZero();
         assertThat(dispatch.settlements(manager, 1)).extracting(DriverDispatchService.Settlement::shiftId)
                 .contains(shift.id());
-        assertThatThrownBy(() -> dispatch.cashUp(currentManager, shift.id(), 1, 60,
-                new BigDecimal("120.00"), BigDecimal.ZERO, ""))
+        assertThat(dispatch.settlements(manager, 1).get(0).timeAdjustmentReason()).isEqualTo("Test shift adjustment");
+        assertThat(dispatch.settlements(manager, 1).get(0).approvedClockInAt()).isNotNull();
+        assertThat(dispatch.settlements(manager, 1).get(0).approvedClockOutAt()).isNotNull();
+        try (Connection c = ownerConnection();
+             var statement = c.prepareStatement("SELECT clocked_in_at, clocked_out_at, approved_minutes "
+                     + "FROM driver_shift WHERE shift_id = ?")) {
+            statement.setLong(1, shift.id());
+            try (var rows = statement.executeQuery()) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getObject(1, OffsetDateTime.class)).isEqualTo(shift.clockedInAt());
+                assertThat(rows.getObject(2, OffsetDateTime.class)).isEqualTo(recordedClockOut.clockedOutAt());
+                assertThat(rows.getInt(3)).isZero();
+            }
+        }
+        assertThatThrownBy(() -> dispatch.cashUp(currentManager, shift.id(), 1,
+                java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT,
+                new BigDecimal("180.00"), BigDecimal.ZERO, "", null))
                 .isInstanceOf(IllegalStateException.class);
-        dispatch.updateRates(manager, newDriver, 1, new BigDecimal("60.00"), new BigDecimal("10.00"));
+        dispatch.updateRates(manager, newDriver, 1, new BigDecimal("60.00"), new BigDecimal("70.00"));
 
         long payoutOrder;
         try (Connection c = ownerConnection()) {
@@ -805,11 +823,13 @@ class RlsPostgresIT {
         dispatch.clockOut(driverAuth);
         as("one@example.com");
         manager = SecurityContextHolder.getContext().getAuthentication();
-        var payoutPreview = dispatch.preview(manager, payoutShift.id(), 1, 60);
+        var payoutPreview = dispatch.preview(manager, payoutShift.id(), 1,
+                java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT);
         assertThat(payoutPreview.orderSales()).isEqualByComparingTo("50.00");
         assertThat(payoutPreview.expectedCashDue()).isEqualByComparingTo("-20.00");
-        assertThat(dispatch.cashUp(manager, payoutShift.id(), 1, 60, BigDecimal.ZERO,
-                new BigDecimal("21.00"), "One rand paid out above expected").variance())
+        assertThat(dispatch.cashUp(manager, payoutShift.id(), 1,
+                java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT, BigDecimal.ZERO,
+                new BigDecimal("21.00"), "One rand paid out above expected", null).variance())
                 .isEqualByComparingTo("-1.00");
         as("dispatch-driver@example.com");
         assertThat(dispatch.driverDashboard(SecurityContextHolder.getContext().getAuthentication()).settlements())

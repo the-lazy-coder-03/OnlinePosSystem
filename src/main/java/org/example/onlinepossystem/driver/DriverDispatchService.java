@@ -18,8 +18,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -52,7 +52,8 @@ public class DriverDispatchService {
         List<Settlement> settlements = jdbc.query("""
                 SELECT shift_id, manager_username, order_sales, online_order_paid, online_tips, cash_tips,
                     hourly_pay, delivery_pay, expected_cash_due, cash_handed_in, cash_paid_out,
-                    variance, variance_reason, settled_at
+                    variance, variance_reason, settled_at, approved_clock_in_at, approved_clock_out_at,
+                    time_adjustment_reason
                 FROM driver_settlement WHERE driver_id = ? ORDER BY settled_at DESC LIMIT 10
                 """, this::settlementRow, driverId);
         return new DriverDashboard(profile, shift, deliveries, settlements);
@@ -301,17 +302,18 @@ public class DriverDispatchService {
 
     @Transactional(readOnly = true)
     public CashUpPreview preview(Authentication authentication, long shiftId, Integer branchId,
-                                 Integer approvedMinutes) {
+                                 LocalTime clockInTime, LocalTime clockOutTime) {
         int branch = managerBranch(authentication, branchId);
         Shift shift = shift(shiftId);
         if (shift.branchId() != branch) throw new AccessDeniedException("Shift belongs to another branch.");
-        return calculate(shift, approvedMinutes);
+        return calculate(shift, clockInTime, clockOutTime);
     }
 
     @Transactional
     public CashUpResult cashUp(Authentication authentication, long shiftId, Integer branchId,
-                               int approvedMinutes, BigDecimal cashHandedIn, BigDecimal cashPaidOut,
-                               String varianceReason) {
+                               LocalTime clockInTime, LocalTime clockOutTime,
+                               BigDecimal cashHandedIn, BigDecimal cashPaidOut,
+                               String varianceReason, String timeAdjustmentReason) {
         int branch = managerBranch(authentication, branchId);
         jdbc.queryForObject("SELECT shift_id FROM driver_shift WHERE shift_id = ? FOR UPDATE", Long.class, shiftId);
         Shift shift = shift(shiftId);
@@ -321,7 +323,9 @@ public class DriverDispatchService {
                 SELECT count(*) FROM delivery_assignment WHERE shift_id = ? AND state IN ('ASSIGNED', 'PICKED_UP')
                 """, Integer.class, shiftId);
         if (unfinished != null && unfinished > 0) throw new IllegalStateException("Unfinished deliveries cannot be settled.");
-        CashUpPreview preview = calculate(shift, approvedMinutes);
+        if (clockInTime == null || clockOutTime == null)
+            throw new IllegalArgumentException("Select both clock-in and clock-out times.");
+        CashUpPreview preview = calculate(shift, clockInTime, clockOutTime);
         requireNonnegative(cashHandedIn);
         requireNonnegative(cashPaidOut);
         if (cashHandedIn.signum() > 0 && cashPaidOut.signum() > 0)
@@ -331,17 +335,21 @@ public class DriverDispatchService {
         String reason = varianceReason == null ? "" : varianceReason.trim();
         if (variance.signum() != 0 && reason.isEmpty()) throw new IllegalArgumentException("Explain the cash variance.");
         if (reason.length() > 1000) throw new IllegalArgumentException("Variance reason is too long.");
+        String timeReason = timeAdjustmentReason == null ? "" : timeAdjustmentReason.trim();
+        if (timeReason.length() > 1000) throw new IllegalArgumentException("Time adjustment reason is too long.");
         jdbc.update("""
                 INSERT INTO driver_settlement(shift_id, driver_id, branch_id, manager_id, manager_username,
                     order_sales, online_order_paid, online_tips, cash_tips, hourly_pay, delivery_pay,
-                    expected_cash_due, cash_handed_in, cash_paid_out, variance, variance_reason)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    expected_cash_due, cash_handed_in, cash_paid_out, variance, variance_reason,
+                    approved_clock_in_at, approved_clock_out_at, time_adjustment_reason)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, shiftId, shift.driverId(), branch, actorId(authentication), authentication.getName(),
                 preview.orderSales(), preview.onlineOrderPaid(), preview.onlineTips(), preview.cashTips(),
                 preview.hourlyPay(), preview.deliveryPay(), preview.expectedCashDue(), money(cashHandedIn),
-                money(cashPaidOut), variance, reason.isEmpty() ? null : reason);
+                money(cashPaidOut), variance, reason.isEmpty() ? null : reason,
+                preview.approvedClockInAt(), preview.approvedClockOutAt(), timeReason.isEmpty() ? null : timeReason);
         jdbc.update("UPDATE driver_shift SET approved_minutes = ?, state = 'SETTLED' WHERE shift_id = ?",
-                approvedMinutes, shiftId);
+                preview.approvedMinutes(), shiftId);
         changed(branch, profile(shift.driverId()).email(), "CASHED_UP");
         return new CashUpResult(preview, money(cashHandedIn), money(cashPaidOut), variance, reason);
     }
@@ -352,7 +360,8 @@ public class DriverDispatchService {
         return jdbc.query("""
                 SELECT shift_id, manager_username, order_sales, online_order_paid, online_tips, cash_tips,
                     hourly_pay, delivery_pay, expected_cash_due, cash_handed_in, cash_paid_out,
-                    variance, variance_reason, settled_at
+                    variance, variance_reason, settled_at, approved_clock_in_at, approved_clock_out_at,
+                    time_adjustment_reason
                 FROM driver_settlement WHERE branch_id = ? ORDER BY settled_at DESC LIMIT 100
                 """, this::settlementRow, branch);
     }
@@ -364,12 +373,16 @@ public class DriverDispatchService {
                 rs.getBigDecimal("hourly_pay"), rs.getBigDecimal("delivery_pay"),
                 rs.getBigDecimal("expected_cash_due"), rs.getBigDecimal("cash_handed_in"),
                 rs.getBigDecimal("cash_paid_out"), rs.getBigDecimal("variance"),
-                rs.getString("variance_reason"), rs.getObject("settled_at", OffsetDateTime.class));
+                rs.getString("variance_reason"), rs.getObject("settled_at", OffsetDateTime.class),
+                rs.getObject("approved_clock_in_at", OffsetDateTime.class),
+                rs.getObject("approved_clock_out_at", OffsetDateTime.class),
+                rs.getString("time_adjustment_reason"));
     }
 
-    private CashUpPreview calculate(Shift shift, Integer approvedMinutes) {
-        int minutes = approvedMinutes == null ? elapsedMinutes(shift) : approvedMinutes;
-        if (minutes < 0 || minutes > 24 * 60) throw new IllegalArgumentException("Approved hours must be within one day.");
+    private CashUpPreview calculate(Shift shift, LocalTime clockInTime, LocalTime clockOutTime) {
+        ApprovedShiftTime.Selection selected = ApprovedShiftTime.select(
+                shift.clockedInAt(), shift.clockedOutAt(), clockInTime, clockOutTime);
+        int minutes = selected.minutes();
         List<Long> deliveredOrderIds = jdbc.query("""
                 SELECT order_id FROM delivery_assignment WHERE shift_id = ? AND state = 'DELIVERED'
                 ORDER BY delivered_at, order_id
@@ -395,13 +408,9 @@ public class DriverDispatchService {
                 .divide(SIXTY, 2, RoundingMode.HALF_UP);
         BigDecimal deliveryPay = shift.perDeliveryRate().multiply(BigDecimal.valueOf(deliveredOrderIds.size()));
         BigDecimal expected = sales.subtract(online).subtract(hourly).subtract(deliveryPay).subtract(onlineTips);
-        return new CashUpPreview(shift.id(), deliveredOrderIds.size(), minutes, money(sales), money(online),
+        return new CashUpPreview(shift.id(), deliveredOrderIds.size(), minutes, selected.clockInTime(),
+                selected.clockOutTime(), selected.approvedClockInAt(), selected.approvedClockOutAt(), money(sales), money(online),
                 money(onlineTips), money(cashTips), money(hourly), money(deliveryPay), money(expected));
-    }
-
-    private int elapsedMinutes(Shift shift) {
-        OffsetDateTime end = shift.clockedOutAt() == null ? OffsetDateTime.now() : shift.clockedOutAt();
-        return Math.toIntExact(Math.max(0, Duration.between(shift.clockedInAt(), end).toMinutes()));
     }
 
     private List<Delivery> deliveries(long shiftId) {
@@ -541,7 +550,10 @@ public class DriverDispatchService {
                                   List<Settlement> settlements) {}
     public record ManagerDashboard(int branchId, List<Profile> drivers, List<OrderBrief> queue,
                                    List<Shift> shifts, List<Delivery> assignments) {}
-    public record CashUpPreview(long shiftId, int deliveredCount, int approvedMinutes, BigDecimal orderSales,
+    public record CashUpPreview(long shiftId, int deliveredCount, int approvedMinutes,
+                                LocalTime clockInTime, LocalTime clockOutTime,
+                                OffsetDateTime approvedClockInAt, OffsetDateTime approvedClockOutAt,
+                                BigDecimal orderSales,
                                 BigDecimal onlineOrderPaid, BigDecimal onlineTips, BigDecimal cashTips,
                                 BigDecimal hourlyPay, BigDecimal deliveryPay, BigDecimal expectedCashDue) {}
     public record CashUpResult(CashUpPreview preview, BigDecimal cashHandedIn, BigDecimal cashPaidOut,
@@ -550,5 +562,7 @@ public class DriverDispatchService {
                              BigDecimal onlineOrderPaid, BigDecimal onlineTips, BigDecimal cashTips,
                              BigDecimal hourlyPay, BigDecimal deliveryPay, BigDecimal expectedCashDue,
                              BigDecimal cashHandedIn, BigDecimal cashPaidOut, BigDecimal variance,
-                             String varianceReason, OffsetDateTime settledAt) {}
+                             String varianceReason, OffsetDateTime settledAt,
+                             OffsetDateTime approvedClockInAt, OffsetDateTime approvedClockOutAt,
+                             String timeAdjustmentReason) {}
 }
