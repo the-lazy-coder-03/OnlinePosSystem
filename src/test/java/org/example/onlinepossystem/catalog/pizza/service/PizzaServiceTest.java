@@ -60,6 +60,22 @@ class PizzaServiceTest {
     }
 
     @Test
+    void exposesWhichDefaultToppingsCanBeRemoved() {
+        when(pizzaReadRepository.findSizePricesForPizza(1, 10))
+                .thenReturn(List.of(new PizzaSizePriceRow(10, "Margherita", 30, 120.00, 1)));
+        when(pizzaReadRepository.findToppingsForPizzaAndSize(1, 10, 30)).thenReturn(List.of(
+                new org.example.onlinepossystem.catalog.pizza.dto.ToppingRow(1, "Cheese", 1, 10.0, false),
+                new org.example.onlinepossystem.catalog.pizza.dto.ToppingRow(2, "Basil", 2, 8.0, true),
+                new org.example.onlinepossystem.catalog.pizza.dto.ToppingRow(3, "Mushroom", null, 12.0, null)));
+        when(baseOptionPriceRepository.findAvailableOptions(1, 30)).thenReturn(List.of());
+
+        var detail = pizzaService.getPizzaDetail(1, 10, 30);
+
+        assertThat(detail.defaultToppings()).extracting(t -> t.removable()).containsExactly(false, true);
+        assertThat(detail.allToppings()).hasSize(3);
+    }
+
+    @Test
     void rejectsBaseOptionThatIsUnavailableForBranchAndSize() {
         when(pizzaReadRepository.findBasePrice(2, 10, 23)).thenReturn(Optional.of(90.00));
         when(baseOptionPriceRepository.findAvailableOptions(2, 23)).thenReturn(List.of());

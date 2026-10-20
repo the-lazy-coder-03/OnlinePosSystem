@@ -78,7 +78,8 @@ public interface PizzaReadRepository extends JpaRepository<Pizza, Integer> {
                 i.id,
                 i.name,
                 pdi.sortOrder,
-                bep.price
+                bep.price,
+                pdi.isRemovable
             )
             from Ingredient i
             left join PizzaDefaultIngredient pdi

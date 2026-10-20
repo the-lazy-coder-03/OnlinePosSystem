@@ -81,13 +81,13 @@ public class PizzaService {
         List<ToppingRow> toppingRows = pizzaReadRepository.findToppingsForPizzaAndSize(branchId, pizzaId, selectedSizeCm);
 
         List<ToppingItem> allToppings = toppingRows.stream()
-                .map(row -> new ToppingItem(row.toppingId(), row.name()))
+                .map(row -> new ToppingItem(row.toppingId(), row.name(), null))
                 .toList();
 
         List<ToppingItem> defaultToppings = toppingRows.stream()
                 .filter(row -> row.defaultSortOrder() != null)
                 .sorted(Comparator.comparing(ToppingRow::defaultSortOrder))
-                .map(row -> new ToppingItem(row.toppingId(), row.name()))
+                .map(row -> new ToppingItem(row.toppingId(), row.name(), Boolean.TRUE.equals(row.removable())))
                 .toList();
 
         List<ToppingPrice> extraPrices = toppingRows.stream()
