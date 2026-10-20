@@ -91,6 +91,24 @@
             background-color: #e6f0ff;
         }
 
+        .password-field { position: relative; }
+        .password-field input { padding-right: 78px; }
+        .password-toggle {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            min-width: 68px;
+            height: 41px;
+            border: 0;
+            border-radius: 0 12px 12px 0;
+            background: transparent;
+            color: #0052cc;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .password-toggle:focus-visible { outline: 2px solid #003d99; outline-offset: -4px; }
+
         /* =========================
            LOGIN BUTTON
         ========================= */
@@ -184,7 +202,10 @@
 
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password">
+                <div class="password-field">
+                    <input type="password" id="password" name="password" required autocomplete="current-password" data-password-input>
+                    <button type="button" class="password-toggle" data-password-toggle aria-label="Show password" aria-controls="password" aria-pressed="false">Show</button>
+                </div>
             </div>
 
             <button type="submit" class="login-btn" data-submitting-text="Signing in...">Login</button>
