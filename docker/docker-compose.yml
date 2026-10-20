@@ -54,6 +54,7 @@ services:
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
       SERVER_PORT: 8080
       SERVER_ADDRESS: 0.0.0.0
+      DEPLOYMENT_REVISION: ${GIT_SHA:-unknown}
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "10", "http://127.0.0.1:8080/"]
       interval: 10s

@@ -6,12 +6,17 @@ import org.example.onlinepossystem.security.dto.AuthRequest;
 import org.example.onlinepossystem.security.dto.AuthResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AccountStatusException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -21,10 +26,13 @@ public class ApiAuthenticationService implements ApiAuthentication {
 
     private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
+    private final String deploymentRevision;
 
-    public ApiAuthenticationService(AuthenticationManager authenticationManager, TokenService tokenService) {
+    public ApiAuthenticationService(AuthenticationManager authenticationManager, TokenService tokenService,
+            @Value("${DEPLOYMENT_REVISION:unknown}") String deploymentRevision) {
         this.authenticationManager = authenticationManager;
         this.tokenService = tokenService;
+        this.deploymentRevision = deploymentRevision;
     }
 
     @Override
@@ -45,9 +53,19 @@ public class ApiAuthenticationService implements ApiAuthentication {
                     userDetails.getUsername(),
                     roles
             );
-        } catch (AuthenticationException ex) {
-            logger.warn("Failed API login attempt from IP {}", clientIp);
+        } catch (BadCredentialsException | AccountStatusException ex) {
+            // Keep the response identical for unknown accounts and wrong passwords.
+            // Never include the submitted username, password, or stored hash in logs.
+            logger.warn("API login rejected (instance={}, category=invalid_credentials, ip={})",
+                    deploymentRevision, clientIp);
             throw new InvalidCredentialsException();
+        } catch (AuthenticationException ex) {
+            // Database and provider failures are not bad passwords. Returning 401 for
+            // these failures misleads the app and hides a deployment/account-store issue.
+            logger.error("API login authentication service failure (instance={}, category={}, ip={})",
+                    deploymentRevision, ex.getClass().getSimpleName(), clientIp);
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Authentication service is temporarily unavailable");
         }
     }
 }

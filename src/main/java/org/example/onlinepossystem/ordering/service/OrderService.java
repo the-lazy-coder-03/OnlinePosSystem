@@ -195,7 +195,7 @@ public class OrderService implements OrderOperations, CustomerOrderHistoryReader
     }
 
     private List<CustomerOrderSummary> recentOrders(Long customerId, int limit) {
-        return orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId, PageRequest.of(0, limit))
+        return orderRepository.findAllByCustomerIdOrderByCreatedAtDescIdDesc(customerId, PageRequest.of(0, limit))
                 .stream().map(orderResponseMapper::toDto).map(customerOrderSummaryMapper::toSummary).toList();
     }
 

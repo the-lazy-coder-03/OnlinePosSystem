@@ -130,6 +130,34 @@ and restarts a jar: its database must already be provisioned and migrated, and i
 runtime environment must contain restricted credentials. It is not the workflow's
 current deployment path.
 
+## Android API hostname
+
+The Android DeliveryApp build targets https://api.crowdcam.co.za/, which uses
+public HTTPS port 443. Its catalog requests go through the API virtual host to
+the same Spring application and PostgreSQL catalog used by the website. The
+Android app caches branch menus and pizza data in its on-device SQLite database;
+when the API is unavailable, it can display the last catalog response it saved.
+Order submissions contain catalog IDs, quantities, and selected option IDs so
+the server can validate availability and calculate current prices.
+
+API login failure logs include the deployed revision and a coarse failure
+category, but never the submitted email, password, or password hash. After a
+failed app login, check the app service logs with
+`docker compose --env-file SupportConfigFiles/.env -f docker/docker-compose.yml -p onlinepossystem logs --since 10m app`
+on the server. A matching `API login rejected` event confirms that the request
+reached this deployment; its `instance` value identifies the deployed revision.
+If no matching event appears, check the active Nginx virtual host for
+`api.crowdcam.co.za` and confirm it proxies to the same `127.0.0.1:18080` as
+the website. Both host proxy configs in this repository target that app port,
+and the app's website and API authentication use the same account lookup.
+
+Before deploying the API route, point the api.crowdcam.co.za DNS A record at
+the same public server as the website (add an AAAA record only if that server
+accepts IPv6), and allow inbound ports 80 and 443. Deploy the updated
+docker/nginx/default.conf, then run scripts/init-letsencrypt.sh on the
+server so the TLS certificate includes the API hostname. HTTP requests on port
+80 redirect to HTTPS on port 443; Nginx forwards HTTPS API traffic to the
+Spring container on internal port 8080.
 ## Browser and proxy security
 
 `APP_BASE_URL` supplies the default allowed CORS origin. If separate trusted browser

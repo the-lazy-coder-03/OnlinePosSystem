@@ -157,6 +157,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/staff/create").hasRole("SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/orders").hasRole("USER")
                         .requestMatchers(HttpMethod.GET, "/api/orders/menu").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/orders/mine").hasRole("USER")
                         .requestMatchers("/api/orders", "/api/orders/**").hasRole("ADMIN")
                         .requestMatchers("/input-orders", "/orders", "/InputOrders", "/InputOrders.html").hasRole("ADMIN")
                         .requestMatchers("/api/auth/login").permitAll()

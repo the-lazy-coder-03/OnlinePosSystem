@@ -5,6 +5,8 @@ import org.example.onlinepossystem.catalog.api.OrderCatalogResolver;
 import org.example.onlinepossystem.catalog.dto.MenuDTO;
 import org.example.onlinepossystem.ordering.api.OrderOperations;
 import org.example.onlinepossystem.ordering.api.InvalidOrderStatusException;
+import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
+import org.example.onlinepossystem.ordering.api.CustomerOrderSummary;
 import org.example.onlinepossystem.ordering.dto.OrderRequestDTO;
 import org.example.onlinepossystem.ordering.dto.OrderResponseDTO;
 import org.springframework.http.ResponseEntity;
@@ -25,10 +27,13 @@ public class OrderController {
 
     private final OrderOperations orderOperations;
     private final OrderCatalogResolver catalogResolver;
+    private final CustomerOrderHistoryReader customerOrderHistoryReader;
 
-    public OrderController(OrderOperations orderOperations, OrderCatalogResolver catalogResolver) {
+    public OrderController(OrderOperations orderOperations, OrderCatalogResolver catalogResolver,
+            CustomerOrderHistoryReader customerOrderHistoryReader) {
         this.orderOperations = orderOperations;
         this.catalogResolver = catalogResolver;
+        this.customerOrderHistoryReader = customerOrderHistoryReader;
     }
 
     /**
@@ -38,6 +43,18 @@ public class OrderController {
     @GetMapping("/menu")
     public ResponseEntity<List<MenuDTO>> getMenu(@RequestParam String branch) {
         return ResponseEntity.ok(catalogResolver.getMenuForBranch(branch));
+    }
+
+    /** GET /api/orders/mine: return the authenticated customer's ten latest linked orders. */
+    @GetMapping("/mine")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<List<CustomerOrderSummary>> getMyOrders(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "A customer-backed account is required to view order history.");
+        }
+        return ResponseEntity.ok(customerOrderHistoryReader.getRecentOrdersForCustomer(
+                authentication.getName(), 10));
     }
 
     /**

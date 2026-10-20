@@ -114,6 +114,9 @@ class ApiSecurityTest {
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"admin\",\"password\":\"admin\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").isNotEmpty());
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin\",\"password\":\"wrong-password\"}"))
+                .andExpect(status().isUnauthorized());
         mvc.perform(post("/login").param("username", "admin").param("password", "admin"))
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/auth/login").contentType(MediaType.TEXT_PLAIN).content("{}"))

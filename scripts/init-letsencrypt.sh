@@ -34,6 +34,16 @@ compose=(docker compose --env-file "${env_file}" -f "${compose_file}")
 
 if [[ -f "${cert_dir}/fullchain.pem" && -f "${cert_dir}/privkey.pem" ]]; then
   "${compose[@]}" up -d
+  if ! openssl x509 -in "${cert_dir}/fullchain.pem" -noout -text | grep -q 'DNS:api.crowdcam.co.za'; then
+    echo "Expanding the existing TLS certificate to include api.crowdcam.co.za."
+    "${compose[@]}" --profile legacy-proxy up -d nginx
+    "${compose[@]}" --profile tools run --rm certbot certonly \
+      --webroot --webroot-path /var/www/certbot \
+      --cert-name crowdcam.co.za --expand \
+      --email "${certbot_email}" --agree-tos --no-eff-email \
+      -d crowdcam.co.za -d www.crowdcam.co.za -d email.crowdcam.co.za -d api.crowdcam.co.za
+    "${compose[@]}" --profile legacy-proxy exec -T nginx nginx -s reload
+  fi
   echo "Existing certificate found; stack started."
   exit 0
 fi
@@ -53,14 +63,15 @@ docker run --rm --detach \
   -v "${bootstrap_config}:/etc/nginx/conf.d/default.conf:ro" \
   nginx:1.27-alpine >/dev/null
 
-"${compose[@]}" run --rm certbot certonly \
+"${compose[@]}" --profile tools run --rm certbot certonly \
   --webroot --webroot-path /var/www/certbot \
   --cert-name crowdcam.co.za \
   --email "${certbot_email}" \
   --agree-tos --no-eff-email \
   -d crowdcam.co.za \
   -d www.crowdcam.co.za \
-  -d email.crowdcam.co.za
+  -d email.crowdcam.co.za \
+  -d api.crowdcam.co.za
 
 cleanup
 trap - EXIT
