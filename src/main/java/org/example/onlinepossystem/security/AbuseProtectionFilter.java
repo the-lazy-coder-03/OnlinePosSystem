@@ -39,7 +39,8 @@ public final class AbuseProtectionFilter extends OncePerRequestFilter {
     private Limit limitFor(HttpServletRequest request) {
         String method = request.getMethod();
         String path = request.getRequestURI().substring(request.getContextPath().length());
-        if ("POST".equals(method) && "/register".equals(path)) return new Limit("register", 10, Duration.ofHours(1));
+        if ("POST".equals(method) && ("/register".equals(path) || "/api/auth/register".equals(path)))
+            return new Limit("register", 10, Duration.ofHours(1));
         if ("GET".equals(method) && "/api/full-address".equals(path)) return new Limit("geocode", 30, Duration.ofMinutes(1));
         if ("POST".equals(method) && "/api/orders".equals(path)) return new Limit("orders", 20, Duration.ofMinutes(1));
         if ("POST".equals(method) && (path.equals("/forgot-password") || path.equals("/api/auth/forgot-password")))

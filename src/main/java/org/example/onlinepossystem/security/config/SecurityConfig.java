@@ -133,7 +133,7 @@ public class SecurityConfig {
                         .ignoringRequestMatchers(request -> Boolean.TRUE.equals(
                                 request.getAttribute(JwtAuthenticationFilter.AUTHENTICATED_BEARER)))
                         .ignoringRequestMatchers(request -> "POST".equals(request.getMethod())
-                                && java.util.Set.of("/api/auth/login", "/api/auth/forgot-password",
+                                && java.util.Set.of("/api/auth/login", "/api/auth/register", "/api/auth/forgot-password",
                                         "/api/auth/reset-password", "/api/staff/login").contains(request.getRequestURI().substring(request.getContextPath().length()))
                                 && request.getContentType() != null
                                 && request.getContentType().split(";", 2)[0].trim()
@@ -161,6 +161,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/orders", "/api/orders/**").hasRole("ADMIN")
                         .requestMatchers("/input-orders", "/orders", "/InputOrders", "/InputOrders.html").hasRole("ADMIN")
                         .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register").permitAll()
                         .requestMatchers("/api/auth/forgot-password").permitAll()
                         .requestMatchers("/api/auth/reset-password").permitAll()
                         .requestMatchers("/api/staff/login").permitAll()
