@@ -12,6 +12,14 @@ async function login(page, username) {
     await expect(page).not.toHaveURL(/\/login/);
 }
 
+async function refreshDispatch(page) {
+    await Promise.all([
+        page.waitForResponse(response => response.url().includes('/api/admin/dispatch/settlements')
+            && response.status() === 200),
+        page.locator('#dispatchRefresh').click()
+    ]);
+}
+
 test('manager dispatch and mobile driver shift flow', async ({browser}) => {
     const managerContext = await browser.newContext();
     const manager = await managerContext.newPage();
@@ -24,18 +32,30 @@ test('manager dispatch and mobile driver shift flow', async ({browser}) => {
     await manager.locator('#dispatchPromote button').click();
     await expect(manager.locator('#dispatchRoster')).toContainText('Browser Driver');
     await manager.locator('[data-hourly]').first().fill('60.00');
+    await refreshDispatch(manager);
+    await expect(manager.locator('[data-hourly]').first()).toHaveValue('60.00');
     await manager.locator('[data-delivery]').first().fill('10.00');
-    await Promise.all([
+    await refreshDispatch(manager);
+    await expect(manager.locator('[data-hourly]').first()).toHaveValue('60.00');
+    await expect(manager.locator('[data-delivery]').first()).toHaveValue('10.00');
+    const [ratesResponse] = await Promise.all([
         manager.waitForResponse(response => response.url().includes('/rates') && response.status() === 200),
         manager.locator('[data-rates]').first().click()
     ]);
+    expect(ratesResponse.request().postDataJSON()).toMatchObject({hourlyRate:'60.00',perDeliveryRate:'10.00'});
+    expect(await ratesResponse.json()).toMatchObject({hourlyRate:60,perDeliveryRate:10});
 
     const driverContext = await browser.newContext({viewport:{width:390,height:844}});
     const driver = await driverContext.newPage();
     await login(driver, 'browser-driver@example.com');
     await expect(driver).toHaveURL(/\/driver$/);
     await expect(driver.locator('#driverBranch')).toContainText('Kenridge');
-    await driver.locator('#driverClockIn').click();
+    const [clockInResponse] = await Promise.all([
+        driver.waitForResponse(response => response.url().endsWith('/api/driver/clock-in')
+            && response.status() === 200),
+        driver.locator('#driverClockIn').click()
+    ]);
+    expect(await clockInResponse.json()).toMatchObject({hourlyRate:60,perDeliveryRate:10});
     await expect(driver.locator('#driverShiftState')).toHaveText('On shift');
     await driver.locator('#driverClaim').click();
     await expect(driver.locator('#driverOrders')).toContainText('Browser Customer');

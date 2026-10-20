@@ -1,8 +1,8 @@
 package org.example.onlinepossystem.ordering.web;
 
 import org.example.onlinepossystem.customer.service.CustomerService;
-import org.example.onlinepossystem.ordering.api.CustomerOrderHistoryReader;
 import org.example.onlinepossystem.ordering.api.CustomerOrderSummary;
+import org.example.onlinepossystem.ordering.service.OrderService;
 import org.example.onlinepossystem.security.api.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,8 @@ class OrderHistoryApiTest {
     @Autowired TokenService tokens;
     @Autowired UserDetailsService accounts;
     @Autowired CustomerService customers;
-    @MockBean CustomerOrderHistoryReader history;
+    // Keep both history and OrderOperations available when replacing the shared service bean.
+    @MockBean OrderService history;
 
     @BeforeEach
     void setUp() {
