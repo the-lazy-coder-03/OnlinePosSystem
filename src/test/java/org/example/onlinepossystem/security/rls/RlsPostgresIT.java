@@ -121,6 +121,39 @@ class RlsPostgresIT {
         }
     }
 
+    @Test @Order(1)
+    void deployedCustomerAccountCanSignInWithoutAdminAccessAndIsNotReset() throws Exception {
+        var account = (AccountPrincipal) accounts.loadUserByUsername("customer");
+        assertThat(account.getAuthorities()).extracting(Object::toString).containsExactly("ROLE_USER");
+        assertThat(account.environmentAdmin()).isFalse();
+        assertThat(application.getBean(org.springframework.security.crypto.password.PasswordEncoder.class)
+                .matches("customer", account.getPassword())).isTrue();
+
+        mvc.perform(post("/login").with(csrf()).param("username", "customer").param("password", "customer"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers
+                        .authenticated().withUsername("customer"));
+        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"customer\",\"password\":\"customer\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.accessToken").isNotEmpty());
+        mvc.perform(get("/admin").with(user(account))).andExpect(status().isForbidden());
+
+        String sql = new org.springframework.core.io.ClassPathResource("sql/customer-account-v1.sql")
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        try (Connection c = ownerConnection(); var statement = c.createStatement()) {
+            c.setAutoCommit(false);
+            try {
+                statement.executeUpdate("UPDATE customers SET password='{noop}changed-password' WHERE email='customer'");
+                statement.execute(sql);
+                try (var rows = statement.executeQuery("SELECT password FROM customers WHERE email='customer'")) {
+                    assertThat(rows.next()).isTrue();
+                    assertThat(rows.getString(1)).isEqualTo("{noop}changed-password");
+                    assertThat(rows.next()).isFalse();
+                }
+            } finally { c.rollback(); }
+        }
+    }
+
     private String[] runtimeArguments() {
         return new String[]{"--spring.profiles.active=rls-test", "--spring.config.import=",
                 "--spring.datasource.url=" + jdbcUrl, "--spring.datasource.username=" + runtime,
