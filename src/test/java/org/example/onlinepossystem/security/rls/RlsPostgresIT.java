@@ -774,7 +774,7 @@ class RlsPostgresIT {
         assertThatThrownBy(() -> dispatch.claimNext(initialDriver)).isInstanceOf(RuntimeException.class);
         assertThat(ids("customer_order", "order_id")).containsExactly(firstOrder);
         assertThat(update("UPDATE customer_order SET status='Completed' WHERE order_id=?", firstOrder)).isZero();
-        assertThatThrownBy(() -> dispatch.pickup(initialDriver, firstOrder)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> dispatch.delivered(initialDriver, firstOrder)).isInstanceOf(IllegalStateException.class);
 
         as("one@example.com");
         manager = SecurityContextHolder.getContext().getAuthentication();
@@ -1008,6 +1008,73 @@ class RlsPostgresIT {
     }
 
     @Test @Order(14)
+    void driverCanConfirmCollectionBeforeKitchenCompletionWithExistingGuards() throws Exception {
+        DriverDispatchService dispatch = application.getBean(DriverDispatchService.class);
+        List<Long> orders = new ArrayList<>();
+        try (Connection c = ownerConnection()) {
+            for (String email : List.of("pickup-driver@example.com", "pickup-other@example.com")) {
+                insert(c, "INSERT INTO customers(email,password,access_level,role) VALUES ('"
+                        + email + "','{noop}pass',0,'USER') RETURNING id");
+            }
+            for (String status : List.of("Pending", "Preparing", "Completed", "Pending", "Pending")) {
+                orders.add(insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) "
+                        + "VALUES (1," + customerA + ",'" + status + "',now(),'delivery') RETURNING order_id"));
+            }
+        }
+        as("one@example.com");
+        var manager = SecurityContextHolder.getContext().getAuthentication();
+        long driverId = dispatch.promote(manager, "pickup-driver@example.com", 1).id();
+        dispatch.promote(manager, "pickup-other@example.com", 1);
+        as("pickup-driver@example.com");
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        long shiftId = dispatch.clockIn(auth).id();
+        as("pickup-other@example.com");
+        var other = SecurityContextHolder.getContext().getAuthentication();
+        dispatch.clockIn(other);
+        as("one@example.com");
+        dispatch.assignBatch(manager, orders, driverId, 1);
+        update("UPDATE customer_order SET status='Rejected' WHERE order_id=?", orders.get(3));
+        update("UPDATE customer_order SET status='Rejected' WHERE order_id=?", orders.get(4));
+        dispatch.cancelRejected(manager, orders.get(4), 1);
+
+        as("pickup-other@example.com");
+        assertThatThrownBy(() -> dispatch.pickup(other, orders.get(0))).isInstanceOf(RuntimeException.class);
+        as("pickup-driver@example.com");
+        assertThatThrownBy(() -> dispatch.pickup(auth, orderB)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> dispatch.pickup(auth, orders.get(3))).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> dispatch.pickup(auth, orders.get(4))).isInstanceOf(RuntimeException.class);
+        invalidDeliveryTransition(() -> transaction.<Integer>execute(s -> jdbc.update("""
+                UPDATE delivery_assignment SET state='PICKED_UP', picked_up_at=now()
+                WHERE order_id=?
+                """, orders.get(3))));
+        invalidDeliveryTransition(() -> transaction.<Integer>execute(s -> jdbc.update("""
+                UPDATE delivery_assignment SET state='PICKED_UP', picked_up_at='2000-01-01'
+                WHERE order_id=?
+                """, orders.get(0))));
+        for (int n = 0; n < 3; n++) {
+            long orderId = orders.get(n);
+            var result = dispatch.pickup(auth, orderId);
+            var delivery = result.deliveries().stream().filter(d -> d.order().getId() == orderId).findFirst().orElseThrow();
+            assertThat(delivery.state()).isEqualTo("PICKED_UP");
+            assertThat(delivery.pickedUpAt()).isNotNull();
+            assertThat(delivery.order().getStatus()).isEqualTo(List.of("Pending", "Preparing", "Completed").get(n));
+            assertThatThrownBy(() -> dispatch.pickup(auth, orderId)).isInstanceOf(RuntimeException.class);
+            var unchanged = dispatch.driverDashboard(auth).deliveries().stream()
+                    .filter(d -> d.order().getId() == orderId).findFirst().orElseThrow();
+            assertThat(unchanged.pickedUpAt()).isEqualTo(delivery.pickedUpAt());
+            dispatch.delivered(auth, orderId);
+        }
+        assertThat(transaction.<Integer>execute(s -> jdbc.queryForObject(
+                "SELECT count(*) FROM driver_dispatch_event WHERE shift_id=? AND event_type='PICKED_UP'",
+                Integer.class, shiftId))).isEqualTo(3);
+        as("one@example.com");
+        dispatch.cancelRejected(manager, orders.get(3), 1);
+        as("pickup-driver@example.com");
+        dispatch.clockOut(auth);
+        assertThatThrownBy(() -> dispatch.pickup(auth, orders.get(0))).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test @Order(14)
     void unsafeOwnerLoginCannotStartAsRuntime() {
         SpringApplication app = new SpringApplication(OnlinePosSystemApplication.class);
         String[] arguments = Arrays.stream(runtimeArguments())
@@ -1048,6 +1115,11 @@ class RlsPostgresIT {
         var principal = accounts.loadUserByUsername(username);
         assertThat(principal).isInstanceOf(AccountPrincipal.class);
         SecurityContextHolder.getContext().setAuthentication(UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities()));
+    }
+
+    private void invalidDeliveryTransition(Runnable action) {
+        assertThatThrownBy(action::run).rootCause().isInstanceOf(SQLException.class)
+                .satisfies(cause -> assertThat(((SQLException) cause).getSQLState()).isEqualTo("23514"));
     }
 
     private void denied(Runnable action) {

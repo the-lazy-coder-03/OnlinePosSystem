@@ -198,7 +198,9 @@ public class DriverDispatchService {
                 SELECT o.status FROM customer_order o JOIN delivery_assignment a ON a.order_id = o.order_id
                 WHERE o.order_id = ? AND a.driver_id = ? AND a.shift_id = ? AND a.state = 'ASSIGNED'
                 """, String.class, orderId, driverId, shift.id());
-        if (!"Completed".equals(kitchenStatus)) throw new IllegalStateException("The kitchen has not completed this order.");
+        if (!List.of("Pending", "Preparing", "Completed").contains(kitchenStatus)) {
+            throw new IllegalStateException("This order is no longer available for pickup.");
+        }
         int updated = jdbc.update("""
                 UPDATE delivery_assignment SET state = 'PICKED_UP', picked_up_at = now()
                 WHERE order_id = ? AND driver_id = ? AND shift_id = ? AND state = 'ASSIGNED'

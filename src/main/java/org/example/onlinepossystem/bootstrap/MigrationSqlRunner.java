@@ -36,6 +36,7 @@ public class MigrationSqlRunner implements CommandLineRunner {
     private static final String RLS_ADDRESS_MIGRATION_ID = "db/rls-v5-address.sql";
     private static final String RLS_DRIVERS_MIGRATION_ID = "db/rls-v6-drivers.sql";
     private static final String RLS_DRIVER_TIMES_MIGRATION_ID = "db/rls-v7-driver-times.sql";
+    private static final String RLS_DRIVER_PICKUP_MIGRATION_ID = "db/rls-v8-driver-pickup.sql";
     private static final String CUSTOMER_ACCOUNT_MIGRATION_ID = "db/customer-account-v1.sql";
     private static final String CATALOG_MIGRATION_RESOURCE = "sql/migration.sql";
     private static final String RLS_MIGRATION_RESOURCE = "sql/rls-v1.sql";
@@ -45,6 +46,7 @@ public class MigrationSqlRunner implements CommandLineRunner {
     private static final String RLS_ADDRESS_MIGRATION_RESOURCE = "sql/rls-v5-address.sql";
     private static final String RLS_DRIVERS_MIGRATION_RESOURCE = "sql/rls-v6-drivers.sql";
     private static final String RLS_DRIVER_TIMES_MIGRATION_RESOURCE = "sql/rls-v7-driver-times.sql";
+    private static final String RLS_DRIVER_PICKUP_MIGRATION_RESOURCE = "sql/rls-v8-driver-pickup.sql";
     private static final String CUSTOMER_ACCOUNT_MIGRATION_RESOURCE = "sql/customer-account-v1.sql";
 
     private final DataSource dataSource;
@@ -101,6 +103,8 @@ public class MigrationSqlRunner implements CommandLineRunner {
         applyMigration(connection, RLS_DRIVERS_MIGRATION_ID, RLS_DRIVERS_MIGRATION_RESOURCE, true,
                 () -> setRuntimeRole(connection));
         applyMigration(connection, RLS_DRIVER_TIMES_MIGRATION_ID, RLS_DRIVER_TIMES_MIGRATION_RESOURCE, true,
+                () -> setRuntimeRole(connection));
+        applyMigration(connection, RLS_DRIVER_PICKUP_MIGRATION_ID, RLS_DRIVER_PICKUP_MIGRATION_RESOURCE, true,
                 () -> setRuntimeRole(connection));
         applyMigration(connection, CUSTOMER_ACCOUNT_MIGRATION_ID, CUSTOMER_ACCOUNT_MIGRATION_RESOURCE, true,
                 () -> {});

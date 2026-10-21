@@ -17,7 +17,7 @@
     function setBusy(value) {
         busy = value;
         document.querySelectorAll('.driver-actions button, .driver-orders button[data-action]').forEach(button => {
-            button.disabled = value || (button.dataset.action === 'pickup' && button.textContent.includes('Waiting for kitchen'));
+            button.disabled = value || (button.dataset.action === 'pickup' && button.dataset.pickupAllowed !== 'true');
         });
     }
 
@@ -42,7 +42,8 @@
         const address = order.formattedAddress || [order.houseNumber,order.street,order.area,order.city,order.postalCode].filter(Boolean).join(", ");
         const lines = [...(order.menuItems || []),...(order.pizzaItems || []),...(order.specialItems || [])]
             .map(item => `<li>${esc(item.quantity || 1)} × ${esc(item.name || item.pizzaName || "Item")}</li>`).join("");
-        const button = delivery.state === "ASSIGNED" ? `<button type="button" class="btn btn-primary" data-action="pickup" data-order="${order.id}" ${order.status !== "Completed" ? "disabled" : ""}><i class="bi bi-bag-check me-1"></i>${order.status === "Completed" ? "Confirm pickup" : "Waiting for kitchen"}</button>`
+        const pickupAllowed = ["Pending", "Preparing", "Completed"].includes(order.status);
+        const button = delivery.state === "ASSIGNED" ? `<button type="button" class="btn btn-primary" data-action="pickup" data-order="${order.id}" data-pickup-allowed="${pickupAllowed}" ${pickupAllowed ? "" : "disabled"}><i class="bi bi-bag-check me-1"></i>${pickupAllowed ? "Confirm pickup" : "Pickup unavailable"}</button>`
             : delivery.state === "PICKED_UP" ? `<button type="button" class="btn btn-primary" data-action="delivered" data-order="${order.id}"><i class="bi bi-check2-circle me-1"></i>Mark delivered</button>` : "";
         const phone = String(order.phone || "").replace(/[^+0-9]/g, "");
         return `<article class="driver-order"><div class="driver-order-head"><h3>Order #${esc(order.id)}</h3><span class="badge ${delivery.state === "DELIVERED" ? "text-bg-success" : "text-bg-primary"}">${esc(delivery.state.replaceAll("_"," "))}</span></div><p><strong>${esc(order.customerName)}</strong>${phone ? ` · <a href="tel:${esc(phone)}">${esc(order.phone)}</a>` : ""}</p><p>${esc(address)}</p>${order.complexName ? `<p>Unit: ${esc(order.complexName)}</p>` : ""}${order.gateAccessCode ? `<p>Gate code: ${esc(order.gateAccessCode)}</p>` : ""}${order.notes ? `<p>Notes: ${esc(order.notes)}</p>` : ""}<details><summary>Order contents · ${money(delivery.total)}</summary><ul>${lines}</ul></details>${button}</article>`;
@@ -91,6 +92,7 @@
         element("driverReturning").addEventListener("click", () => action("/api/driver/returning"));
         element("driverOrders").addEventListener("click", event => {
             const button = event.target.closest("button[data-action]");
+            if (button?.dataset.action === "pickup" && !window.confirm(`Have you collected order #${button.dataset.order}?`)) return;
             if (button) action(`/api/driver/orders/${button.dataset.order}/${button.dataset.action}`);
         });
         refresh();connect();setInterval(refresh,15000);

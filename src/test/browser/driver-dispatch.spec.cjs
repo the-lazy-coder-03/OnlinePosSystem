@@ -29,6 +29,7 @@ test('driver API returns 401 instead of redirecting expired sessions to a web pa
 });
 
 test('manager dispatch and mobile driver shift flow', async ({browser}) => {
+    test.setTimeout(90000);
     const managerContext = await browser.newContext();
     const manager = await managerContext.newPage();
     await login(manager, 'branch@example.com');
@@ -78,6 +79,8 @@ test('manager dispatch and mobile driver shift flow', async ({browser}) => {
     expect(await driver.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     for (const name of ['Browser Customer','Browser Batch']) {
         const card = driver.locator('.driver-order').filter({hasText:name});
+        await expect(card.getByRole('button', {name:'Confirm pickup'})).toBeEnabled();
+        driver.once('dialog', dialog => dialog.accept());
         await card.getByRole('button', {name:'Confirm pickup'}).click();
         await card.getByRole('button', {name:'Mark delivered'}).click();
     }
