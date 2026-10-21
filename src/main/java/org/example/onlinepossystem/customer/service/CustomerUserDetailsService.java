@@ -30,7 +30,8 @@ public class CustomerUserDetailsService implements UserDetailsService {
         if (identifier == null || identifier.isBlank()) throw new UsernameNotFoundException("Invalid account");
         String normalized = identifier.trim();
         if (normalized.equals(adminUsername)) {
-            return new AccountPrincipal(adminUsername, "{noop}" + adminPassword, null, 3, true);
+            String encoded = adminPassword.startsWith("{bcrypt}") ? adminPassword : "{noop}" + adminPassword;
+            return new AccountPrincipal(adminUsername, encoded, null, 3, true);
         }
         if (normalized.contains("@")) normalized = normalized.toLowerCase(Locale.ROOT);
         var account = accounts.findCredentials(normalized)

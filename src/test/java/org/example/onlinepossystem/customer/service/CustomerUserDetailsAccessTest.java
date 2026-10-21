@@ -14,6 +14,33 @@ import static org.mockito.Mockito.when;
 
 class CustomerUserDetailsAccessTest {
 
+    @org.junit.jupiter.api.Test
+    void environmentSuperAdminSupportsBcryptWithoutChangingItsIdentity() {
+        var encoder = org.springframework.security.crypto.factory.PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        var stored = encoder.encode("admin");
+        var repository = mock(CustomerRepository.class);
+        var service = new CustomerUserDetailsService(
+                new org.example.onlinepossystem.customer.persistence.JpaAccountBootstrapStore(repository, null), "admin", stored);
+        var details = (org.example.onlinepossystem.security.api.AccountPrincipal) service.loadUserByUsername("admin");
+        assertThat(details.getPassword()).isEqualTo(stored).startsWith("{bcrypt}");
+        assertThat(encoder.matches("admin", details.getPassword())).isTrue();
+        assertThat(encoder.matches("incorrect", details.getPassword())).isFalse();
+        assertThat(details.environmentAdmin()).isTrue();
+        assertThat(details.customerId()).isNull();
+        assertThat(details.getAuthorities()).extracting(Object::toString)
+                .containsExactly("ROLE_ADMIN", "ROLE_SUPER_ADMIN");
+        org.mockito.Mockito.verifyNoInteractions(repository);
+    }
+
+    @org.junit.jupiter.api.Test
+    void existingPlainTextEnvironmentPasswordsRemainCompatible() {
+        var encoder = org.springframework.security.crypto.factory.PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        var service = new CustomerUserDetailsService(
+                new org.example.onlinepossystem.customer.persistence.JpaAccountBootstrapStore(mock(CustomerRepository.class), null),
+                "admin", "legacy-password");
+        assertThat(encoder.matches("legacy-password", service.loadUserByUsername("admin").getPassword())).isTrue();
+    }
+
     @ParameterizedTest
     @CsvSource({
             "0,ROLE_USER",
