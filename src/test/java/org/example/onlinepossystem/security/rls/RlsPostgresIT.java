@@ -814,16 +814,16 @@ class RlsPostgresIT {
         assertThat(preview.onlineOrderPaid()).isZero();
         assertThat(preview.onlineTips()).isZero();
         assertThat(preview.hourlyPay()).isZero();
-        assertThat(preview.deliveryPay()).isEqualByComparingTo("20.00");
-        assertThat(preview.expectedCashDue()).isEqualByComparingTo("180.00");
+        assertThat(preview.deliveryPay()).isEqualByComparingTo("30.00");
+        assertThat(preview.expectedCashDue()).isEqualByComparingTo("170.00");
         var currentManager = manager;
         assertThatThrownBy(() -> dispatch.cashUp(currentManager, shift.id(), 1,
                 java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT,
-                new BigDecimal("179.00"), BigDecimal.ZERO, "", null))
+                new BigDecimal("169.00"), BigDecimal.ZERO, "", null))
                 .isInstanceOf(IllegalArgumentException.class);
         var result = dispatch.cashUp(manager, shift.id(), 1,
                 java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT,
-                new BigDecimal("180.00"), BigDecimal.ZERO, "", "Test shift adjustment");
+                new BigDecimal("170.00"), BigDecimal.ZERO, "", "Test shift adjustment");
         assertThat(result.variance()).isZero();
         assertThat(dispatch.settlements(manager, 1)).extracting(DriverDispatchService.Settlement::shiftId)
                 .contains(shift.id());
@@ -843,7 +843,7 @@ class RlsPostgresIT {
         }
         assertThatThrownBy(() -> dispatch.cashUp(currentManager, shift.id(), 1,
                 java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT,
-                new BigDecimal("180.00"), BigDecimal.ZERO, "", null))
+                new BigDecimal("170.00"), BigDecimal.ZERO, "", null))
                 .isInstanceOf(IllegalStateException.class);
         dispatch.updateRates(manager, newDriver, 1, new BigDecimal("60.00"), new BigDecimal("70.00"));
 
@@ -1072,6 +1072,145 @@ class RlsPostgresIT {
         as("pickup-driver@example.com");
         dispatch.clockOut(auth);
         assertThatThrownBy(() -> dispatch.pickup(auth, orders.get(0))).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test @Order(14)
+    void savingRatesRepairsUncashedShiftsAndPreservesSettledPayroll() throws Exception {
+        DriverDispatchService dispatch = application.getBean(DriverDispatchService.class);
+        List<Long> deliveryIds = new ArrayList<>();
+        try (Connection c = ownerConnection()) {
+            insert(c, "INSERT INTO customers(email,password,access_level,role) "
+                    + "VALUES ('rates-driver@example.com','{noop}pass',0,'USER') RETURNING id");
+            for (int price : List.of(400, 300, 300, 100)) {
+                long id = insert(c, "INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) "
+                        + "VALUES (1," + customerA + ",'Completed',now(),'delivery') RETURNING order_id");
+                deliveryIds.add(id);
+                try (var statement = c.createStatement()) {
+                    statement.execute("INSERT INTO order_menu_item(order_id,menu_item_id,qty,unit_price_at_time) "
+                            + "SELECT " + id + ",burger_id,1," + price
+                            + " FROM burger_recipe_assignment ORDER BY burger_id LIMIT 1");
+                }
+            }
+        }
+        as("one@example.com");
+        var manager = SecurityContextHolder.getContext().getAuthentication();
+        long driverId = dispatch.promote(manager, "rates-driver@example.com", 1).id();
+        as("rates-driver@example.com");
+        var driverAuth = SecurityContextHolder.getContext().getAuthentication();
+        var shift = dispatch.clockIn(driverAuth);
+        assertThat(shift.hourlyRate()).isZero();
+        as("one@example.com");
+        dispatch.assignBatch(manager, deliveryIds.subList(0, 3), driverId, 1);
+        as("rates-driver@example.com");
+        for (long id : deliveryIds.subList(0, 3)) {
+            dispatch.pickup(driverAuth, id);
+            dispatch.delivered(driverAuth, id);
+        }
+        var recordedOut = dispatch.clockOut(driverAuth).clockedOutAt();
+        as("one@example.com");
+        // Reproduce a pre-fix profile save that left the shift's rate snapshot at zero.
+        update("UPDATE driver_profile SET hourly_rate=15, per_delivery_rate=25 WHERE driver_id=?", driverId);
+        assertThat(dispatch.preview(manager, shift.id(), 1, java.time.LocalTime.MIDNIGHT,
+                java.time.LocalTime.MIDNIGHT).deliveryPay()).isZero();
+        as("rates-driver@example.com");
+        denied(() -> update("UPDATE driver_shift SET hourly_rate=15, per_delivery_rate=25 WHERE shift_id=?", shift.id()));
+        assertThatThrownBy(() -> dispatch.updateRates(driverAuth, driverId, 1,
+                BigDecimal.TEN, BigDecimal.TEN)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        as("two@example.com");
+        var otherManager = SecurityContextHolder.getContext().getAuthentication();
+        assertThatThrownBy(() -> dispatch.updateRates(otherManager, driverId, 1,
+                BigDecimal.TEN, BigDecimal.TEN)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(update("UPDATE driver_shift SET hourly_rate=15 WHERE shift_id=?", shift.id())).isZero();
+        as("one@example.com");
+        denied(() -> update("UPDATE driver_shift SET hourly_rate=99 WHERE shift_id=?", shift.id()));
+        dispatch.updateRates(manager, driverId, 1, new BigDecimal("15.00"), new BigDecimal("25.00"));
+        var preview = dispatch.preview(manager, shift.id(), 1, java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT);
+        assertThat(preview.orderSales()).isEqualByComparingTo("1000.00");
+        assertThat(preview.deliveredCount()).isEqualTo(3);
+        assertThat(preview.hourlyRate()).isEqualByComparingTo("15.00");
+        assertThat(preview.perDeliveryRate()).isEqualByComparingTo("25.00");
+        assertThat(preview.deliveryPay()).isEqualByComparingTo("75.00");
+        assertThat(preview.expectedCashDue()).isEqualByComparingTo("925.00");
+        var audit = transaction.execute(s -> jdbc.queryForMap("""
+                SELECT actor_id, actor_username, details->>'oldHourlyRate' AS old_hourly,
+                    details->>'newHourlyRate' AS new_hourly, details->>'oldPerDeliveryRate' AS old_delivery,
+                    details->>'newPerDeliveryRate' AS new_delivery, occurred_at
+                FROM driver_dispatch_event WHERE shift_id=? AND event_type='SHIFT_RATES_CHANGED'
+                """, shift.id()));
+        assertThat(audit.get("actor_id")).isEqualTo(branchOne);
+        assertThat(audit.get("actor_username")).isEqualTo("one@example.com");
+        assertThat(new BigDecimal((String) audit.get("old_hourly"))).isZero();
+        assertThat(new BigDecimal((String) audit.get("old_delivery"))).isZero();
+        assertThat(new BigDecimal((String) audit.get("new_hourly"))).isEqualByComparingTo("15");
+        assertThat(new BigDecimal((String) audit.get("new_delivery"))).isEqualByComparingTo("25");
+        assertThat(audit.get("occurred_at")).isNotNull();
+        dispatch.updateRates(manager, driverId, 1, new BigDecimal("15.00"), new BigDecimal("25.00"));
+        assertThat(transaction.<Integer>execute(s -> jdbc.queryForObject("""
+                SELECT count(*) FROM driver_dispatch_event WHERE shift_id=? AND event_type='SHIFT_RATES_CHANGED'
+                """, Integer.class, shift.id()))).isEqualTo(1);
+        dispatch.cashUp(manager, shift.id(), 1, java.time.LocalTime.MIDNIGHT, java.time.LocalTime.MIDNIGHT,
+                new BigDecimal("925.00"), BigDecimal.ZERO, "", null);
+        dispatch.updateRates(manager, driverId, 1, new BigDecimal("20.00"), new BigDecimal("30.00"));
+        var settlement = dispatch.settlements(manager, 1).stream().filter(s -> s.shiftId() == shift.id()).findFirst().orElseThrow();
+        assertThat(settlement.deliveryPay()).isEqualByComparingTo("75.00");
+        assertThat(settlement.expectedCashDue()).isEqualByComparingTo("925.00");
+        denied(() -> update("UPDATE driver_shift SET hourly_rate=20, per_delivery_rate=30 WHERE shift_id=?", shift.id()));
+        assertThatThrownBy(() -> dispatch.preview(manager, shift.id(), 1, null, null)).isInstanceOf(IllegalStateException.class);
+        try (Connection c = ownerConnection(); var statement = c.prepareStatement(
+                "SELECT hourly_rate,per_delivery_rate,clocked_in_at,clocked_out_at FROM driver_shift WHERE shift_id=?")) {
+            statement.setLong(1, shift.id());
+            try (var rows = statement.executeQuery()) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getBigDecimal(1)).isEqualByComparingTo("15");
+                assertThat(rows.getBigDecimal(2)).isEqualByComparingTo("25");
+                assertThat(rows.getObject(3, OffsetDateTime.class)).isEqualTo(shift.clockedInAt());
+                assertThat(rows.getObject(4, OffsetDateTime.class)).isEqualTo(recordedOut);
+            }
+        }
+        as("rates-driver@example.com");
+        var nextShift = dispatch.clockIn(driverAuth);
+        assertThat(nextShift.hourlyRate()).isEqualByComparingTo("20");
+        assertThat(nextShift.perDeliveryRate()).isEqualByComparingTo("30");
+        as("one@example.com");
+        dispatch.updateRates(manager, driverId, 1, new BigDecimal("30.00"), new BigDecimal("50.00"));
+        dispatch.assign(manager, deliveryIds.get(3), driverId, 1);
+        as("rates-driver@example.com");
+        var active = dispatch.driverDashboard(driverAuth).shift();
+        assertThat(active.hourlyRate()).isEqualByComparingTo("30");
+        assertThat(active.perDeliveryRate()).isEqualByComparingTo("50");
+        dispatch.pickup(driverAuth, deliveryIds.get(3));
+        dispatch.delivered(driverAuth, deliveryIds.get(3));
+        dispatch.clockOut(driverAuth);
+
+        pool.setMaximumPoolSize(3);
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        CountDownLatch go = new CountDownLatch(1);
+        try {
+            Future<?> save = workers.submit(() -> {
+                SecurityContextHolder.getContext().setAuthentication(manager);
+                try {
+                    go.await(5, TimeUnit.SECONDS);
+                    return dispatch.updateRates(manager, driverId, 1, new BigDecimal("40.00"), new BigDecimal("60.00"));
+                } finally { SecurityContextHolder.clearContext(); }
+            });
+            var settle = workers.submit(() -> {
+                SecurityContextHolder.getContext().setAuthentication(manager);
+                try {
+                    go.await(5, TimeUnit.SECONDS);
+                    return dispatch.cashUp(manager, nextShift.id(), 1, java.time.LocalTime.MIDNIGHT,
+                            java.time.LocalTime.MIDNIGHT, new BigDecimal("50.00"), BigDecimal.ZERO,
+                            "Concurrent rate test", null);
+                } finally { SecurityContextHolder.clearContext(); }
+            });
+            go.countDown();
+            save.get(10, TimeUnit.SECONDS);
+            var settled = settle.get(10, TimeUnit.SECONDS).preview();
+            assertThat(settled.hourlyRate().intValue()).isIn(30, 40);
+            assertThat(settled.perDeliveryRate().subtract(settled.hourlyRate())).isEqualByComparingTo("20");
+            assertThat(settled.deliveryPay()).isEqualByComparingTo(settled.perDeliveryRate());
+            assertThat(settled.expectedCashDue()).isEqualByComparingTo(
+                    new BigDecimal("100.00").subtract(settled.deliveryPay()));
+        } finally { workers.shutdownNow(); pool.setMaximumPoolSize(1); }
     }
 
     @Test @Order(14)

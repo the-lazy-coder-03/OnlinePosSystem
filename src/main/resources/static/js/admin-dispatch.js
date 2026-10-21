@@ -13,6 +13,7 @@
     let delay = 1000;
     let cashUpShift = null;
     let cashPreview = null;
+    let settling = false;
     let previewRevision = 0;
     let refreshRevision = 0;
     const rateDrafts = new Map();
@@ -48,6 +49,11 @@
             const data=await request(`/api/admin/dispatch?branchId=${requestedBranch}`);
             if(!current())return;
             render(data);error("");
+            if(cashUpShift!==null&&!settling){
+                if(data.shifts.some(shift=>shift.id===cashUpShift&&shift.state==="CLOCKED_OUT"))await updateCashPreview();
+                else closeCashUp();
+            }
+            if(!current())return;
             const rows=await request(`/api/admin/dispatch/settlements?branchId=${requestedBranch}`);
             if(current())renderHistory(rows);
         }catch(e){if(current())error(e.message);}
@@ -72,6 +78,9 @@
         const body={branchId,hourlyRate:button.parentElement.querySelector(`[data-hourly="${id}"]`).value,
             perDeliveryRate:button.parentElement.querySelector(`[data-delivery="${id}"]`).value};
         savingRates.add(key);button.disabled=true;
+        const affectsCashUp=snapshot.shifts.some(shift=>shift.id===cashUpShift&&shift.driverId===Number(id));
+        if(affectsCashUp){previewRevision++;cashPreview=null;element("dispatchCashUpSubmit").disabled=true;}
+        let saveError="";
         try{
             await request(`/api/admin/dispatch/drivers/${id}/rates`,"PUT",body);
             const draft=rateDrafts.get(key);
@@ -81,14 +90,17 @@
                 }
                 if(!Object.keys(draft).length)rateDrafts.delete(key);
             }
+            savingRates.delete(key);
             if(branchId===branch())await refresh();
-        }catch(e){if(branchId===branch())error(e.message);}
+        }catch(e){saveError=e.message;if(branchId===branch())error(saveError);}
         finally{
             savingRates.delete(key);
             if(snapshot?.branchId===branchId){
                 const currentButton=element("dispatchRoster").querySelector(`[data-rates="${id}"]`);
                 if(currentButton)currentButton.disabled=false;
             }
+            if(affectsCashUp&&cashUpShift!==null&&!cashPreview)await updateCashPreview();
+            if(saveError&&branchId===branch())error(saveError);
         }
     }
     async function mutate(path,method,body){try{await request(path,method,body);error("");await refresh();}catch(e){error(e.message);}}
@@ -100,6 +112,8 @@
             dispatchOnlinePaid:money(preview.onlineOrderPaid),dispatchHourlyPay:money(preview.hourlyPay),
             dispatchDeliveryPay:money(preview.deliveryPay),dispatchOnlineTips:money(preview.onlineTips),
             dispatchCashTips:money(preview.cashTips),dispatchExpectedCash:money(preview.expectedCashDue)};
+        values.dispatchHourlyCalculation=`${money(preview.hourlyRate)}/hour × ${preview.approvedMinutes} minutes ÷ 60`;
+        values.dispatchDeliveryCalculation=`${money(preview.perDeliveryRate)}/delivery × ${preview.deliveredCount}`;
         Object.entries(values).forEach(([id,value])=>{element(id).textContent=value;});
         updateVariance();
     }
@@ -113,15 +127,20 @@
     }
     async function updateCashPreview(){
         if(cashUpShift===null)return;
+        const revision=++previewRevision;
         const clockInTime=element("dispatchClockInTime").value;
         const clockOutTime=element("dispatchClockOutTime").value;
         if(!clockInTime||!clockOutTime){cashPreview=null;element("dispatchCashUpSubmit").disabled=true;return;}
-        const revision=++previewRevision;
         cashPreview=null;
         element("dispatchCashUpSubmit").disabled=true;
         try{
             const preview=await request(`/api/admin/dispatch/shifts/${cashUpShift}/cash-up?branchId=${branch()}&clockInTime=${encodeURIComponent(clockInTime)}&clockOutTime=${encodeURIComponent(clockOutTime)}`);
-            if(revision===previewRevision){renderCashPreview(preview);element("dispatchCashUpSubmit").disabled=false;error("");}
+            if(revision===previewRevision){
+                renderCashPreview(preview);
+                const shift=snapshot?.shifts.find(item=>item.id===cashUpShift);
+                element("dispatchCashUpSubmit").disabled=settling||!!(shift&&savingRates.has(rateKey(branch(),shift.driverId)));
+                error("");
+            }
         }catch(e){if(revision===previewRevision)error(e.message);}
     }
     async function cashUp(shiftId){
@@ -129,7 +148,8 @@
             const preview=await request(`/api/admin/dispatch/shifts/${shiftId}/cash-up?branchId=${branch()}`);
             cashUpShift=Number(shiftId);
             previewRevision++;
-            element("dispatchCashUpSubmit").disabled=false;
+            const shift=snapshot?.shifts.find(item=>item.id===cashUpShift);
+            element("dispatchCashUpSubmit").disabled=settling||!!(shift&&savingRates.has(rateKey(branch(),shift.driverId)));
             element("dispatchCashUpHeading").textContent=`Cash-up · Shift #${shiftId}`;
             element("dispatchClockInTime").value=preview.clockInTime.slice(0,5);
             element("dispatchClockOutTime").value=preview.clockOutTime.slice(0,5);
@@ -145,7 +165,7 @@
     }
     async function settleCashUp(event){
         event.preventDefault();
-        if(cashUpShift===null||!cashPreview)return;
+        if(cashUpShift===null||!cashPreview||settling||element("dispatchCashUpSubmit").disabled)return;
         const clockInTime=element("dispatchClockInTime").value;
         const clockOutTime=element("dispatchClockOutTime").value;
         const cashHandedIn=Number(element("dispatchCashHanded").value);
@@ -160,12 +180,18 @@
             error("A variance reason is required.");return;
         }
         if(!confirm(`Settle shift #${cashUpShift}? This cannot be changed.`))return;
+        settling=true;element("dispatchCashUpSubmit").disabled=true;
+        let settlementError="";
         try{
             await request(`/api/admin/dispatch/shifts/${cashUpShift}/cash-up`,"POST",
                 {branchId:branch(),clockInTime,clockOutTime,cashHandedIn,cashPaidOut,varianceReason,
                     timeAdjustmentReason:element("dispatchTimeReason").value.trim()});
             closeCashUp();error("");await refresh();
-        }catch(e){error(e.message);}
+        }catch(e){settlementError=e.message;}
+        finally{
+            settling=false;if(cashUpShift!==null)await updateCashPreview();
+            if(settlementError)error(settlementError);
+        }
     }
     function connect(){if(typeof createSimpleStompClient!=="function")return;liveClient=createSimpleStompClient({onConnect:()=>{delay=1000;const topic=fixedBranch?`/topic/admin/branches/${fixedBranch}/dispatch`:"/topic/admin/dispatch";liveClient.subscribe(topic,frame=>{try{const event=JSON.parse(frame.body);if(event.eventType==="RETURNING"&&event.branchId===branch()){const box=element("dispatchAlert");box.textContent=`${event.driverUsername} is returning to the store.`;box.classList.remove("d-none");}refresh();}catch(e){refresh();}});refresh();},onDisconnect:()=>{setTimeout(connect,delay);delay=Math.min(delay*2,15000);}});liveClient.connect();}
     document.addEventListener("DOMContentLoaded",()=>{

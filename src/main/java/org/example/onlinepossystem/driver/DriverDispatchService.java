@@ -117,11 +117,32 @@ public class DriverDispatchService {
         int branch = managerBranch(authentication, requestedBranch);
         requireRate(hourlyRate);
         requireRate(perDeliveryRate);
+        lockDriver(driverId);
         int count = jdbc.update("""
                 UPDATE driver_profile SET hourly_rate = ?, per_delivery_rate = ?
                 WHERE driver_id = ? AND branch_id = ?
                 """, money(hourlyRate), money(perDeliveryRate), driverId, branch);
         if (count != 1) throw new NoSuchElementException("Driver not found in this branch.");
+        List<Shift> shifts = jdbc.query("""
+                SELECT shift_id, driver_id, branch_id, business_date, clocked_in_at, clocked_out_at,
+                    approved_minutes, hourly_rate, per_delivery_rate, returning_at, state
+                FROM driver_shift WHERE driver_id = ? AND branch_id = ?
+                    AND state IN ('ACTIVE', 'CLOCKED_OUT') FOR UPDATE
+                """, this::shiftRow, driverId, branch);
+        for (Shift shift : shifts) {
+            if (shift.hourlyRate().compareTo(hourlyRate) == 0
+                    && shift.perDeliveryRate().compareTo(perDeliveryRate) == 0) continue;
+            jdbc.update("UPDATE driver_shift SET hourly_rate = ?, per_delivery_rate = ? WHERE shift_id = ?",
+                    money(hourlyRate), money(perDeliveryRate), shift.id());
+            jdbc.update("""
+                    INSERT INTO driver_dispatch_event(shift_id, actor_id, actor_username, branch_id,
+                        event_type, details)
+                    VALUES (?, ?, ?, ?, 'SHIFT_RATES_CHANGED', jsonb_build_object(
+                        'oldHourlyRate', CAST(? AS numeric), 'newHourlyRate', CAST(? AS numeric),
+                        'oldPerDeliveryRate', CAST(? AS numeric), 'newPerDeliveryRate', CAST(? AS numeric)))
+                    """, shift.id(), actorId(authentication), authentication.getName(), branch,
+                    shift.hourlyRate(), money(hourlyRate), shift.perDeliveryRate(), money(perDeliveryRate));
+        }
         changed(branch, profile(driverId).email(), "RATES_CHANGED");
         return profile(driverId);
     }
@@ -318,6 +339,7 @@ public class DriverDispatchService {
         int branch = managerBranch(authentication, branchId);
         Shift shift = shift(shiftId);
         if (shift.branchId() != branch) throw new AccessDeniedException("Shift belongs to another branch.");
+        if (!"CLOCKED_OUT".equals(shift.state())) throw new IllegalStateException("Clock out before cash-up.");
         return calculate(shift, clockInTime, clockOutTime);
     }
 
@@ -327,6 +349,9 @@ public class DriverDispatchService {
                                BigDecimal cashHandedIn, BigDecimal cashPaidOut,
                                String varianceReason, String timeAdjustmentReason) {
         int branch = managerBranch(authentication, branchId);
+        Shift initial = shift(shiftId);
+        if (initial.branchId() != branch) throw new AccessDeniedException("Shift belongs to another branch.");
+        lockDriver(initial.driverId());
         jdbc.queryForObject("SELECT shift_id FROM driver_shift WHERE shift_id = ? FOR UPDATE", Long.class, shiftId);
         Shift shift = shift(shiftId);
         if (shift.branchId() != branch) throw new AccessDeniedException("Shift belongs to another branch.");
@@ -422,7 +447,8 @@ public class DriverDispatchService {
         BigDecimal expected = sales.subtract(online).subtract(hourly).subtract(deliveryPay).subtract(onlineTips);
         return new CashUpPreview(shift.id(), deliveredOrderIds.size(), minutes, selected.clockInTime(),
                 selected.clockOutTime(), selected.approvedClockInAt(), selected.approvedClockOutAt(), money(sales), money(online),
-                money(onlineTips), money(cashTips), money(hourly), money(deliveryPay), money(expected));
+                money(onlineTips), money(cashTips), shift.hourlyRate(), shift.perDeliveryRate(),
+                money(hourly), money(deliveryPay), money(expected));
     }
 
     private List<Delivery> deliveries(long shiftId) {
@@ -576,6 +602,7 @@ public class DriverDispatchService {
                                 OffsetDateTime approvedClockInAt, OffsetDateTime approvedClockOutAt,
                                 BigDecimal orderSales,
                                 BigDecimal onlineOrderPaid, BigDecimal onlineTips, BigDecimal cashTips,
+                                BigDecimal hourlyRate, BigDecimal perDeliveryRate,
                                 BigDecimal hourlyPay, BigDecimal deliveryPay, BigDecimal expectedCashDue) {}
     public record CashUpResult(CashUpPreview preview, BigDecimal cashHandedIn, BigDecimal cashPaidOut,
                                BigDecimal variance, String varianceReason) {}

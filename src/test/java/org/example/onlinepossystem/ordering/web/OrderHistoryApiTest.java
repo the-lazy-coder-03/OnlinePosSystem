@@ -36,7 +36,6 @@ class OrderHistoryApiTest {
     @Autowired TokenService tokens;
     @Autowired UserDetailsService accounts;
     @Autowired CustomerService customers;
-    // Keep both history and OrderOperations available when replacing the shared service bean.
     @MockBean OrderService history;
 
     @BeforeEach

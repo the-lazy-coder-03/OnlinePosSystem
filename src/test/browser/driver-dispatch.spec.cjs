@@ -28,7 +28,7 @@ test('driver API returns 401 instead of redirecting expired sessions to a web pa
     }
 });
 
-test('manager dispatch and mobile driver shift flow', async ({browser}) => {
+test('manager dispatch and mobile driver shift flow', async ({browser}, testInfo) => {
     test.setTimeout(90000);
     const managerContext = await browser.newContext();
     const manager = await managerContext.newPage();
@@ -47,13 +47,6 @@ test('manager dispatch and mobile driver shift flow', async ({browser}) => {
     await refreshDispatch(manager);
     await expect(manager.locator('[data-hourly]').first()).toHaveValue('60.00');
     await expect(manager.locator('[data-delivery]').first()).toHaveValue('10.00');
-    const [ratesResponse] = await Promise.all([
-        manager.waitForResponse(response => response.url().includes('/rates') && response.status() === 200),
-        manager.locator('[data-rates]').first().click()
-    ]);
-    expect(ratesResponse.request().postDataJSON()).toMatchObject({hourlyRate:'60.00',perDeliveryRate:'10.00'});
-    expect(await ratesResponse.json()).toMatchObject({hourlyRate:60,perDeliveryRate:10});
-
     const driverContext = await browser.newContext({viewport:{width:390,height:844}});
     const driver = await driverContext.newPage();
     await login(driver, 'browser-driver@example.com');
@@ -64,7 +57,13 @@ test('manager dispatch and mobile driver shift flow', async ({browser}) => {
             && response.status() === 200),
         driver.locator('#driverClockIn').click()
     ]);
-    expect(await clockInResponse.json()).toMatchObject({hourlyRate:60,perDeliveryRate:10});
+    expect(await clockInResponse.json()).toMatchObject({hourlyRate:0,perDeliveryRate:0});
+    const [ratesResponse] = await Promise.all([
+        manager.waitForResponse(response => response.url().includes('/rates') && response.status() === 200),
+        manager.locator('[data-rates]').first().click()
+    ]);
+    expect(ratesResponse.request().postDataJSON()).toMatchObject({hourlyRate:'60.00',perDeliveryRate:'10.00'});
+    expect(await ratesResponse.json()).toMatchObject({hourlyRate:60,perDeliveryRate:10});
     await expect(driver.locator('#driverShiftState')).toHaveText('On shift');
     await driver.locator('#driverClaim').click();
     await expect(driver.locator('#driverOrders')).toContainText('Browser Customer');
@@ -113,6 +112,10 @@ test('manager dispatch and mobile driver shift flow', async ({browser}) => {
         await manager.locator('#dispatchClockOutTime').dispatchEvent('change');
         await expect(manager.locator('#dispatchVariance')).toContainText(/R\s*0,00/);
     }
+    await manager.locator('#dispatchCashUp').screenshot({path:testInfo.outputPath('cash-up-rates.png')});
+    await manager.setViewportSize({width:390, height:844});
+    expect(await manager.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await manager.locator('#dispatchCashUp').screenshot({path:testInfo.outputPath('cash-up-rates-mobile.png')});
     manager.once('dialog', dialog => dialog.accept());
     await manager.locator('#dispatchCashUpSubmit').click();
     await expect(manager.locator('#dispatchHistory')).toContainText(/R\s*75,00/);
