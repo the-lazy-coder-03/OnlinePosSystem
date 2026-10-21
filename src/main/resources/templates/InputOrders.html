@@ -11,7 +11,7 @@
         body {
             box-sizing: border-box;
             font-family: Arial, sans-serif;
-            background-color: #e6f0ff;
+            background-color: var(--color-page);
             margin: 0;
             padding: 0;
             display: flex;
@@ -21,7 +21,7 @@
 
         .container {
             box-sizing: border-box;
-            background-color: #fff;
+            background-color: var(--color-surface);
             border-radius: 15px;
             padding: 30px;
             margin-top: 30px;
@@ -32,14 +32,14 @@
         }
 
         h2 {
-            color: #0073e6;
+            color: var(--color-blue);
         }
 
         .branchLabel {
             font-weight: bold;
             font-size: 1.3rem;
             margin-bottom: 20px;
-            color: #0073e6;
+            color: var(--color-blue);
         }
 
         /* ========================
@@ -52,7 +52,7 @@
         }
 
         .orderItem {
-            background-color: #cce0ff;
+            background-color: var(--color-blue-tint);
             padding: 15px;
             margin: 10px 0;
             border-radius: 12px;
@@ -80,13 +80,13 @@
             font-size: 0.95rem;
             padding: 5px 10px;
             border-radius: 8px;
-            color: white;
+            color: var(--color-surface);
         }
 
-        .status.Pending { background-color: #0073e6; }   /* blue */
+        .status.Pending { background-color: var(--color-blue); }   /* blue */
         .status.Preparing { background-color: #ff9f1a; } /* orange */
         .status.Completed { background-color: #00b300; } /* green */
-        .status.Rejected { background-color: #ff4d4d; }  /* red */
+        .status.Rejected { background-color: var(--color-red-light); }  /* red */
 
         .orderItem button {
             padding: 15px 25px;
@@ -95,17 +95,17 @@
             font-weight: bold;
             cursor: pointer;
             font-size: 1.1rem;
-            background-color: #0073e6;
-            color: white;
+            background-color: var(--color-blue);
+            color: var(--color-surface);
             transition: all 0.2s ease;
         }
 
         .orderItem button:hover {
-            background-color: #0052cc;
+            background-color: var(--color-blue);
         }
 
         .liveStatus {
-            color: #003366;
+            color: var(--color-blue-dark);
             font-size: 0.9rem;
             margin-top: -10px;
             margin-bottom: 12px;
@@ -115,7 +115,7 @@
            SINGLE ORDER SCREEN
         ======================== */
         .orderCard {
-            background-color: #cce0ff;
+            background-color: var(--color-blue-tint);
             border-radius: 12px;
             padding: 20px;
             margin: 15px 0;
@@ -140,20 +140,20 @@
         }
 
         .acceptBtn {
-            background-color: #0073e6;
-            color: white;
+            background-color: var(--color-blue);
+            color: var(--color-surface);
         }
 
         .acceptBtn:hover {
-            background-color: #0052cc;
+            background-color: var(--color-blue);
         }
 
         .rejectBtn {
-            background-color: #ccc;
+            background-color: var(--color-border);
         }
 
         .rejectBtn:hover {
-            background-color: #999;
+            background-color: var(--color-disabled);
         }
 
         .homeBtn {
@@ -165,11 +165,11 @@
         }
 
         .backBtn {
-            background-color: #ff9999;
+            background-color: var(--color-red-soft);
         }
 
         .backBtn:hover {
-            background-color: #ff6666;
+            background-color: var(--color-red-light);
         }
 
         /* ========================
@@ -199,6 +199,7 @@
         }
 
     </style>
+    <link rel="stylesheet" th:href="@{/css/theme.css}">
 </head>
 <body>
 
@@ -209,7 +210,7 @@
         <h2>Online Orders Queue</h2>
         <div id="liveStatus" class="liveStatus"></div>
         <ul id="orderListQueue" class="orderList"></ul>
-        <button id="processNextOrderButton" type="button" style="padding:15px 30px;font-size:1.2rem;background:#0073e6;color:white;border:none;border-radius:12px;margin-top:20px;">Process Next Order</button>
+        <button id="processNextOrderButton" type="button" style="padding:15px 30px;font-size:1.2rem;background:var(--color-blue);color:var(--color-surface);border:none;border-radius:12px;margin-top:20px;">Process Next Order</button>
     </div>
 
     <!-- SINGLE ORDER SCREEN -->

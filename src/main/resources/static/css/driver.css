@@ -1,8 +1,8 @@
-:root{--ink:#1c2936;--muted:#667280;--blue:#174ea6;--line:#dbe2e9;--paper:#fff;--canvas:#f3f6f8}
+:root{--ink:var(--color-text);--muted:var(--color-muted);--blue:var(--color-blue);--line:var(--color-border);--paper:var(--color-surface);--canvas:var(--color-page)}
 body{margin:0;background:var(--canvas);color:var(--ink);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .driver-container{width:min(100% - 32px,1000px);margin-inline:auto}
-.driver-topbar{background:#102a43;color:#fff}.driver-topbar-inner{height:64px;display:flex;align-items:center;justify-content:space-between}
-.driver-brand{color:#fff;text-decoration:none;font-weight:700;font-size:1.12rem}.driver-brand i{color:#ffb44c;margin-right:8px}.driver-logout{border:0;background:transparent;color:#fff;font-size:1.25rem;padding:8px}
+.driver-topbar{background:var(--color-blue-dark);color:var(--color-surface)}.driver-topbar-inner{height:64px;display:flex;align-items:center;justify-content:space-between}
+.driver-brand{color:var(--color-surface);text-decoration:none;font-weight:700;font-size:1.12rem}.driver-brand i{color:var(--color-red-light);margin-right:8px}.driver-logout{border:0;background:transparent;color:var(--color-surface);font-size:1.25rem;padding:8px}
 .driver-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:28px 0 18px}.driver-heading h1{font-size:1.8rem;margin:0 0 4px}.driver-kicker{font-size:.75rem;text-transform:uppercase;color:var(--blue);font-weight:800;margin:0 0 5px}.driver-muted{color:var(--muted);font-size:.92rem;margin-bottom:0}.driver-connection{font-size:.75rem;color:var(--muted)}
 .driver-shift{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--paper);padding:20px;border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:6px}.driver-shift strong{font-size:1.1rem}.driver-actions{display:flex;flex-wrap:wrap;gap:8px}
 .driver-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0 28px}.driver-summary>div{background:var(--paper);border:1px solid var(--line);padding:16px;border-radius:6px}.driver-summary span{display:block;color:var(--muted);font-size:.8rem}.driver-summary strong{font-size:1.25rem;display:block;margin-top:3px}

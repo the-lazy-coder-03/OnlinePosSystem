@@ -13,7 +13,7 @@
 
         body {
             font-family: Arial, sans-serif;
-            background-color: #e6f0ff;
+            background-color: var(--color-page);
             min-height: 100dvh;
             padding: 16px;
             display: flex;
@@ -38,11 +38,11 @@
 
         .brand h1 {
             font-size: 3em;
-            color: #0052cc; /* updated blue theme */
+            color: var(--color-blue); /* updated blue theme */
         }
 
         .brand p {
-            color: #555;
+            color: var(--color-muted);
             font-size: 1.1em;
         }
 
@@ -50,7 +50,7 @@
            LOGIN BOX
         ========================= */
         .login-container {
-            background: white;
+            background: var(--color-surface);
             padding: 40px 30px;
             width: min(380px, 100%);
             margin-inline: auto;
@@ -65,7 +65,7 @@
 
         .login-container h2 {
             text-align: center;
-            color: #0052cc;
+            color: var(--color-blue);
             margin-bottom: 25px;
         }
 
@@ -79,16 +79,16 @@
             height: 45px;
             padding: 0 15px;
             border-radius: 15px; /* rounded like order page */
-            border: 2px solid #0052cc;
+            border: 2px solid var(--color-blue);
             font-size: 16px;
-            background-color: #f0f6ff;
+            background-color: var(--color-blue-tint);
             transition: all 0.3s;
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #003d99;
-            background-color: #e6f0ff;
+            border-color: var(--color-blue-dark);
+            background-color: var(--color-page);
         }
 
         .password-field { position: relative; }
@@ -102,12 +102,12 @@
             border: 0;
             border-radius: 0 12px 12px 0;
             background: transparent;
-            color: #0052cc;
+            color: var(--color-blue);
             font-size: 14px;
             font-weight: bold;
             cursor: pointer;
         }
-        .password-toggle:focus-visible { outline: 2px solid #003d99; outline-offset: -4px; }
+        .password-toggle:focus-visible { outline: 2px solid var(--color-blue-dark); outline-offset: -4px; }
 
         /* =========================
            LOGIN BUTTON
@@ -115,8 +115,8 @@
         .login-btn {
             width: 100%;
             height: 50px;
-            background-color: #0052cc;
-            color: white;
+            background-color: var(--color-blue);
+            color: var(--color-surface);
             font-weight: bold;
             border: none;
             border-radius: 15px;
@@ -127,9 +127,9 @@
         }
 
         .login-btn:hover {
-            background-color: white;
-            color: #0052cc;
-            border: 2px solid #7a9ac5;
+            background-color: var(--color-surface);
+            color: var(--color-blue);
+            border: 2px solid var(--color-blue-soft);
             transform: scale(1.03);
         }
 
@@ -137,7 +137,7 @@
            ERROR & LOGOUT MESSAGES
         ========================= */
         .error {
-            color: red;
+            color: var(--color-error);
             font-size: 0.95em;
             margin-top: 10px;
             text-align: center;
@@ -159,7 +159,7 @@
         }
 
         .extra-links a {
-            color: #0052cc;
+            color: var(--color-blue);
             text-decoration: none;
             font-weight: bold;
             transition: all 0.3s;
@@ -167,9 +167,10 @@
 
         .extra-links a:hover {
             text-decoration: underline;
-            color: #003d99;
+            color: var(--color-blue-dark);
         }
     </style>
+    <link rel="stylesheet" th:href="@{/css/theme.css}">
 </head>
 
 <body>

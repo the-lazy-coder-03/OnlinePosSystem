@@ -1,0 +1,121 @@
+/* Shared Online POS colour system. Page styles consume these semantic tokens. */
+:root {
+    --color-red: #DC2626;
+    --color-red-dark: #991B1B;
+    --color-red-light: #EF4444;
+    --color-red-soft: #FCA5A5;
+    --color-red-tint: #FEE2E2;
+    --color-blue: #2563EB;
+    --color-blue-dark: #1E40AF;
+    --color-blue-light: #3B82F6;
+    --color-blue-soft: #93C5FD;
+    --color-blue-tint: #DBEAFE;
+    --color-text: #1F2937;
+    --color-text-secondary: #4B5563;
+    --color-muted: #6B7280;
+    --color-disabled: #9CA3AF;
+    --color-border: #E5E7EB;
+    --color-page: #F9FAFB;
+    --color-surface: #FFFFFF;
+    --color-success: #15803D;
+    --color-warning: #D97706;
+    --color-error: #B91C1C;
+    --focus-ring: 0 0 0 3px rgba(37, 99, 235, .24);
+    --bs-primary: var(--color-blue);
+    --bs-primary-rgb: 37, 99, 235;
+    --bs-danger: var(--color-red);
+    --bs-danger-rgb: 220, 38, 38;
+    --bs-body-color: var(--color-text);
+    --bs-body-bg: var(--color-page);
+    --bs-border-color: var(--color-border);
+}
+
+html { background: var(--color-page); }
+body { color: var(--color-text); background-color: var(--color-page); }
+a { color: var(--color-blue); }
+a:hover { color: var(--color-blue-dark); }
+
+button, input, select, textarea { font: inherit; }
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+}
+
+/* Red is the primary action colour; blue supports navigation and secondary actions. */
+.btn-primary,
+.button-primary,
+button[type="submit"]:not(.btn-danger),
+input[type="submit"] {
+    color: var(--color-surface);
+    background-color: var(--color-red);
+    border-color: var(--color-red);
+}
+.btn-primary:hover,
+.button-primary:hover,
+button[type="submit"]:not(.btn-danger):hover,
+input[type="submit"]:hover {
+    color: var(--color-surface);
+    background-color: var(--color-red-dark);
+    border-color: var(--color-red-dark);
+}
+.btn-danger, .button-danger, .danger-action {
+    color: var(--color-surface);
+    background-color: var(--color-red);
+    border-color: var(--color-red);
+}
+.btn-danger:hover, .button-danger:hover, .danger-action:hover {
+    background-color: var(--color-red-dark);
+    border-color: var(--color-red-dark);
+}
+.btn-secondary, .button-secondary, .secondary-action {
+    color: var(--color-surface);
+    background-color: var(--color-blue);
+    border-color: var(--color-blue);
+}
+.btn-secondary:hover, .button-secondary:hover, .secondary-action:hover {
+    color: var(--color-surface);
+    background-color: var(--color-blue-dark);
+    border-color: var(--color-blue-dark);
+}
+.btn-neutral, .button-neutral, .neutral-action {
+    color: var(--color-surface);
+    background-color: var(--color-text-secondary);
+    border-color: var(--color-text-secondary);
+}
+.btn-neutral:hover, .button-neutral:hover, .neutral-action:hover {
+    background-color: var(--color-text);
+    border-color: var(--color-text);
+}
+button:disabled, .btn:disabled, .button:disabled, input[type="submit"]:disabled {
+    color: var(--color-surface);
+    background-color: var(--color-disabled);
+    border-color: var(--color-disabled);
+    cursor: not-allowed;
+    opacity: .72;
+}
+
+.btn-outline-primary {
+    color: var(--color-blue);
+    border-color: var(--color-blue);
+}
+.btn-outline-primary:hover {
+    color: var(--color-surface);
+    background-color: var(--color-blue);
+    border-color: var(--color-blue);
+}
+
+.card, .modal-content, .dropdown-menu, table { border-color: var(--color-border); }
+.text-muted { color: var(--color-muted) !important; }
+.form-control, .form-select {
+    color: var(--color-text);
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--color-blue);
+    box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}

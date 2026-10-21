@@ -20,8 +20,8 @@
         /* 2.1 BODY */
         body {
             font-family: Arial, sans-serif;
-            background-color: #e6f0ff;
-            color: #333;
+            background-color: var(--color-page);
+            color: var(--color-text);
             margin: 0;
         }
 
@@ -29,8 +29,8 @@
           3. HEADER STYLES
         ================================================== */
         header {
-            background-color: #0052cc;
-            color: white;
+            background-color: var(--color-blue);
+            color: var(--color-surface);
             padding: 20px;
             text-align: center;
             position: relative;
@@ -62,8 +62,8 @@
         }
 
         .view-profile-btn {
-            background-color: #ff9900;
-            color: white;
+            background-color: var(--color-red);
+            color: var(--color-surface);
             padding: 8px 15px;
             border-radius: 15px;
             font-weight: bold;
@@ -73,17 +73,17 @@
         }
 
         .view-profile-btn:hover {
-            background-color: white;
-            color: #ff9900;
-            border: 2px solid #e6a433;
+            background-color: var(--color-surface);
+            color: var(--color-red);
+            border: 2px solid var(--color-red-soft);
         }
 
         /* ==================================================
           4. LOGGED-IN GREETING BAR
         ================================================== */
         #logged-in {
-            background-color: #cce0ff;
-            color: #003366;
+            background-color: var(--color-blue-tint);
+            color: var(--color-blue-dark);
             text-align: center;
             padding: 10px;
             font-weight: bold;
@@ -109,10 +109,10 @@
             width: 150px;
             height: 50px;
             box-sizing: border-box;
-            border: 2px solid #0052cc;
+            border: 2px solid var(--color-blue);
             border-radius: 15px;
             background-color: transparent;
-            color: #0052cc;
+            color: var(--color-blue);
             font-family: inherit;
             font-weight: bold;
             font-size: 1em;
@@ -140,8 +140,8 @@
 
         .nav-links a:hover,
         .nav-links button:hover {
-            background-color: #0052cc;
-            color: white;
+            background-color: var(--color-blue);
+            color: var(--color-surface);
         }
 
         /* ==================================================
@@ -159,7 +159,7 @@
         .map-container {
             flex: 1 1 0;
             min-width: 300px;
-            background: white;
+            background: var(--color-surface);
             border-radius: 15px;
             padding: 20px;
             text-align: center;
@@ -174,7 +174,7 @@
         }
 
         .map-container h3 {
-            color: #0052cc;
+            color: var(--color-blue);
             margin-bottom: 15px;
         }
 
@@ -187,17 +187,17 @@
             align-self: center;
             align-items: center;
             justify-content: center;
-            border: 2px solid #0052cc;
+            border: 2px solid var(--color-blue);
             border-radius: 15px;
-            color: #0052cc;
+            color: var(--color-blue);
             font-weight: bold;
             text-decoration: none;
             transition: all 0.3s;
         }
 
         .view-menu-btn:hover {
-            background-color: #0052cc;
-            color: white;
+            background-color: var(--color-blue);
+            color: var(--color-surface);
             transform: scale(1.05);
         }
 
@@ -231,6 +231,7 @@
         }
 
     </style>
+    <link rel="stylesheet" th:href="@{/css/theme.css}">
 </head>
 
 <body>

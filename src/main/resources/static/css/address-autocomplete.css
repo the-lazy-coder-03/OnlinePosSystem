@@ -6,7 +6,7 @@
 }
 
 .address-autocomplete label {
-    color: #003366;
+    color: var(--color-blue-dark);
     font-weight: 700;
 }
 
@@ -26,9 +26,9 @@
     min-height: 48px;
     margin: 0 !important;
     padding: 11px 42px 11px 14px;
-    color: #1f2937;
-    background: #fff;
-    border: 2px solid #0052cc;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 2px solid var(--color-blue);
     border-radius: 12px;
     font: inherit;
     outline: none;
@@ -37,13 +37,13 @@
 }
 
 .address-search-input:focus {
-    border-color: #003d99;
+    border-color: var(--color-blue-dark);
     box-shadow: 0 0 0 3px rgba(0, 82, 204, .14);
 }
 
 .address-search-input:disabled {
-    color: #64748b;
-    background: #f4f7fb;
+    color: var(--color-muted);
+    background: var(--color-page);
     cursor: not-allowed;
 }
 
@@ -54,9 +54,9 @@
     width: 12px;
     height: 12px;
     content: "";
-    border: 2px solid #0052cc;
+    border: 2px solid var(--color-blue);
     border-radius: 50%;
-    box-shadow: 6px 6px 0 -5px #0052cc;
+    box-shadow: 6px 6px 0 -5px var(--color-blue);
     pointer-events: none;
 }
 
@@ -70,9 +70,9 @@
     margin: 0;
     padding: 5px;
     overflow-y: auto;
-    color: #1f2937;
-    background: #fff;
-    border: 1px solid #bfd3f2;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-blue-soft);
     border-radius: 12px;
     box-shadow: 0 14px 30px rgba(11, 42, 91, .18);
     list-style: none;
@@ -92,21 +92,21 @@
 
 .address-result:hover,
 .address-result[aria-selected="true"] {
-    color: #003d99;
-    background: #f0f6ff;
+    color: var(--color-blue-dark);
+    background: var(--color-blue-tint);
 }
 
 .address-results-empty {
     padding: 12px;
-    color: #64748b;
+    color: var(--color-muted);
     font-size: .9rem;
     line-height: 1.4;
 }
 
 .address-attribution {
     padding: 7px 10px 5px;
-    color: #64748b;
-    border-top: 1px solid #e2e8f0;
+    color: var(--color-muted);
+    border-top: 1px solid var(--color-border);
     font-size: .78rem;
     font-weight: 400;
     letter-spacing: .01em;
@@ -115,22 +115,22 @@
 }
 
 .address-status {
-    color: #5f3700;
+    color: #92400E;
     font-size: .9rem;
     line-height: 1.35;
 }
 
 .address-autocomplete[data-address-state="loading"] .address-status {
-    color: #0052cc;
+    color: var(--color-blue);
 }
 
 .address-autocomplete[data-address-state="verified"] .address-status {
-    color: #126b2f;
+    color: var(--color-success);
 }
 
 .address-autocomplete[data-address-state="invalid"] .address-status,
 .address-autocomplete[data-address-state="error"] .address-status {
-    color: #b00020;
+    color: var(--color-error);
 }
 
 @media (max-width: 520px) {

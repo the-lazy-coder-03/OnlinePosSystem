@@ -8,6 +8,7 @@
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.8/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/1.13.1/font/bootstrap-icons.min.css}">
     <link rel="stylesheet" th:href="@{/css/driver.css}">
+    <link rel="stylesheet" th:href="@{/css/theme.css}">
 </head>
 <body>
 <header class="driver-topbar"><div class="driver-container driver-topbar-inner"><a href="/driver" class="driver-brand"><i class="bi bi-bicycle" aria-hidden="true"></i> Pete's Pizza</a><form method="post" th:action="@{/logout}"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button type="submit" class="driver-logout" title="Sign out"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="visually-hidden">Sign out</span></button></form></div></header>
