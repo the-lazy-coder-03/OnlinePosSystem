@@ -112,10 +112,16 @@ test('manager dispatch and mobile driver shift flow', async ({browser}, testInfo
         await manager.locator('#dispatchClockOutTime').dispatchEvent('change');
         await expect(manager.locator('#dispatchVariance')).toContainText(/R\s*0,00/);
     }
-    await manager.locator('#dispatchCashUp').screenshot({path:testInfo.outputPath('cash-up-rates.png')});
+    await manager.locator('#dispatchCashUp').evaluate(panel => panel.scrollIntoView({behavior:'instant', block:'start'}));
+    expect(await manager.locator('#dispatchCashUp').evaluate(panel => panel.getBoundingClientRect().top
+        >= document.querySelector('.admin-topbar').getBoundingClientRect().bottom)).toBe(true);
+    await manager.screenshot({path:testInfo.outputPath('cash-up-rates.png')});
     await manager.setViewportSize({width:390, height:844});
     expect(await manager.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
-    await manager.locator('#dispatchCashUp').screenshot({path:testInfo.outputPath('cash-up-rates-mobile.png')});
+    await manager.locator('#dispatchCashUp').evaluate(panel => panel.scrollIntoView({behavior:'instant', block:'start'}));
+    expect(await manager.locator('#dispatchCashUp').evaluate(panel => panel.getBoundingClientRect().top
+        >= document.querySelector('.admin-topbar').getBoundingClientRect().bottom)).toBe(true);
+    await manager.screenshot({path:testInfo.outputPath('cash-up-rates-mobile.png')});
     manager.once('dialog', dialog => dialog.accept());
     await manager.locator('#dispatchCashUpSubmit').click();
     await expect(manager.locator('#dispatchHistory')).toContainText(/R\s*75,00/);
