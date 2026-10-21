@@ -20,6 +20,14 @@ async function refreshDispatch(page) {
     ]);
 }
 
+test('driver API returns 401 instead of redirecting expired sessions to a web page', async ({request}) => {
+    for (const headers of [{}, {Authorization: 'Bearer invalid-test-token'}]) {
+        const response = await request.get('/api/driver', {headers, maxRedirects: 0});
+        expect(response.status()).toBe(401);
+        expect(response.headers().location).toBeUndefined();
+    }
+});
+
 test('manager dispatch and mobile driver shift flow', async ({browser}) => {
     const managerContext = await browser.newContext();
     const manager = await managerContext.newPage();

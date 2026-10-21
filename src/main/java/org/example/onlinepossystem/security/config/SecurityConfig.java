@@ -193,7 +193,8 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, exception) ->
                                 response.setStatus(HttpServletResponse.SC_FORBIDDEN))
                         .defaultAuthenticationEntryPointFor(
-                                (request, response, exception) -> response.sendError(401, "Authentication is required"),
+                                // Avoid a protected /error dispatch turning API 401s into web-login redirects.
+                                (request, response, exception) -> response.setStatus(HttpServletResponse.SC_UNAUTHORIZED),
                                 new AntPathRequestMatcher("/api/**")
                         )
                         .defaultAuthenticationEntryPointFor(new LoginUrlAuthenticationEntryPoint("/admin/login"),
