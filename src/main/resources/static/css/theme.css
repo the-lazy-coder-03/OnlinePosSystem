@@ -20,13 +20,54 @@
     --color-success: #15803D;
     --color-warning: #D97706;
     --color-error: #B91C1C;
+    --color-white-85: rgba(255, 255, 255, .85098);
+    --color-white-70: rgba(255, 255, 255, .70196);
     --focus-ring: 0 0 0 3px rgba(37, 99, 235, .24);
-    --bs-primary: var(--color-blue);
-    --bs-primary-rgb: 37, 99, 235;
-    --bs-danger: var(--color-red);
-    --bs-danger-rgb: 220, 38, 38;
+    --bs-primary: var(--color-red);
+    --bs-primary-rgb: 220, 38, 38;
+    --bs-secondary: var(--color-blue);
+    --bs-secondary-rgb: 37, 99, 235;
+    --bs-success: var(--color-success);
+    --bs-success-rgb: 21, 128, 61;
+    --bs-warning: var(--color-warning);
+    --bs-warning-rgb: 217, 119, 6;
+    --bs-danger: var(--color-error);
+    --bs-danger-rgb: 185, 28, 28;
+    --bs-info: var(--color-blue);
+    --bs-info-rgb: 37, 99, 235;
+    --bs-light: var(--color-page);
+    --bs-light-rgb: 249, 250, 251;
+    --bs-dark: var(--color-text);
+    --bs-dark-rgb: 31, 41, 55;
     --bs-body-color: var(--color-text);
+    --bs-body-color-rgb: 31, 41, 55;
     --bs-body-bg: var(--color-page);
+    --bs-body-bg-rgb: 249, 250, 251;
+    --bs-emphasis-color: var(--color-text);
+    --bs-emphasis-color-rgb: 31, 41, 55;
+    --bs-secondary-color: var(--color-text-secondary);
+    --bs-secondary-bg: var(--color-border);
+    --bs-tertiary-color: var(--color-muted);
+    --bs-tertiary-bg: var(--color-page);
+    --bs-link-color: var(--color-blue);
+    --bs-link-color-rgb: 37, 99, 235;
+    --bs-link-hover-color: var(--color-blue-dark);
+    --bs-link-hover-color-rgb: 30, 64, 175;
+    --bs-primary-text-emphasis: var(--color-red-dark);
+    --bs-primary-bg-subtle: var(--color-red-tint);
+    --bs-primary-border-subtle: var(--color-red-soft);
+    --bs-secondary-text-emphasis: var(--color-blue-dark);
+    --bs-secondary-bg-subtle: var(--color-blue-tint);
+    --bs-secondary-border-subtle: var(--color-blue-soft);
+    --bs-success-text-emphasis: var(--color-success);
+    --bs-success-bg-subtle: var(--color-page);
+    --bs-success-border-subtle: var(--color-success);
+    --bs-warning-text-emphasis: var(--color-text);
+    --bs-warning-bg-subtle: var(--color-warning);
+    --bs-warning-border-subtle: var(--color-warning);
+    --bs-danger-text-emphasis: var(--color-error);
+    --bs-danger-bg-subtle: var(--color-red-tint);
+    --bs-danger-border-subtle: var(--color-red-soft);
     --bs-border-color: var(--color-border);
 }
 
@@ -35,7 +76,9 @@ body { color: var(--color-text); background-color: var(--color-page); }
 a { color: var(--color-blue); }
 a:hover { color: var(--color-blue-dark); }
 
-button, input, select, textarea { font: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+input::placeholder, textarea::placeholder { color: var(--color-muted); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-red); }
 input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible {
     outline: none;
     box-shadow: var(--focus-ring);
@@ -60,19 +103,19 @@ input[type="submit"]:hover {
 }
 .btn-danger, .button-danger, .danger-action {
     color: var(--color-surface);
-    background-color: var(--color-red);
-    border-color: var(--color-red);
+    background-color: var(--color-error);
+    border-color: var(--color-error);
 }
 .btn-danger:hover, .button-danger:hover, .danger-action:hover {
     background-color: var(--color-red-dark);
     border-color: var(--color-red-dark);
 }
-.btn-secondary, .button-secondary, .secondary-action {
+.btn-secondary, .secondary-action {
     color: var(--color-surface);
     background-color: var(--color-blue);
     border-color: var(--color-blue);
 }
-.btn-secondary:hover, .button-secondary:hover, .secondary-action:hover {
+.btn-secondary:hover, .secondary-action:hover {
     color: var(--color-surface);
     background-color: var(--color-blue-dark);
     border-color: var(--color-blue-dark);
@@ -106,10 +149,11 @@ button:disabled, .btn:disabled, .button:disabled, input[type="submit"]:disabled 
 
 .card, .modal-content, .dropdown-menu, table { border-color: var(--color-border); }
 .text-muted { color: var(--color-muted) !important; }
+.text-secondary { color: var(--color-text-secondary) !important; }
 .form-control, .form-select {
     color: var(--color-text);
     background-color: var(--color-surface);
-    border-color: var(--color-border);
+    border-color: var(--color-muted);
 }
 .form-control:focus, .form-select:focus {
     border-color: var(--color-blue);
@@ -120,7 +164,7 @@ button:disabled, .btn:disabled, .button:disabled, input[type="submit"]:disabled 
     *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
 
-/* Red is the dominant brand colour across every application shell. */
+/* Android roles: red actions, blue toolbars, charcoal home and driver shells. */
 :root {
     --color-primary: var(--color-red);
     --color-primary-dark: var(--color-red-dark);
@@ -131,24 +175,35 @@ button:disabled, .btn:disabled, .button:disabled, input[type="submit"]:disabled 
 header:not(.admin-topbar),
 .topbar,
 .driver-topbar {
-    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
+    background: linear-gradient(180deg, var(--color-blue-dark), var(--color-blue-dark));
 }
 
 .page-heading,
 .confirmation-hero {
-    background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
+    background: linear-gradient(135deg, var(--color-blue-dark), var(--color-blue-dark));
 }
 
-.admin-sidebar { background: var(--color-primary-dark); }
+body:has(#locations) > header,
+.driver-topbar {
+    background: linear-gradient(180deg, var(--color-text), var(--color-text));
+}
+body:has(#locations) > header h1 { color: var(--color-red); }
+body:has(#locations) > header p { color: var(--color-white-85); }
+.driver-brand i { color: var(--color-red-soft); }
+.driver-topbar .driver-logout,
+.driver-topbar .driver-logout:hover { color: var(--color-white-85); background-color: transparent; border-color: transparent; }
+
+.admin-sidebar { background: var(--color-blue-dark); }
 .admin-brand-mark {
-    color: var(--color-primary-dark);
+    color: var(--color-blue-dark);
     background: var(--color-surface);
 }
-.admin-nav .nav-link.active { color: var(--color-primary-dark); }
+.admin-nav .nav-link.active { color: var(--color-red-dark); }
 
 .recovery-brand-name,
 .recovery-title,
 .error-page h1 { color: var(--color-primary-dark); }
+.recovery-brand .recovery-brand-name { color: var(--color-surface); }
 .recovery-primary,
 .summary-actions .btn-primary,
 .container > .btn,
@@ -165,3 +220,70 @@ header:not(.admin-topbar),
     background: var(--color-primary-dark);
     border-color: var(--color-primary-dark);
 }
+
+/* Bootstrap keeps component-local state colours, independent of its root palette. */
+.btn-primary { --action: var(--color-red); --action-dark: var(--color-red-dark); --action-rgb: 220, 38, 38; }
+.btn-secondary, .btn-outline-primary, .btn-outline-secondary { --action: var(--color-blue); --action-dark: var(--color-blue-dark); --action-rgb: 37, 99, 235; }
+.btn-success, .btn-outline-success { --action: var(--color-success); --action-dark: var(--color-success); --action-rgb: 21, 128, 61; }
+.btn-danger, .btn-outline-danger { --action: var(--color-error); --action-dark: var(--color-red-dark); --action-rgb: 185, 28, 28; }
+.btn-warning { --action: var(--color-warning); --action-dark: var(--color-warning); --action-rgb: 217, 119, 6; }
+.btn-outline-dark { --action: var(--color-text); --action-dark: var(--color-text); --action-rgb: 31, 41, 55; }
+.btn-outline-light { --action: var(--color-surface); --action-dark: var(--color-surface); --action-rgb: 255, 255, 255; }
+.btn-primary, .btn-secondary, .btn-success, .btn-danger, .btn-warning {
+    --bs-btn-color: var(--color-surface);
+    --bs-btn-bg: var(--action);
+    --bs-btn-border-color: var(--action);
+    --bs-btn-hover-color: var(--color-surface);
+    --bs-btn-hover-bg: var(--action-dark);
+    --bs-btn-hover-border-color: var(--action-dark);
+    --bs-btn-active-color: var(--color-surface);
+    --bs-btn-active-bg: var(--action-dark);
+    --bs-btn-active-border-color: var(--action-dark);
+    --bs-btn-disabled-color: var(--color-surface);
+    --bs-btn-disabled-bg: var(--color-disabled);
+    --bs-btn-disabled-border-color: var(--color-disabled);
+    --bs-btn-focus-shadow-rgb: var(--action-rgb);
+}
+.btn-outline-primary, .btn-outline-secondary, .btn-outline-success, .btn-outline-danger, .btn-outline-dark, .btn-outline-light {
+    --bs-btn-color: var(--action);
+    --bs-btn-border-color: var(--action);
+    --bs-btn-hover-color: var(--color-surface);
+    --bs-btn-hover-bg: var(--action);
+    --bs-btn-hover-border-color: var(--action);
+    --bs-btn-active-color: var(--color-surface);
+    --bs-btn-active-bg: var(--action-dark);
+    --bs-btn-active-border-color: var(--action-dark);
+    --bs-btn-disabled-color: var(--color-disabled);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: var(--color-disabled);
+    --bs-btn-focus-shadow-rgb: var(--action-rgb);
+}
+.btn-warning {
+    --bs-btn-color: var(--color-text);
+    --bs-btn-hover-color: var(--color-text);
+    --bs-btn-active-color: var(--color-text);
+}
+.btn-outline-light { --bs-btn-hover-color: var(--color-text); --bs-btn-active-color: var(--color-text); }
+.btn-outline-primary:disabled, .btn-outline-secondary:disabled, .btn-outline-success:disabled, .btn-outline-danger:disabled, .btn-outline-dark:disabled, .btn-outline-light:disabled {
+    color: var(--color-disabled);
+    background-color: transparent;
+    border-color: var(--color-disabled);
+}
+.text-bg-warning { color: var(--color-text) !important; }
+.text-bg-light { color: var(--color-text) !important; }
+.form-check-input { border-color: var(--color-muted); }
+.form-check-input:checked { background-color: var(--color-red); border-color: var(--color-red); }
+.form-check-input:focus { border-color: var(--color-blue); }
+.table { --bs-table-color: var(--color-text); --bs-table-bg: var(--color-surface); --bs-table-border-color: var(--color-border); --bs-table-striped-bg: var(--color-page); --bs-table-striped-color: var(--color-text); --bs-table-hover-bg: var(--color-blue-tint); --bs-table-hover-color: var(--color-text); }
+.dropdown-menu { --bs-dropdown-bg: var(--color-surface); --bs-dropdown-color: var(--color-text); --bs-dropdown-link-color: var(--color-text); --bs-dropdown-link-hover-color: var(--color-blue-dark); --bs-dropdown-link-hover-bg: var(--color-blue-tint); --bs-dropdown-link-active-color: var(--color-surface); --bs-dropdown-link-active-bg: var(--color-red); --bs-dropdown-link-disabled-color: var(--color-disabled); }
+.modal { --bs-modal-color: var(--color-text); --bs-modal-bg: var(--color-surface); --bs-modal-border-color: var(--color-border); --bs-modal-header-border-color: var(--color-border); --bs-modal-footer-border-color: var(--color-border); }
+.modal-backdrop { --bs-backdrop-bg: var(--color-text); }
+
+/* Preserve secondary tonal/outlined treatments on the two checkout views. */
+.button-secondary { color: var(--color-blue-dark); border-color: var(--color-blue); }
+.checkout-layout .button-secondary { background-color: var(--color-blue-tint); }
+.confirmation-layout .button-secondary { background-color: var(--color-surface); }
+.button-secondary:hover { color: var(--color-blue-dark); background-color: var(--color-blue-tint); border-color: var(--color-blue-dark); }
+
+/* Legacy order metadata is generated with inline colours; leave its logic untouched. */
+.orderItem > div:not(.orderMain):not(.orderActions) { color: var(--color-text-secondary) !important; }

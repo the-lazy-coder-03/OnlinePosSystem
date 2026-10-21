@@ -27,7 +27,7 @@
             margin-top: 30px;
             width: 90%;
             max-width: 700px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 20px rgba(31, 41, 55,0.1);
             text-align: center;
         }
 
@@ -84,9 +84,9 @@
         }
 
         .status.Pending { background-color: var(--color-blue); }   /* blue */
-        .status.Preparing { background-color: #ff9f1a; } /* orange */
-        .status.Completed { background-color: #00b300; } /* green */
-        .status.Rejected { background-color: var(--color-red-light); }  /* red */
+        .orderItem span.status.Preparing { background-color: var(--color-warning); color: var(--color-text); } /* orange */
+        .status.Completed { background-color: var(--color-success); } /* green */
+        .status.Rejected { background-color: var(--color-error); }  /* red */
 
         .orderItem button {
             padding: 15px 25px;
@@ -157,11 +157,11 @@
         }
 
         .homeBtn {
-            background-color: #00b300;
+            background-color: var(--color-success);
         }
 
         .homeBtn:hover {
-            background-color: #009900;
+            background-color: var(--color-success);
         }
 
         .backBtn {

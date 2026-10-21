@@ -27,8 +27,8 @@
             --muted:var(--color-muted);
             --line:var(--color-border);
 
-            --shadow: 0 10px 30px rgba(11,42,91,.10);
-            --shadow-soft: 0 6px 20px rgba(11,42,91,.08);
+            --shadow: 0 10px 30px rgba(31, 41, 55,.10);
+            --shadow-soft: 0 6px 20px rgba(31, 41, 55,.08);
             --radius: 14px;
 
             --danger:var(--color-error);
@@ -113,7 +113,7 @@
             height: 8px;
             border-radius: 50%;
             background: var(--color-blue-soft);
-            box-shadow: 0 0 0 3px rgba(142,224,255,.18);
+            box-shadow: 0 0 0 3px rgba(147, 197, 253,.18);
         }
 
         .btn{
@@ -216,7 +216,7 @@
             transform: translateY(-1px);
         }
         .catbtn.active{
-            background: var(--blue-650);
+            background: var(--color-red);
             color:var(--color-surface);
             border-color: rgba(255,255,255,.25);
         }
@@ -229,7 +229,7 @@
             color: var(--blue-900);
         }
         .catbtn.active .count{
-            background: rgba(255,255,255,.18);
+            background: var(--color-red-dark);
             color:var(--color-surface);
             border: 1px solid rgba(255,255,255,.25);
         }
@@ -257,7 +257,7 @@
             width: 14px;
             height: 14px;
             margin: 0;
-            accent-color: var(--blue-650);
+            accent-color: var(--color-red);
         }
 
         .sidebar-footer{
@@ -285,7 +285,7 @@
             padding: 12px;
         }
         .sidebar-footer .btn-cart{
-            background: var(--blue-650);
+            background: var(--color-red);
             color:var(--color-surface);
         }
         .sidebar-footer .btn-cart:hover{ opacity:.96; }
@@ -376,7 +376,7 @@
             margin: 10px 4px;
             cursor:pointer;
             transition: transform .12s ease, box-shadow .18s ease, border-color .18s ease;
-            box-shadow: 0 4px 14px rgba(11,42,91,.06);
+            box-shadow: 0 4px 14px rgba(31, 41, 55,.06);
         }
         .row:hover{
             border-color: var(--blue-200);
@@ -389,7 +389,7 @@
         }
         .row.special-unavailable:hover{
             border-color: var(--line);
-            box-shadow: 0 4px 14px rgba(11,42,91,.06);
+            box-shadow: 0 4px 14px rgba(31, 41, 55,.06);
             transform: none;
         }
         .row-top{
@@ -420,14 +420,14 @@
         .row-add-btn{
             border: none;
             border-radius: 10px;
-            background: var(--blue-650);
+            background: var(--color-red);
             color: var(--color-surface);
             padding: 8px 10px;
             font-weight: 950;
             cursor: pointer;
             white-space: nowrap;
         }
-        .row-add-btn:hover{ opacity: .94; }
+        .row-add-btn:hover{ opacity: .94; background: var(--color-red-dark); }
         .row-direct-add{
             cursor: default;
         }
@@ -518,7 +518,7 @@
             background:var(--color-surface);
             border: 1px solid var(--line);
             border-radius: 14px;
-            box-shadow: 0 4px 14px rgba(11,42,91,.06);
+            box-shadow: 0 4px 14px rgba(31, 41, 55,.06);
             padding: 14px;
             margin: 10px 4px;
         }
@@ -644,7 +644,7 @@
             right: 16px;
             width: auto;
             z-index: 8;
-            background: rgba(244,248,255,.92);
+            background: rgba(249, 250, 251,.92);
             backdrop-filter: blur(10px);
             border-top: 1px solid var(--line);
             padding: 10px 12px;
@@ -664,8 +664,8 @@
             border-radius: 999px;
             background: var(--color-blue-soft);
             color: var(--color-blue-dark);
-            box-shadow: 0 10px 25px rgba(11,42,91,.12);
-            border: 1px solid rgba(5,34,56,.10);
+            box-shadow: 0 10px 25px rgba(31, 41, 55,.12);
+            border: 1px solid rgba(31, 41, 55,.10);
         }
         .sticky-left{
             font-weight: 950;
@@ -812,6 +812,7 @@
             background:var(--blue-100);
             border:1px solid var(--blue-200);
         }
+        #btnSummaryBack { color: var(--color-blue-dark); background: var(--color-blue-tint); border-color: var(--color-blue); }
         .sum-totals{ padding-top:10px; }
         .sum-line,
         .sum-total{
@@ -854,9 +855,9 @@
         .payload{
             margin: 10px 4px;
             border-radius: 14px;
-            background: #071014;
-            color: #79ff8f;
-            border: 1px solid rgba(121,255,143,.25);
+            background: var(--color-text);
+            color: var(--color-blue-soft);
+            border: 1px solid rgba(147, 197, 253,.25);
             padding: 12px;
             font-size: 12px;
             overflow:auto;
@@ -872,7 +873,7 @@
             align-items:center;
             justify-content:center;
             padding: 16px;
-            background: rgba(0,0,0,.55);
+            background: rgba(31, 41, 55,.55);
         }
         .overlay.show{ display:flex; }
         .overlay-card{
@@ -906,7 +907,7 @@
             min-width: 210px;
             padding: 12px 12px;
             border-radius: 12px;
-            border: 1px solid var(--line);
+            border: 1px solid var(--color-muted);
             outline:none;
             font-weight: 800;
         }
@@ -945,14 +946,14 @@
             background: var(--blue-100);
         }
         .overlay .btn-primary{
-            background: var(--blue-650);
+            background: var(--color-red);
             color: var(--color-surface);
-            border-color: var(--blue-650);
+            border-color: var(--color-red);
         }
         .choice-btn.selected{
-            background: var(--blue-650) !important;
+            background: var(--color-red) !important;
             color: var(--color-surface) !important;
-            border: 1px solid var(--blue-650) !important;
+            border: 1px solid var(--color-red) !important;
         }
         .menu-only .ordering-only{
             display: none !important;
@@ -1202,8 +1203,8 @@
                     <button class="backlink" id="btnCustomizeBack" type="button" aria-label="Back to menu">
                         ← Back
                     </button>
-                    <div class="pill ordering-only" style="background: rgba(11,42,91,.06); border-color: var(--line); color: var(--blue-800);">
-                        <span class="dot" style="background: var(--blue-650); box-shadow:0 0 0 3px rgba(30,99,214,.12);"></span>
+                    <div class="pill ordering-only" style="background: rgba(31,41,55,.06); border-color: var(--line); color: var(--blue-800);">
+                        <span class="dot" style="background: var(--blue-650); box-shadow:0 0 0 3px rgba(37,99,235,.12);"></span>
                         <span id="customizeCartPill">0 item(s)</span>
                     </div>
                 </div>

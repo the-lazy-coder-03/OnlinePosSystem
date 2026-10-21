@@ -11,10 +11,10 @@
     --background: var(--color-page);
     --ink: var(--color-text);
     --muted: var(--color-muted);
-    --line: var(--color-blue-soft);
+    --line: var(--color-border);
     --danger: var(--color-error);
     --success: var(--color-success);
-    --shadow-soft: 0 6px 20px rgba(11, 42, 91, .08);
+    --shadow-soft: 0 6px 20px rgba(31, 41, 55, .08);
     --radius: 14px;
 }
 
@@ -51,11 +51,11 @@ a { color: inherit; }
 .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .select-option { min-height: 78px; padding: 14px; display: flex; align-items: center; gap: 12px; text-align: left; color: var(--ink); background: var(--color-surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .15s ease; }
 .select-option:hover { border-color: var(--blue-650); transform: translateY(-1px); }
-.select-option.active { border-color: var(--blue-650); background: var(--blue-100); }
+.select-option.active { border-color: var(--color-red); background: var(--color-red-tint); }
 .select-option > span:last-child { display: grid; gap: 3px; }
-.select-option small, .payment-option small { color: var(--muted); font-size: .8rem; }
-.option-mark { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; color: var(--blue-800); background: var(--blue-100); border-radius: 10px; font-weight: 950; }
-.select-option.active .option-mark { color: var(--color-surface); background: var(--blue-650); }
+.select-option small, .payment-option small { color: var(--color-text-secondary); font-size: .8rem; }
+.option-mark { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; color: var(--color-blue-dark); background: var(--blue-100); border-radius: 10px; font-weight: 950; }
+.select-option.active .option-mark { color: var(--color-surface); background: var(--color-red); }
 .selection-hint { margin: 10px 2px 0; color: var(--muted); font-size: .8rem; font-weight: 700; }
 
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -63,25 +63,26 @@ a { color: inherit; }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; margin-bottom: 7px; color: var(--blue-950); font-size: .86rem; font-weight: 800; }
 .form-group label span { color: var(--muted); font-weight: 600; }
-.form-group input { width: 100%; min-height: 46px; padding: 10px 12px; color: var(--ink); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; outline: none; transition: border-color .15s ease, box-shadow .15s ease; }
-.form-group input:focus { border-color: var(--blue-650); box-shadow: 0 0 0 3px rgba(0,82,204,.12); }
+.form-group input { width: 100%; min-height: 46px; padding: 10px 12px; color: var(--ink); background: var(--color-surface); border: 1px solid var(--color-muted); border-radius: 10px; outline: none; transition: border-color .15s ease, box-shadow .15s ease; }
+.form-group input:focus { border-color: var(--blue-650); box-shadow: 0 0 0 3px rgba(37, 99, 235,.12); }
 .form-group input:read-only { color: var(--muted); background: var(--color-page); cursor: not-allowed; }
 .form-group input:user-invalid { border-color: var(--danger); }
 .field-hint { display: block; margin-top: 5px; color: var(--muted); font-size: .75rem; }
 .estate-access { min-width: 0; margin: 2px 0 0; padding: 10px 16px 0; background: var(--blue-100); border: 1px solid var(--blue-200); border-radius: 12px; }
 .estate-access legend { padding: 0 5px; color: var(--blue-950); font-size: .88rem; font-weight: 900; }
+.estate-access .field-hint, .estate-access label span { color: var(--color-text-secondary); }
 #deliveryFields[hidden] { display: none; }
 .payment-card { padding-bottom: 22px; }
 .payment-option { padding: 15px 16px; display: flex; align-items: center; gap: 12px; background: var(--blue-100); border: 1px solid var(--blue-200); border-radius: 12px; }
 .payment-option > div { display: grid; gap: 3px; }
-.radio-selected { width: 20px; height: 20px; flex: 0 0 20px; background: var(--blue-650); border: 5px solid var(--color-surface); border-radius: 50%; box-shadow: 0 0 0 2px var(--blue-650); }
+.radio-selected { width: 20px; height: 20px; flex: 0 0 20px; background: var(--color-red); border: 5px solid var(--color-surface); border-radius: 50%; box-shadow: 0 0 0 2px var(--color-red); }
 
 .order-summary { position: sticky; top: 86px; padding: 26px; }
 .summary-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
 .summary-header a { color: var(--blue-650); font-size: .82rem; font-weight: 850; }
 .checkout-items { display: grid; }
 .cart-item { padding: 16px 0; display: grid; grid-template-columns: 40px minmax(0,1fr) auto; align-items: start; gap: 11px; border-bottom: 1px solid var(--line); }
-.item-quantity { width: 34px; height: 34px; display: grid; place-items: center; color: var(--blue-800); background: var(--blue-100); border-radius: 9px; font-size: .8rem; font-weight: 950; }
+.item-quantity { width: 34px; height: 34px; display: grid; place-items: center; color: var(--color-blue-dark); background: var(--blue-100); border-radius: 9px; font-size: .8rem; font-weight: 950; }
 .cart-info { min-width: 0; display: grid; gap: 4px; }
 .cart-info strong { overflow-wrap: anywhere; }
 .cart-info small { color: var(--muted); font-size: .76rem; line-height: 1.35; }
@@ -105,7 +106,7 @@ a { color: inherit; }
 .empty-cart p { margin: 7px 0 16px; font-size: .86rem; }
 .checkout-notice { margin: 8px 0 14px; padding: 12px; border-radius: 10px; font-size: .86rem; font-weight: 750; line-height: 1.4; }
 .checkout-notice.error { color: var(--danger); background: var(--color-red-tint); border: 1px solid var(--color-red-soft); }
-.checkout-notice.success { color: var(--success); background: #DCFCE7; border: 1px solid #86EFAC; }
+.checkout-notice.success { color: var(--success); background: var(--color-page); border: 1px solid var(--color-success); }
 
 @media (max-width: 900px) { .checkout-layout { grid-template-columns: 1fr; } .order-summary { position: static; } }
 @media (max-width: 620px) {

@@ -413,13 +413,13 @@ body.admin-body {
 }
 
 .status-preparing {
-    background: var(--color-red-tint);
-    color: #9a4d00;
+    background: var(--color-warning);
+    color: var(--color-text);
 }
 
 .status-completed {
-    background: #e5f5ec;
-    color: #11643f;
+    background: var(--color-page);
+    color: var(--color-success);
 }
 
 .status-rejected {
@@ -482,7 +482,7 @@ body.admin-body {
     padding: 9px 10px;
     border: 1px solid var(--color-border);
     border-radius: 6px;
-    background: #f8fafc;
+    background: var(--color-page);
 }
 
 .order-item-title {
