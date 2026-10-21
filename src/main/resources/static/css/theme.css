@@ -119,3 +119,49 @@ button:disabled, .btn:disabled, .button:disabled, input[type="submit"]:disabled 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* Red is the dominant brand colour across every application shell. */
+:root {
+    --color-primary: var(--color-red);
+    --color-primary-dark: var(--color-red-dark);
+    --color-primary-light: var(--color-red-light);
+    --color-primary-tint: var(--color-red-tint);
+}
+
+header:not(.admin-topbar),
+.topbar,
+.driver-topbar {
+    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
+}
+
+.page-heading,
+.confirmation-hero {
+    background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
+}
+
+.admin-sidebar { background: var(--color-primary-dark); }
+.admin-brand-mark {
+    color: var(--color-primary-dark);
+    background: var(--color-surface);
+}
+.admin-nav .nav-link.active { color: var(--color-primary-dark); }
+
+.recovery-brand-name,
+.recovery-title,
+.error-page h1 { color: var(--color-primary-dark); }
+.recovery-primary,
+.summary-actions .btn-primary,
+.container > .btn,
+#processNextOrderButton {
+    color: var(--color-surface);
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+}
+.recovery-primary:hover,
+.summary-actions .btn-primary:hover,
+.container > .btn:hover,
+#processNextOrderButton:hover {
+    color: var(--color-surface);
+    background: var(--color-primary-dark);
+    border-color: var(--color-primary-dark);
+}
