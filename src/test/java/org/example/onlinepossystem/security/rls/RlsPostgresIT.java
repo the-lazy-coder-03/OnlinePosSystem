@@ -759,6 +759,14 @@ class RlsPostgresIT {
         as("dispatch-driver@example.com");
         assertThat(ids("customer_order", "order_id")).isEmpty();
         var shift = dispatch.clockIn(driverAuth);
+        String token = new ObjectMapper().readTree(mvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"dispatch-driver@example.com\",\"password\":\"pass\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.roles[0]").value("ROLE_DRIVER"))
+                .andReturn().getResponse().getContentAsString()).get("accessToken").asText();
+        mvc.perform(post("/api/driver/clock-in").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(shift.id()));
+        as("dispatch-driver@example.com");
         assertThat(shift.hourlyRate()).isEqualByComparingTo("60.00");
         assertThatCode(() -> dispatch.claimNext(initialDriver)).doesNotThrowAnyException();
         assertThat(dispatch.driverDashboard(driverAuth).deliveries()).extracting(d -> d.order().getId())
@@ -779,6 +787,10 @@ class RlsPostgresIT {
         manager = SecurityContextHolder.getContext().getAuthentication();
         dispatch.updateRates(manager, newDriver, 1, new BigDecimal("80.00"), new BigDecimal("15.00"));
         dispatch.assign(manager, secondOrder, newDriver, 1);
+        as("dispatch-driver@example.com");
+        assertThatThrownBy(() -> dispatch.claimNext(initialDriver)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> dispatch.clockOut(initialDriver)).isInstanceOf(IllegalStateException.class);
+        as("one@example.com");
         assertThat(update("UPDATE customer_order SET status='Completed' WHERE order_id=?", firstOrder)).isEqualTo(1);
         assertThat(update("UPDATE customer_order SET status='Completed' WHERE order_id=?", secondOrder)).isEqualTo(1);
         as("dispatch-driver@example.com");
@@ -791,6 +803,7 @@ class RlsPostgresIT {
         dispatch.delivered(driverAuth, secondOrder);
         assertThat(dispatch.returning(driverAuth).returningAt()).isNotNull();
         var recordedClockOut = dispatch.clockOut(driverAuth);
+        assertThat(dispatch.clockOut(driverAuth).clockedOutAt()).isEqualTo(recordedClockOut.clockedOutAt());
         assertThatThrownBy(() -> dispatch.clockIn(initialDriver)).isInstanceOf(IllegalStateException.class);
 
         as("one@example.com");
@@ -905,7 +918,18 @@ class RlsPostgresIT {
         dispatch.promote(manager, "claim-two@example.com", 1);
         as("claim-one@example.com");
         var firstAuth = SecurityContextHolder.getContext().getAuthentication();
-        dispatch.clockIn(firstAuth);
+        pool.setMaximumPoolSize(3);
+        ExecutorService signins = Executors.newFixedThreadPool(2);
+        CountDownLatch loginGo = new CountDownLatch(1);
+        try {
+            Callable<Long> signin = () -> {
+                SecurityContextHolder.getContext().setAuthentication(firstAuth);
+                try { loginGo.await(5, TimeUnit.SECONDS); return dispatch.clockIn(firstAuth).id(); }
+                finally { SecurityContextHolder.clearContext(); }
+            };
+            var a = signins.submit(signin); var b = signins.submit(signin); loginGo.countDown();
+            assertThat(a.get(10, TimeUnit.SECONDS)).isEqualTo(b.get(10, TimeUnit.SECONDS));
+        } finally { signins.shutdownNow(); pool.setMaximumPoolSize(1); }
         as("claim-two@example.com");
         var secondAuth = SecurityContextHolder.getContext().getAuthentication();
         dispatch.clockIn(secondAuth);
@@ -942,6 +966,45 @@ class RlsPostgresIT {
                 .doesNotContain(first);
         assertThatThrownBy(() -> dispatch.cancelRejected(finalManager, second, 1))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test @Order(13)
+    void claimAndClockOutCannotLeaveAnAssignmentOnAClosedShift() throws Exception {
+        DriverDispatchService dispatch=application.getBean(DriverDispatchService.class);
+        long raceOrder;
+        try(Connection c=ownerConnection()) {
+            insert(c,"INSERT INTO customers(email,password,access_level,role) VALUES ('race-driver@example.com','{noop}pass',0,'USER') RETURNING id");
+            raceOrder=insert(c,"INSERT INTO customer_order(branch_id,customer_id,status,created_at,order_type) VALUES (1,"
+                    +customerA+",'Pending','2000-01-01','delivery') RETURNING order_id");
+        }
+        as("one@example.com");var manager=SecurityContextHolder.getContext().getAuthentication();
+        dispatch.promote(manager,"race-driver@example.com",1);
+        as("race-driver@example.com");var auth=SecurityContextHolder.getContext().getAuthentication();
+        dispatch.clockIn(auth);
+        pool.setMaximumPoolSize(3);ExecutorService workers=Executors.newFixedThreadPool(2);
+        CountDownLatch go=new CountDownLatch(1);
+        try {
+            List<Callable<String>> tasks=List.of(() -> {
+                SecurityContextHolder.getContext().setAuthentication(auth);
+                try { go.await(5,TimeUnit.SECONDS);dispatch.claimNext(auth);return "claimed"; }
+                catch(IllegalStateException e) { return "claim blocked"; }
+                finally { SecurityContextHolder.clearContext(); }
+            },() -> {
+                SecurityContextHolder.getContext().setAuthentication(auth);
+                try { go.await(5,TimeUnit.SECONDS);dispatch.clockOut(auth);return "clocked out"; }
+                catch(IllegalStateException e) { return "clock-out blocked"; }
+                finally { SecurityContextHolder.clearContext(); }
+            });
+            var results=tasks.stream().map(workers::submit).toList();go.countDown();
+            List<String> outcome=List.of(results.get(0).get(10,TimeUnit.SECONDS),results.get(1).get(10,TimeUnit.SECONDS));
+            assertThat(outcome.equals(List.of("claimed","clock-out blocked"))
+                    || outcome.equals(List.of("claim blocked","clocked out"))).isTrue();
+        } finally { workers.shutdownNow();pool.setMaximumPoolSize(1); }
+        as("race-driver@example.com");var result=dispatch.driverDashboard(auth);
+        assertThat(result.deliveries().stream().anyMatch(d -> "ASSIGNED".equals(d.state())))
+                .isEqualTo("ACTIVE".equals(result.shift().state()));
+        as("one@example.com");assertThat(update("UPDATE customer_order SET status='Rejected' WHERE order_id=?",raceOrder)).isEqualTo(1);
+        if(!result.deliveries().isEmpty()) dispatch.cancelRejected(manager,raceOrder,1);
     }
 
     @Test @Order(14)

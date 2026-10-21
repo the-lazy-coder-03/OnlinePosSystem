@@ -129,6 +129,7 @@ public class DriverDispatchService {
     @Transactional
     public Shift clockIn(Authentication authentication) {
         long driverId = driverId(authentication);
+        lockDriver(driverId);
         Profile profile = profile(driverId);
         if (!profile.active()) throw new AccessDeniedException("Driver account is inactive.");
         Shift existing = openShift(driverId);
@@ -148,6 +149,9 @@ public class DriverDispatchService {
     @Transactional
     public Shift clockOut(Authentication authentication) {
         long driverId = driverId(authentication);
+        lockDriver(driverId);
+        Shift existing = openShift(driverId);
+        if (existing != null && "CLOCKED_OUT".equals(existing.state())) return existing;
         Shift shift = requiredActiveShift(driverId);
         Integer unfinished = jdbc.queryForObject("""
                 SELECT count(*) FROM delivery_assignment WHERE shift_id = ? AND state IN ('ASSIGNED', 'PICKED_UP')
@@ -163,6 +167,12 @@ public class DriverDispatchService {
     public DriverDashboard claimNext(Authentication authentication) {
         long driverId = driverId(authentication);
         Shift shift = requiredActiveShift(driverId);
+        Integer unfinished = jdbc.queryForObject("""
+                SELECT count(*) FROM delivery_assignment
+                WHERE driver_id = ? AND state IN ('ASSIGNED', 'PICKED_UP')
+                """, Integer.class, driverId);
+        if (unfinished != null && unfinished > 0)
+            throw new IllegalStateException("Finish assigned deliveries before claiming another.");
         Long orderId;
         try {
             orderId = jdbc.queryForObject("SELECT app_security.claim_next_delivery(?)", Long.class, shift.id());
@@ -457,9 +467,18 @@ public class DriverDispatchService {
     }
 
     private Shift requiredActiveShift(long driverId) {
+        lockDriver(driverId);
         Shift shift = openShift(driverId);
         if (shift == null || !"ACTIVE".equals(shift.state())) throw new IllegalStateException("Clock in first.");
         return shift;
+    }
+
+    /** Serializes shift and dispatch mutations even before the driver's first shift exists. */
+    private void lockDriver(long driverId) {
+        // Drivers cannot UPDATE their profile under RLS, so FOR UPDATE would hide that row.
+        // A transaction advisory lock covers the first clock-in without widening any RLS policy.
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended('driver-dispatch:' || CAST(? AS text), 0))",
+                driverId);
     }
 
     private Shift shift(long shiftId) {
