@@ -72,14 +72,14 @@ const PosOrderRenderer = (() => {
         const status = statusOf(order);
         main.appendChild(element('span', status, `status ${status}`));
         const items = element('div', itemLines(order, false).join(', ') || 'No items');
-        items.style.cssText = 'font-size:0.95rem;color:#003366;';
+        items.style.cssText = 'font-size:0.95rem;color:var(--color-text-secondary);';
         const location = element('div', `Address: ${address(order)}`);
-        location.style.cssText = 'font-size:0.9rem;color:#003366;';
+        location.style.cssText = 'font-size:0.9rem;color:var(--color-text-secondary);';
         row.append(main, items, location);
         const accessCode = gateAccess(order);
         if (accessCode) {
             const access = element('div', `Gate access: ${accessCode}`);
-            access.style.cssText = 'font-size:0.9rem;color:#003366;font-weight:700;';
+            access.style.cssText = 'font-size:0.9rem;color:var(--color-text-secondary);font-weight:700;';
             row.appendChild(access);
         }
         row.appendChild(actions(order, onStatusChange));

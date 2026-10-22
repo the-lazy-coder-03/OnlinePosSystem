@@ -20,13 +20,26 @@
     --color-success: #15803D;
     --color-warning: #D97706;
     --color-error: #B91C1C;
-    --color-white-85: rgba(255, 255, 255, .85098);
-    --color-white-70: rgba(255, 255, 255, .70196);
-    --focus-ring: 0 0 0 3px rgba(37, 99, 235, .24);
+    --color-white-85: rgba(var(--color-surface-rgb), .85098);
+    --color-white-70: rgba(var(--color-surface-rgb), .70196);
+    --color-blue-rgb: 37, 99, 235;
+    --color-blue-dark-rgb: 30, 64, 175;
+    --color-red-rgb: 220, 38, 38;
+    --color-text-rgb: 31, 41, 55;
+    --color-surface-rgb: 255, 255, 255;
+    /* The homepage header is frozen independently of the shared palette. */
+    --home-header-background: #1F2937;
+    --home-header-foreground: #FFFFFF;
+    --home-header-title: #DC2626;
+    --home-header-subtitle: rgba(255, 255, 255, .85098);
+    --home-header-profile: #DC2626;
+    --home-header-profile-border: #FCA5A5;
+    --home-header-focus: 0 0 0 3px rgba(37, 99, 235, .24);
+    --focus-ring: 0 0 0 3px rgba(var(--color-blue-rgb), .24);
     --bs-primary: var(--color-red);
-    --bs-primary-rgb: 220, 38, 38;
+    --bs-primary-rgb: var(--color-red-rgb);
     --bs-secondary: var(--color-blue);
-    --bs-secondary-rgb: 37, 99, 235;
+    --bs-secondary-rgb: var(--color-blue-rgb);
     --bs-success: var(--color-success);
     --bs-success-rgb: 21, 128, 61;
     --bs-warning: var(--color-warning);
@@ -34,25 +47,31 @@
     --bs-danger: var(--color-error);
     --bs-danger-rgb: 185, 28, 28;
     --bs-info: var(--color-blue);
-    --bs-info-rgb: 37, 99, 235;
+    --bs-info-rgb: var(--color-blue-rgb);
+    --bs-blue: var(--color-blue);
+    --bs-cyan: var(--color-blue-light);
+    --bs-info-text-emphasis: var(--color-blue-dark);
+    --bs-info-bg-subtle: var(--color-blue-tint);
+    --bs-info-border-subtle: var(--color-blue-soft);
+    --bs-focus-ring-color: rgba(var(--color-blue-rgb), .25);
     --bs-light: var(--color-page);
     --bs-light-rgb: 249, 250, 251;
     --bs-dark: var(--color-text);
-    --bs-dark-rgb: 31, 41, 55;
+    --bs-dark-rgb: var(--color-text-rgb);
     --bs-body-color: var(--color-text);
-    --bs-body-color-rgb: 31, 41, 55;
+    --bs-body-color-rgb: var(--color-text-rgb);
     --bs-body-bg: var(--color-page);
     --bs-body-bg-rgb: 249, 250, 251;
     --bs-emphasis-color: var(--color-text);
-    --bs-emphasis-color-rgb: 31, 41, 55;
+    --bs-emphasis-color-rgb: var(--color-text-rgb);
     --bs-secondary-color: var(--color-text-secondary);
     --bs-secondary-bg: var(--color-border);
     --bs-tertiary-color: var(--color-muted);
     --bs-tertiary-bg: var(--color-page);
     --bs-link-color: var(--color-blue);
-    --bs-link-color-rgb: 37, 99, 235;
+    --bs-link-color-rgb: var(--color-blue-rgb);
     --bs-link-hover-color: var(--color-blue-dark);
-    --bs-link-hover-color-rgb: 30, 64, 175;
+    --bs-link-hover-color-rgb: var(--color-blue-dark-rgb);
     --bs-primary-text-emphasis: var(--color-red-dark);
     --bs-primary-bg-subtle: var(--color-red-tint);
     --bs-primary-border-subtle: var(--color-red-soft);
@@ -183,12 +202,26 @@ header:not(.admin-topbar),
     background: linear-gradient(135deg, var(--color-blue-dark), var(--color-blue-dark));
 }
 
-body:has(#locations) > header,
+body:has(#locations) > header {
+    color: var(--home-header-foreground);
+    background: linear-gradient(180deg, var(--home-header-background), var(--home-header-background));
+}
 .driver-topbar {
     background: linear-gradient(180deg, var(--color-text), var(--color-text));
 }
-body:has(#locations) > header h1 { color: var(--color-red); }
-body:has(#locations) > header p { color: var(--color-white-85); }
+body:has(#locations) > header h1 { color: var(--home-header-title); }
+body:has(#locations) > header p { color: var(--home-header-subtitle); }
+body:has(#locations) > header .view-profile-btn {
+    color: var(--home-header-foreground);
+    background-color: var(--home-header-profile);
+}
+body:has(#locations) > header .view-profile-btn:hover {
+    color: var(--home-header-profile);
+    background-color: var(--home-header-foreground);
+    border-color: var(--home-header-profile-border);
+}
+body:has(#locations) > header a:focus-visible,
+body:has(#locations) > header button:focus-visible { box-shadow: var(--home-header-focus); }
 .driver-brand i { color: var(--color-red-soft); }
 .driver-topbar .driver-logout,
 .driver-topbar .driver-logout:hover { color: var(--color-white-85); background-color: transparent; border-color: transparent; }
@@ -222,13 +255,13 @@ body:has(#locations) > header p { color: var(--color-white-85); }
 }
 
 /* Bootstrap keeps component-local state colours, independent of its root palette. */
-.btn-primary { --action: var(--color-red); --action-dark: var(--color-red-dark); --action-rgb: 220, 38, 38; }
-.btn-secondary, .btn-outline-primary, .btn-outline-secondary { --action: var(--color-blue); --action-dark: var(--color-blue-dark); --action-rgb: 37, 99, 235; }
+.btn-primary { --action: var(--color-red); --action-dark: var(--color-red-dark); --action-rgb: var(--color-red-rgb); }
+.btn-secondary, .btn-outline-primary, .btn-outline-secondary { --action: var(--color-blue); --action-dark: var(--color-blue-dark); --action-rgb: var(--color-blue-rgb); }
 .btn-success, .btn-outline-success { --action: var(--color-success); --action-dark: var(--color-success); --action-rgb: 21, 128, 61; }
 .btn-danger, .btn-outline-danger { --action: var(--color-error); --action-dark: var(--color-red-dark); --action-rgb: 185, 28, 28; }
 .btn-warning { --action: var(--color-warning); --action-dark: var(--color-warning); --action-rgb: 217, 119, 6; }
-.btn-outline-dark { --action: var(--color-text); --action-dark: var(--color-text); --action-rgb: 31, 41, 55; }
-.btn-outline-light { --action: var(--color-surface); --action-dark: var(--color-surface); --action-rgb: 255, 255, 255; }
+.btn-outline-dark { --action: var(--color-text); --action-dark: var(--color-text); --action-rgb: var(--color-text-rgb); }
+.btn-outline-light { --action: var(--color-surface); --action-dark: var(--color-surface); --action-rgb: var(--color-surface-rgb); }
 .btn-primary, .btn-secondary, .btn-success, .btn-danger, .btn-warning {
     --bs-btn-color: var(--color-surface);
     --bs-btn-bg: var(--action);
@@ -273,7 +306,10 @@ body:has(#locations) > header p { color: var(--color-white-85); }
 .text-bg-light { color: var(--color-text) !important; }
 .form-check-input { border-color: var(--color-muted); }
 .form-check-input:checked { background-color: var(--color-red); border-color: var(--color-red); }
-.form-check-input:focus { border-color: var(--color-blue); }
+.form-check-input:focus {
+    border-color: var(--color-blue);
+    box-shadow: 0 0 0 .25rem rgba(var(--color-blue-rgb), .25);
+}
 .table { --bs-table-color: var(--color-text); --bs-table-bg: var(--color-surface); --bs-table-border-color: var(--color-border); --bs-table-striped-bg: var(--color-page); --bs-table-striped-color: var(--color-text); --bs-table-hover-bg: var(--color-blue-tint); --bs-table-hover-color: var(--color-text); }
 .dropdown-menu { --bs-dropdown-bg: var(--color-surface); --bs-dropdown-color: var(--color-text); --bs-dropdown-link-color: var(--color-text); --bs-dropdown-link-hover-color: var(--color-blue-dark); --bs-dropdown-link-hover-bg: var(--color-blue-tint); --bs-dropdown-link-active-color: var(--color-surface); --bs-dropdown-link-active-bg: var(--color-red); --bs-dropdown-link-disabled-color: var(--color-disabled); }
 .modal { --bs-modal-color: var(--color-text); --bs-modal-bg: var(--color-surface); --bs-modal-border-color: var(--color-border); --bs-modal-header-border-color: var(--color-border); --bs-modal-footer-border-color: var(--color-border); }
@@ -285,5 +321,126 @@ body:has(#locations) > header p { color: var(--color-white-85); }
 .confirmation-layout .button-secondary { background-color: var(--color-surface); }
 .button-secondary:hover { color: var(--color-blue-dark); background-color: var(--color-blue-tint); border-color: var(--color-blue-dark); }
 
-/* Legacy order metadata is generated with inline colours; leave its logic untouched. */
-.orderItem > div:not(.orderMain):not(.orderActions) { color: var(--color-text-secondary) !important; }
+/* Bootstrap component defaults also contain literal colours, including embedded SVGs.
+   Override only colours here; keep the framework's geometry and transitions intact. */
+.btn-info, .btn-outline-info {
+    --action: var(--color-blue);
+    --action-dark: var(--color-blue-dark);
+    --bs-btn-color: var(--color-surface);
+    --bs-btn-bg: var(--color-blue);
+    --bs-btn-border-color: var(--color-blue);
+    --bs-btn-hover-color: var(--color-surface);
+    --bs-btn-hover-bg: var(--color-blue-dark);
+    --bs-btn-hover-border-color: var(--color-blue-dark);
+    --bs-btn-active-color: var(--color-surface);
+    --bs-btn-active-bg: var(--color-blue-dark);
+    --bs-btn-active-border-color: var(--color-blue-light);
+    --bs-btn-disabled-color: var(--color-disabled);
+    --bs-btn-disabled-bg: var(--color-page);
+    --bs-btn-disabled-border-color: var(--color-disabled);
+    --bs-btn-focus-shadow-rgb: var(--color-blue-rgb);
+}
+.btn-outline-info {
+    --bs-btn-color: var(--color-blue);
+    --bs-btn-bg: transparent;
+    --bs-btn-hover-bg: var(--color-blue-dark);
+    --bs-btn-disabled-bg: transparent;
+}
+.btn-secondary, .btn-outline-primary, .btn-outline-secondary {
+    --bs-btn-active-border-color: var(--color-blue-light);
+}
+.btn-link { --bs-btn-focus-shadow-rgb: var(--color-blue-rgb); }
+.text-bg-info { color: var(--color-surface) !important; }
+.link-primary, .link-secondary, .link-info {
+    color: rgba(var(--color-blue-rgb), var(--bs-link-opacity, 1)) !important;
+}
+.link-primary:hover, .link-primary:focus,
+.link-secondary:hover, .link-secondary:focus,
+.link-info:hover, .link-info:focus {
+    color: rgba(var(--color-blue-dark-rgb), var(--bs-link-opacity, 1)) !important;
+}
+.nav-link:focus-visible { box-shadow: 0 0 0 .25rem rgba(var(--color-blue-rgb), .25); }
+.nav-pills {
+    --bs-nav-pills-link-active-bg: var(--color-blue-tint);
+    --bs-nav-pills-link-active-color: var(--color-blue-dark);
+}
+.nav-tabs { --bs-nav-tabs-link-active-color: var(--color-blue-dark); }
+.pagination {
+    --bs-pagination-color: var(--color-blue);
+    --bs-pagination-bg: var(--color-surface);
+    --bs-pagination-hover-color: var(--color-blue-dark);
+    --bs-pagination-hover-bg: var(--color-blue-tint);
+    --bs-pagination-focus-color: var(--color-blue-dark);
+    --bs-pagination-focus-bg: var(--color-blue-tint);
+    --bs-pagination-focus-box-shadow: 0 0 0 .25rem rgba(var(--color-blue-rgb), .25);
+    --bs-pagination-active-color: var(--color-surface);
+    --bs-pagination-active-bg: var(--color-blue);
+    --bs-pagination-active-border-color: var(--color-blue-light);
+    --bs-pagination-disabled-color: var(--color-disabled);
+    --bs-pagination-disabled-bg: var(--color-page);
+}
+.progress, .progress-stacked {
+    --bs-progress-bg: var(--color-border);
+    --bs-progress-bar-bg: var(--color-blue);
+    --bs-progress-bar-color: var(--color-surface);
+}
+.list-group {
+    --bs-list-group-color: var(--color-text);
+    --bs-list-group-bg: var(--color-surface);
+    --bs-list-group-border-color: var(--color-border);
+    --bs-list-group-action-hover-color: var(--color-blue-dark);
+    --bs-list-group-action-hover-bg: var(--color-blue-tint);
+    --bs-list-group-action-active-color: var(--color-blue-dark);
+    --bs-list-group-action-active-bg: var(--color-blue-tint);
+    --bs-list-group-active-color: var(--color-blue-dark);
+    --bs-list-group-active-bg: var(--color-blue-tint);
+    --bs-list-group-active-border-color: var(--color-blue-soft);
+    --bs-list-group-disabled-color: var(--color-disabled);
+    --bs-list-group-disabled-bg: var(--color-page);
+}
+.dropdown-menu {
+    --bs-dropdown-link-active-color: var(--color-blue-dark);
+    --bs-dropdown-link-active-bg: var(--color-blue-tint);
+}
+.form-select {
+    --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%234B5563' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+}
+.form-check-input[type="checkbox"]:indeterminate { background-color: var(--color-red); border-color: var(--color-red); }
+.form-switch .form-check-input {
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%239CA3AF'/%3e%3c/svg%3e");
+}
+.form-switch .form-check-input:focus {
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%232563EB'/%3e%3c/svg%3e");
+}
+.form-switch .form-check-input:checked {
+    --bs-form-switch-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23FFFFFF'/%3e%3c/svg%3e");
+}
+.form-range::-webkit-slider-thumb { background-color: var(--color-blue); }
+.form-range::-moz-range-thumb { background-color: var(--color-blue); }
+.form-range::-webkit-slider-thumb:active { background-color: var(--color-blue-light); }
+.form-range::-moz-range-thumb:active { background-color: var(--color-blue-light); }
+.form-range:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 1px var(--color-surface), 0 0 0 .25rem rgba(var(--color-blue-rgb), .25);
+}
+.form-range:focus::-moz-range-thumb {
+    box-shadow: 0 0 0 1px var(--color-surface), 0 0 0 .25rem rgba(var(--color-blue-rgb), .25);
+}
+.form-range:disabled::-webkit-slider-thumb { background-color: var(--color-disabled); }
+.form-range:disabled::-moz-range-thumb { background-color: var(--color-disabled); }
+.accordion {
+    --bs-accordion-color: var(--color-text);
+    --bs-accordion-bg: var(--color-surface);
+    --bs-accordion-active-color: var(--color-blue-dark);
+    --bs-accordion-active-bg: var(--color-blue-tint);
+    --bs-accordion-btn-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%234B5563' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    --bs-accordion-btn-active-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%232563EB' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    --bs-accordion-btn-focus-box-shadow: 0 0 0 .25rem rgba(var(--color-blue-rgb), .25);
+}
+.tooltip { --bs-tooltip-bg: var(--color-text); --bs-tooltip-color: var(--color-surface); }
+.popover {
+    --bs-popover-bg: var(--color-surface);
+    --bs-popover-body-color: var(--color-text);
+    --bs-popover-header-bg: var(--color-page);
+    --bs-popover-header-color: var(--color-text);
+    --bs-popover-border-color: var(--color-border);
+}

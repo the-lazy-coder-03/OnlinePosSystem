@@ -165,6 +165,7 @@ test('customer order, profile and live admin queue work with RLS and CSRF', asyn
     await expect(page).toHaveURL(/\/orders\/\d+\/confirmation$/);
     const orderId = page.url().match(/\/orders\/(\d+)\/confirmation$/)[1];
     await expect(page.getByRole('heading', {name: 'Order Confirmed'})).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('Specials and customisations are included in the saved item pricing.');
     await expect(page.locator('body')).toContainText(`Order #${orderId}`);
     await expect(page.locator('body')).toContainText('Your order has been received by Pete\'s Pizzas Kenridge.');
     await expect(page.locator('body')).toContainText('Delivery');

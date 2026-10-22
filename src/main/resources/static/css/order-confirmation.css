@@ -13,7 +13,7 @@
     --muted: var(--color-muted);
     --line: var(--color-border);
     --success: var(--color-success);
-    --shadow-soft: 0 6px 20px rgba(31, 41, 55, .08);
+    --shadow-soft: 0 6px 20px rgba(var(--color-text-rgb), .08);
     --radius: 14px;
 }
 
@@ -22,13 +22,13 @@
 body { min-height: 100vh; margin: 0; color: var(--ink); background: var(--background); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Arial, sans-serif; }
 a { color: inherit; }
 
-.topbar { position: sticky; top: 0; z-index: 20; color: var(--color-surface); background: linear-gradient(180deg, var(--blue-700), var(--blue-800)); border-bottom: 1px solid rgba(255,255,255,.12); box-shadow: var(--shadow-soft); }
+.topbar { position: sticky; top: 0; z-index: 20; color: var(--color-surface); background: linear-gradient(180deg, var(--blue-700), var(--blue-800)); border-bottom: 1px solid rgba(var(--color-surface-rgb),.12); box-shadow: var(--shadow-soft); }
 .topbar-inner { width: min(1200px, calc(100% - 32px)); min-height: 68px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .brand { color: var(--color-surface); font-size: 1.2rem; font-weight: 900; letter-spacing: .2px; text-decoration: none; }
 .top-actions { display: flex; align-items: center; gap: 8px; }
 .nav-link { padding: 9px 12px; border: 1px solid transparent; border-radius: 12px; color: var(--color-surface); font-size: .9rem; font-weight: 800; text-decoration: none; }
-.nav-link:hover { background: rgba(255,255,255,.12); }
-.nav-link-primary { color: var(--blue-800); background: var(--color-surface); border-color: rgba(255,255,255,.35); }
+.nav-link:hover { background: rgba(var(--color-surface-rgb),.12); }
+.nav-link-primary { color: var(--blue-800); background: var(--color-surface); border-color: rgba(var(--color-surface-rgb),.35); }
 
 .confirmation-hero { color: var(--color-surface); background: linear-gradient(135deg, var(--blue-900), var(--blue-650)); }
 .confirmation-hero-inner { width: min(1200px, calc(100% - 32px)); margin: 0 auto; padding: 36px 0 40px; }
