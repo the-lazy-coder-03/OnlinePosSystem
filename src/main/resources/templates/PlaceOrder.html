@@ -667,6 +667,8 @@
             box-shadow: 0 10px 25px rgba(31, 41, 55,.12);
             border: 1px solid rgba(31, 41, 55,.10);
         }
+        .topping-price-group + .topping-price-group{ margin-top: 8px; }
+        .topping-price-group label{ white-space: normal; overflow-wrap: anywhere; }
         .sticky-left{
             font-weight: 950;
             padding-left: 10px;
@@ -689,25 +691,14 @@
             white-space: nowrap;
         }
         .sticky-action{
-            border:none;
-            background: transparent;
             font: inherit;
-            color: inherit;
             cursor:pointer;
             font-weight: 950;
-            padding: 10px 14px;
-            width: 150px;
-            min-width: 150px;
-            height: 44px;
-            flex: 0 0 150px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            justify-self: center;
-            border-radius: 999px;
+            min-width: 0;
+            min-height: 64px;
             transition: background .12s ease, transform .12s ease;
         }
-        .sticky-action:hover{ background: rgba(255,255,255,.35); }
+        .sticky-action:hover{ background: var(--color-blue-tint); }
         .sticky-action:active{ transform: translateY(1px); }
 
         /* ===== Summary ===== */
@@ -1005,9 +996,9 @@
             .topbar-inner{ flex-wrap: wrap; }
             .brand{ width: 100%; justify-content: space-between; }
             .brand .sub{ max-width: 100%; }
-            .top-actions{ width: 100%; justify-content: stretch; gap: 6px; }
-            .top-actions .pill{ min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
-            .top-actions .btn{ min-width: 0; flex: 0 1 auto; }
+            .top-actions{ width: 100%; justify-content: stretch; gap: 6px; flex-wrap: wrap; }
+            .top-actions .pill{ min-width: 0; flex: 1 1 100%; justify-content: center; }
+            .top-actions .btn{ min-width: 0; flex: 1 1 0; }
             .row-top{ align-items: flex-start; }
             .row-title{
                 white-space: normal;
@@ -1015,7 +1006,9 @@
                 text-overflow: clip;
                 overflow-wrap: anywhere;
             }
-            .sticky-center{ display:none; }
+            .stickybar-inner{ gap: 6px; grid-template-columns: auto minmax(0, 1fr) auto; }
+            .sticky-left, .sticky-right{ padding: 0; font-size: .82rem; }
+            .sticky-center{ font-size: .9rem; }
             #specialSlots .special-choice{
                 display: grid;
                 grid-template-columns: minmax(0, 1fr) auto;
@@ -1051,10 +1044,7 @@
 
         <div class="top-actions">
             <div class="pill" title="Current branch">
-                <span class="dot"></span>
                 <span id="branchPill">Branch: —</span>
-                <span class="ordering-only">•</span>
-                <span id="cartPill" class="ordering-only"><strong>0</strong> item(s)</span>
             </div>
             <button class="btn btn-ghost" id="btnHomeTop" type="button" title="Back to home">
                 Home
@@ -1115,7 +1105,7 @@
         </div>
 
         <div style="display:flex;justify-content:space-between;gap:10px;margin-top:8px;">
-            <div style="font-weight:850;color:var(--muted);">Item total</div>
+            <div style="font-weight:850;color:var(--muted);">Total</div>
             <div style="font-weight:950;color:var(--blue-650);" id="menuItemTotal">R0.00</div>
         </div>
 
@@ -1256,29 +1246,19 @@
 
                 <!-- Quote status -->
                 <div class="card" id="cardQuote">
-                    <h3>Live Price</h3>
-                    <div class="sub" hidden></div>
-                    <div id="quoteLines" style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;">
-                        <div style="font-weight:850;color:var(--muted);">Base</div><div style="font-weight:950;" id="qBase">R0.00</div>
-                        <div style="font-weight:850;color:var(--muted);">Base option</div><div style="font-weight:950;" id="qBaseOption">R0.00</div>
-                        <div style="font-weight:850;color:var(--muted);">Toppings</div><div style="font-weight:950;" id="qToppings">R0.00</div>
-                        <div style="font-weight:850;color:var(--muted);">Subtotal (1 item)</div><div style="font-weight:950;" id="qSubtotal">R0.00</div>
-                        <div style="font-weight:950;color:var(--blue-800);border-top:1px solid var(--line);padding-top:10px;">Total (qty)</div>
-                        <div style="font-weight:950;color:var(--blue-650);border-top:1px solid var(--line);padding-top:10px;" id="qTotal">R0.00</div>
-                    </div>
-                    <div id="quoteError" style="margin-top:10px;color:var(--danger);font-weight:800;display:none;"></div>
+                    <h3>Total</h3>
+                    <div style="font-weight:950;color:var(--blue-650);" id="qTotal">R0.00</div>
                 </div>
+                <div id="quoteError" role="alert" style="margin-top:10px;color:var(--danger);font-weight:800;display:none;"></div>
             </div>
 
             <!-- Sticky bottom bar: Add to Cart w/ live total -->
             <div class="stickybar ordering-only" aria-label="Add to cart sticky bar">
-                <div class="stickybar-inner">
-                    <div class="sticky-left" id="stickyQty">1 item</div>
-                    <button class="sticky-action ordering-only" id="btnAddToCart" type="button" aria-label="Add to cart">
-                        Add to cart
-                    </button>
-                    <div class="sticky-right" id="stickyTotal">R0.00</div>
-                </div>
+                <button class="stickybar-inner sticky-action" id="btnAddToCart" type="button">
+                    <span class="sticky-left" id="stickyQty">1 item</span>
+                    <span class="sticky-center" id="addToCartLabel">Add to cart</span>
+                    <span class="sticky-right">Total <span id="stickyTotal">R0.00</span></span>
+                </button>
             </div>
         </section>
 
@@ -1588,18 +1568,14 @@
     const render = {
         updateTopBar(){
             const baseLabel = state.branch.id ? `${state.branch.name}` : (MENU_ONLY ? "Menu" : "Place Order");
-            const label = MENU_ONLY && state.branch.id
-                ? `${baseLabel} Menu`
-                : baseLabel;
-            const b = state.branch.id ? `${state.branch.name} (ID: ${state.branch.id})` : "Branch: —";
-            $("branchLabel").textContent = label;
+            const b = state.branch.id ? state.branch.name : "Branch: —";
+            $("branchLabel").textContent = baseLabel;
             $("branchPill").textContent = b;
             render.updateCartBadges();
         },
 
         updateCartBadges(){
             const count = state.cart.items.reduce((a, it) => a + (Number(it.quantity) || 1), 0);
-            $("cartPill").innerHTML = `<strong>${count}</strong> item(s)`;
             $("customizeCartPill").textContent = `${count} item(s)`;
 
             const total = cartTotal();
@@ -1786,17 +1762,18 @@
             setCustomizeCardHeader("cardSizes", "Size", "");
             setCustomizeCardHeader("cardDefaults", "Default Toppings", "");
             setCustomizeCardHeader("cardExtras", "Extra Toppings", "");
-            setCustomizeCardHeader("cardQuote", "Live Price", "");
+            setCustomizeCardHeader("cardQuote", "Total", "");
             $("cardSizes").style.display = "";
             $("cardBaseOptions").style.display = "";
             $("cardDefaults").style.display = "";
             $("cardExtras").style.display = "";
-            $("cardQuote").style.display = "";
+            $("cardQuote").style.display = MENU_ONLY ? "" : "none";
             $("cardQuantity").style.display = state.special.pending ? "none" : "";
-            $("btnAddToCart").textContent = "Add to cart";
+            $("addToCartLabel").textContent = "Add to cart";
 
             const d = state.customize.detail;
             if (!d){
+                renderCustomizationTotal(0);
                 $("customizePizzaName").textContent = "Loading…";
                 $("customizePizzaMeta").textContent = "";
                 $("sizeOptions").innerHTML = "";
@@ -1881,21 +1858,19 @@
                 }
             }
 
-            // Extra toppings grouped by category
+            // Presentation groups use the selected size's actual extra prices.
             $("extraToppingsGroups").innerHTML = "";
-            const groups = normalizeExtraToppingGroups(d, state.customize.defaultToppingIds);
+            const groups = pizzaExtraPriceGroups(d, state.customize.defaultToppingIds);
             if (!groups.length){
                 $("extraToppingsGroups").innerHTML = `<div class="empty">No extra toppings available.</div>`;
             } else {
                 for (const g of groups){
-                    const title = document.createElement("div");
-                    title.className = "group-title";
-                    title.textContent = g.groupName;
-                    $("extraToppingsGroups").appendChild(title);
+                    const group = document.createElement("div");
+                    group.className = "topping-price-group";
 
                     for (const t of g.toppings){
                         const id = `ext_${g.groupKey}_${t.toppingId}`;
-                        const price = getExtraPrice(d, t.toppingId);
+                        const price = getExtraPriceForSort(d, t.toppingId);
                         const wrap = document.createElement("div");
                         wrap.className = "opt";
                         wrap.innerHTML = `
@@ -1908,8 +1883,9 @@
                         wrap.querySelector("input").addEventListener("change", (e) => {
                             actions.toggleTopping(t.toppingId, e.target.checked);
                         });
-                        $("extraToppingsGroups").appendChild(wrap);
+                        group.appendChild(wrap);
                     }
+                    $("extraToppingsGroups").appendChild(group);
                 }
             }
 
@@ -1924,12 +1900,12 @@
         burgerCustomize(){
             const item = state.menuCustomize.menuItem;
             $("cardQuantity").style.display = state.special.pending ? "none" : "";
-            $("btnAddToCart").textContent = "Add to cart";
+            $("addToCartLabel").textContent = "Add to cart";
             $("cardSizes").style.display = "";
             $("cardBaseOptions").style.display = "none";
             $("cardDefaults").style.display = "";
             $("cardExtras").style.display = "";
-            $("cardQuote").style.display = "";
+            $("cardQuote").style.display = MENU_ONLY ? "" : "none";
 
             if (!item){
                 $("customizePizzaName").textContent = "Burger";
@@ -1939,12 +1915,7 @@
                 $("extraToppingsGroups").innerHTML = "";
                 $("qtyValue").textContent = "1";
                 $("stickyQty").textContent = "1 item";
-                $("qBase").textContent = money(0);
-                $("qBaseOption").textContent = money(0);
-                $("qToppings").textContent = money(0);
-                $("qSubtotal").textContent = money(0);
-                $("qTotal").textContent = money(0);
-                $("stickyTotal").textContent = money(0);
+                renderCustomizationTotal(0);
                 return;
             }
 
@@ -2113,27 +2084,22 @@
             $("qtyValue").textContent = String(state.menuCustomize.qty);
             $("stickyQty").textContent = `${state.menuCustomize.qty} item${state.menuCustomize.qty === 1 ? "" : "s"}`;
 
-            setCustomizeCardHeader("cardQuote", "Live Price", "");
+            setCustomizeCardHeader("cardQuote", "Total", "");
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
             $("quoteError").style.display = "none";
-            $("qBase").textContent = money(pricing.base);
-            $("qBaseOption").textContent = money(0);
-            $("qToppings").textContent = money(pricing.modifiers);
-            $("qSubtotal").textContent = money(pricing.subtotal);
-            $("qTotal").textContent = money(pricing.lineTotal);
-            $("stickyTotal").textContent = money(pricing.lineTotal);
+            renderCustomizationTotal(pricing.lineTotal);
         },
 
         genericMenuCustomize(){
             const item = state.menuCustomize.menuItem;
             $("cardQuantity").style.display = state.special.pending ? "none" : "";
-            $("btnAddToCart").textContent = "Add to cart";
+            $("addToCartLabel").textContent = "Add to cart";
             const pastaVariants = getPastaVariantFamily(item);
             $("cardSizes").style.display = pastaVariants.length ? "" : "none";
             $("cardBaseOptions").style.display = "none";
             $("cardDefaults").style.display = "none";
             $("cardExtras").style.display = "";
-            $("cardQuote").style.display = "";
+            $("cardQuote").style.display = MENU_ONLY ? "" : "none";
 
             if (!item){
                 $("customizePizzaName").textContent = "Menu Item";
@@ -2143,12 +2109,7 @@
                 $("extraToppingsGroups").innerHTML = "";
                 $("qtyValue").textContent = "1";
                 $("stickyQty").textContent = "1 item";
-                $("qBase").textContent = money(0);
-                $("qBaseOption").textContent = money(0);
-                $("qToppings").textContent = money(0);
-                $("qSubtotal").textContent = money(0);
-                $("qTotal").textContent = money(0);
-                $("stickyTotal").textContent = money(0);
+                renderCustomizationTotal(0);
                 return;
             }
 
@@ -2223,15 +2184,10 @@
             $("qtyValue").textContent = String(state.menuCustomize.qty);
             $("stickyQty").textContent = `${state.menuCustomize.qty} item${state.menuCustomize.qty === 1 ? "" : "s"}`;
 
-            setCustomizeCardHeader("cardQuote", "Live Price", "");
+            setCustomizeCardHeader("cardQuote", "Total", "");
             const pricing = calcMenuItemPricing(item, state.menuCustomize.selectedByGroup, state.menuCustomize.qty);
             $("quoteError").style.display = "none";
-            $("qBase").textContent = money(pricing.base);
-            $("qBaseOption").textContent = money(0);
-            $("qToppings").textContent = money(pricing.modifiers);
-            $("qSubtotal").textContent = money(pricing.subtotal);
-            $("qTotal").textContent = money(pricing.lineTotal);
-            $("stickyTotal").textContent = money(pricing.lineTotal);
+            renderCustomizationTotal(pricing.lineTotal);
         },
 
         quote(){
@@ -2239,12 +2195,7 @@
             const errEl = $("quoteError");
 
             if (!q){
-                $("qBase").textContent = money(0);
-                $("qBaseOption").textContent = money(0);
-                $("qToppings").textContent = money(0);
-                $("qSubtotal").textContent = money(0);
-                $("qTotal").textContent = money(0);
-                $("stickyTotal").textContent = money(0);
+                renderCustomizationTotal(0);
                 errEl.style.display = "none";
                 return;
             }
@@ -2256,14 +2207,8 @@
             const toppings = Number(q.toppingsTotal || 0);
             const subtotal = Number(q.total || (base + baseOption + toppings) || 0);
 
-            $("qBase").textContent = money(base);
-            $("qBaseOption").textContent = money(baseOption);
-            $("qToppings").textContent = money(toppings);
-            $("qSubtotal").textContent = money(subtotal);
-
             const total = subtotal * (Number(state.customize.qty) || 1);
-            $("qTotal").textContent = money(total);
-            $("stickyTotal").textContent = money(total);
+            renderCustomizationTotal(total);
         },
 
         menuCustomize(){
@@ -3229,6 +3174,11 @@
         }
     }
 
+    function renderCustomizationTotal(total){
+        $("qTotal").textContent = money(total);
+        $("stickyTotal").textContent = money(total);
+    }
+
     function resetMenuCustomizeSelections(item){
         state.menuCustomize.selectedByGroup = new Map();
         state.menuCustomize.selectedBurgerToppingIds = new Set();
@@ -3853,6 +3803,25 @@
         });
     }
 
+    function pizzaExtraPriceGroups(detail, defaultIdsSet){
+        const toppings = new Map();
+        for (const group of normalizeExtraToppingGroups(detail, defaultIdsSet)){
+            for (const topping of group.toppings) toppings.set(topping.toppingId, topping);
+        }
+        const priceInCents = topping => {
+            const price = getExtraPriceForSort(detail, topping.toppingId);
+            return price === null ? null : Math.round(price * 100);
+        };
+        const groups = new Map();
+        for (const topping of sortOptionalToppingsByPrice([...toppings.values()], priceInCents)){
+            const cents = priceInCents(topping);
+            const key = cents === null ? "unknown" : String(cents);
+            if (!groups.has(key)) groups.set(key, {groupKey: `price_${key}`, toppings: []});
+            groups.get(key).toppings.push(topping);
+        }
+        return [...groups.values()];
+    }
+
     function normalizeExtraToppingGroups(detail, defaultIdsSet){
         const out = [];
 
@@ -4116,6 +4085,7 @@
     async function quoteActiveSpecial(){
         state.special.quote = null;
         $("specialAdd").disabled = true;
+        $("specialQuoteStatus").hidden = false;
         if (!specialIsComplete()) {
             $("specialQuoteStatus").textContent = "Complete every required selection for a live quote.";
             $("specialTotal").textContent = money(0);
@@ -4125,7 +4095,8 @@
         try {
             const quote = await api.quoteSpecial(state.branch.id, state.special.active.id, specialPayload());
             state.special.quote = quote;
-            $("specialQuoteStatus").textContent = `Bundle ${money(quote.basePrice)} · Customizations ${money(quote.customizationTotal)} · Add-ons ${money(quote.addonTotal)}`;
+            $("specialQuoteStatus").textContent = "";
+            $("specialQuoteStatus").hidden = true;
             $("specialTotal").textContent = money(quote.lineTotal);
             $("specialAdd").disabled = MENU_ONLY;
         } catch (error) {
@@ -4481,18 +4452,12 @@
                     tops ? escapeHtml(tops) : "No toppings selected."
                   ].filter(Boolean).join(" • ")
                 : (mods ? ("Modifiers: " + escapeHtml(mods)) : "No modifiers selected.");
-            const pricingLine = isSpecial
-                ? `Authoritative bundle total: ${money(it.pricing?.lineTotal || 0)}`
-                : isPizza
-                ? `Subtotal (1): ${money(it.pricing?.subtotal || 0)} • Base: ${money(it.pricing?.base || 0)}${Number(it.pricing?.baseOption || 0) > 0 ? ` • Base option: ${money(it.pricing.baseOption)}` : ""} • Toppings: ${money(it.pricing?.toppings || 0)}`
-                : `Subtotal (1): ${money(it.pricing?.subtotal || 0)} • Base: ${money(it.pricing?.base || 0)} • Modifiers: ${money(it.pricing?.modifiers || 0)}`;
             div.innerHTML = `
                 <div class="sum-item-main">
                   <span class="sum-quantity">${it.quantity}×</span>
                   <div class="sum-info">
                     <strong>${escapeHtml(it.name)}${meta}</strong>
                     <small>${detailLine}</small>
-                    <small class="sum-pricing">${pricingLine}</small>
                   </div>
                   <strong class="sum-price">${money(it.pricing?.lineTotal || 0)}</strong>
                 </div>

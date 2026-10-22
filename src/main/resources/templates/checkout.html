@@ -47,7 +47,6 @@
         <a id="backToOrderTop" class="back-link" th:href="@{/order}">← Back to order</a>
         <p class="eyebrow">Final step</p>
         <h1>Checkout</h1>
-        <p>Check your details and order before placing it.</p>
     </div>
 </section>
 
@@ -58,20 +57,18 @@
                 <span class="step-number">1</span>
                 <div>
                     <h2>Order type</h2>
-                    <p>Your selected branch is <strong id="branchName">—</strong>.</p>
                 </div>
             </div>
             <div class="option-grid" role="group" aria-label="Order type">
-                <button type="button" class="select-option" id="deliveryButton" aria-pressed="false" aria-describedby="orderTypeHint">
+                <button type="button" class="select-option" id="deliveryButton" aria-pressed="false">
                     <span class="option-mark" aria-hidden="true">D</span>
-                    <span><strong>Delivery</strong><small>Deliver to my saved address</small></span>
+                    <span><strong>Delivery</strong></span>
                 </button>
-                <button type="button" class="select-option" id="pickupButton" aria-pressed="false" aria-describedby="orderTypeHint">
+                <button type="button" class="select-option" id="pickupButton" aria-pressed="false">
                     <span class="option-mark" aria-hidden="true">C</span>
-                    <span><strong>Collection</strong><small>Collect from the selected branch</small></span>
+                    <span><strong>Collection</strong></span>
                 </button>
             </div>
-            <p id="orderTypeHint" class="selection-hint">Choose collection or delivery before placing your order.</p>
         </article>
 
         <article class="checkout-card">
@@ -79,7 +76,6 @@
                 <span class="step-number">2</span>
                 <div>
                     <h2>Customer details</h2>
-                    <p>Loaded from your Pete’s Pizza account. You can adjust them for this order.</p>
                 </div>
             </div>
             <form id="checkoutForm" novalidate>
@@ -97,7 +93,6 @@
                 <div class="form-group">
                     <label for="email">Account email</label>
                     <input id="email" name="email" type="email" autocomplete="email" readonly>
-                    <small class="field-hint">Orders are linked to this signed-in account.</small>
                 </div>
                 <div id="deliveryFields" hidden>
                     <div id="checkoutAddressAutocomplete"
@@ -162,9 +157,7 @@
                         <div class="form-group">
                             <label for="gateAccessCode">Gate access code <span>(optional)</span></label>
                             <input id="gateAccessCode" name="gateAccessCode" type="text" maxlength="64"
-                                   pattern="[A-Za-z0-9 #*]*" autocomplete="off" spellcheck="false"
-                                   aria-describedby="gateAccessHint">
-                            <small id="gateAccessHint" class="field-hint">For estates or complexes with controlled access. Letters, numbers, spaces, # and * only.</small>
+                                   pattern="[A-Za-z0-9 #*]*" autocomplete="off" spellcheck="false">
                         </div>
                     </fieldset>
                 </div>
@@ -176,7 +169,6 @@
                 <span class="step-number">3</span>
                 <div>
                     <h2>Payment</h2>
-                    <p>Payment is completed when you collect your order or when it is delivered.</p>
                 </div>
             </div>
             <div class="payment-option" aria-label="Pay on fulfilment">
@@ -206,7 +198,6 @@
         </div>
         <div id="checkoutNotice" class="checkout-notice" role="status" aria-live="polite" hidden></div>
         <button class="button button-primary place-order" id="placeOrderButton" type="button" disabled>Place order</button>
-        <p class="terms">The final total is validated by Pete’s Pizza when your order is placed.</p>
     </aside>
 </main>
 

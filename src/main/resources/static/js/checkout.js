@@ -271,7 +271,7 @@
     async function placeOrder() {
         if (submitting || !draft?.items?.length) return;
         if (!document.getElementById("orderType").value) {
-            showNotice("Choose collection or delivery before placing your order.", "error");
+            showNotice("Select an order type.", "error");
             updatePlaceOrderAvailability();
             return;
         }
@@ -321,7 +321,6 @@
     }
 
     populateCustomer();
-    document.getElementById("branchName").textContent = draft?.branch?.name || "your selected branch";
     setOrderType(draft?.orderType === "delivery" || draft?.orderType === "pickup" ? draft.orderType : null);
     renderItems();
     deliveryButton.addEventListener("click", () => setOrderType("delivery"));
